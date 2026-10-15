@@ -1,35 +1,35 @@
 ---
-description: "The local filesystem spill backend: how spilled text is saved to private session-scoped files and retrieved with read or grep."
+description: "本地文件系统 spill 后端：spill 文本如何保存到私有会话级文件，并用 read 或 grep 取回。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-spill-local
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-spill-local` saves a caller's oversized text to a private, session-scoped file on the host filesystem and returns that file's path as the locator, with retrieval guidance telling the model to read or grep it. Mount it whenever a composition needs spill storage on the same machine the agent runs on. Files are private to the current user, names are unpredictable, and each session's files group under a stable directory, so a shared root cannot leak output or be redirected by a planted symlink. Configuration selects the root and the startup-cleanup retention period; previews and spill decisions live in other packages.
+`dsh-spill-local` 把调用方的超大文本保存到宿主文件系统中私有的会话级文件，并以该文件路径作为定位信息返回，同时给出告诉模型读取或搜索它的取回指引。只要组合需要在 agent（智能体）运行所在的同一台机器上进行 spill 存储，就挂载它。文件对当前用户私有、名称不可预测，且每个会话的文件归入稳定的目录，因此共享根目录既不会泄露输出，也不会被预置的符号链接重定向。配置选择根目录与启动清理保留期；预览与 spill 决策由其他包负责。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this backend in a composition that spills text to the local filesystem. It registers as the `ctx.spillStore` service that the `dsh-spill-policy` plugin and other callers use.
+在需要把文本 spill 到本地文件系统的组合中挂载此后端。它注册为 `dsh-spill-policy` 插件与其他调用方使用的 `ctx.spillStore` 服务。
 
-### Minimal configuration
+### 最小配置
 
-Loading the plugin with no config is safe: files land in a lazily-created private (0700) per-process directory under the OS temp directory. Set `root` when the files must live under a known location.
+不带配置加载插件是安全的：文件会落在操作系统临时目录下延迟创建的私有（0700）每进程目录中。当文件必须位于已知位置时，设置 `root`。
 
 ```yaml
 - name: '@deepseek-ai/dsh-spill-local'
@@ -38,104 +38,104 @@ Loading the plugin with no config is safe: files land in a lazily-created privat
     cleanupPeriodDays: 30
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `root` | private 0700 temp dir | Root directory for spill files; set to keep them under a known location |
-| `cleanupPeriodDays` | `30` | File age in days before the one-shot startup cleanup may delete it; `0` disables cleanup |
+| `root` | 私有 0700 临时目录 | spill 文件的根目录；设置后可将文件保存在已知位置 |
+| `cleanupPeriodDays` | `30` | 文件在一次性启动清理中可被删除前需经过的天数；`0` 禁用清理 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-spill-local) is the exhaustive source for every accepted field.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-spill-local)是每个受支持字段的穷尽式真源。
 
-### What you get back
+### 你会得到什么
 
-Each `saveText` call writes the full text to a fresh file and returns three fields: `locator` (the file path), `bytes` (the exact UTF-8 byte count), and `retrievalHint` — "Use read with offset/limit, or grep this path to search within it." A consumer shows that hint to the model, which can then read or search the file with its ordinary file tools.
+每次 `saveText` 调用都会把完整文本写入一个新文件，并返回三个字段：`locator`（文件路径）、`bytes`（精确的 UTF-8 字节数）与 `retrievalHint`——"Use read with offset/limit, or grep this path to search within it."。消费方把该提示展示给模型，模型随后可以用其常规文件工具读取或搜索该文件。
 
-### Where files land
+### 文件存放位置
 
-Files are stored at `<root>/session-<hash>/<random>-<safeName>`, where `session-<hash>` is a short hash of the owning session id (so one session's files group together) and `<random>-<safeName>` pairs an unpredictable hex prefix with the caller's suggested name sanitized to one safe path segment. A relative `root` resolves from the process working directory.
+文件存放在 `<root>/session-<hash>/<random>-<safeName>`：`session-<hash>` 是所属会话 id 的短哈希（让同一会话的文件归在一起），`<random>-<safeName>` 把不可预测的十六进制前缀与清理为单个安全路径段的调用方建议名配对。相对 `root` 从进程工作目录解析。
 
 <a id="startup-cleanup"></a>
-### Startup cleanup
+### 启动清理
 
-One best-effort sweep starts after activation without delaying service availability. It scans the configured root and prior default `dsh-spill-*` roots under the OS temp directory, deletes regular files whose modification time is strictly older than the configured cutoff, prunes empty session directories, and removes only empty prior-default roots. A long-lived process does not sweep again until restart. Disposal waits for the sweep, and a concurrent write recreates a session directory if cleanup removes it.
+一次尽力而为的扫描会在激活后启动，不延迟服务可用性。它扫描配置的根目录和操作系统临时目录下先前的默认 `dsh-spill-*` 根目录，删除修改时间严格早于配置截止时间的常规文件，修剪空会话目录，并只删除已经变空的先前默认根目录。长期运行的进程要到重启时才会再次扫描。dispose（资源释放）会等待扫描结束；如果清理移除了会话目录，并发写入会重新创建它。
 
-The sweep resolves filesystem identities, never follows or deletes symlinks, and skips unrelated entries. On POSIX it admits only roots and session directories owned by the current user, not writable by group or others, and protected from replacement through their ancestor path; writable sticky temporary directories such as `/tmp` are permitted. Unsafe paths produce a warning and remain untouched. Filesystem and warning-sink failures are contained, so cleanup cannot fail activation or a concurrent spill write.
+扫描会解析文件系统身份，绝不跟随或删除符号链接，并跳过无关条目。在 POSIX 上，它只接受当前用户拥有、组用户和其他用户不可写、且祖先路径能防止替换的根目录与会话目录；`/tmp` 等带 sticky 位的可写临时目录仍然允许使用。不安全路径会产生警告并保持不变。文件系统和警告接收方故障都会被兜底，因此清理无法使激活或并发 spill 写入失败。
 
-### Failures and recovery
+### 故障与恢复
 
-A real storage failure — permissions, no space left, an unwritable root — rejects the `saveText` call; the caller decides how to degrade. The shipped policy treats the rejection as best-effort and keeps the original inline result.
+真实存储故障——权限不足、磁盘已满、根目录不可写——会让 `saveText` 调用以拒绝结束；由调用方决定如何降级。随附策略把拒绝当作尽力而为处理并保留原始内联结果。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the backend; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释此后端背后的设计决策；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-The backend owns storage details only, on one principle: **a spilled artifact must be private and unredirectable**. The root is private (0700), the session directory is a stable hash, the leaf name is unpredictable, and the write is exclusive and owner-only. The storage mechanics live in a Cordis-free module so they are unit-testable without a context.
+后端只负责存储细节，建立在一个原则之上：**spill 产物必须私有且不可重定向**。根目录私有（0700）、会话目录是稳定哈希、文件名不可预测、写入采用排他且仅所有者模式。存储机制放在与 Cordis 无关的模块中，以便无需上下文即可单元测试。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, the `LocalSpillStore` service, cleanup lifecycle, locator and retrieval-hint assembly |
-| [`src/cleanup.ts`](src/cleanup.ts) | One-shot age sweep, filesystem-identity checks, symlink and ownership safeguards |
-| [`src/store.ts`](src/store.ts) | Cordis-free storage mechanics: private root, session directory, safe-name encoding, exclusive write |
+| [`src/index.ts`](src/index.ts) | 插件入口：`Config`、`LocalSpillStore` 服务、清理生命周期、定位信息与取回提示的组装 |
+| [`src/cleanup.ts`](src/cleanup.ts) | 一次性按年龄扫描、文件系统身份检查、符号链接和所有权保护 |
+| [`src/store.ts`](src/store.ts) | 与 Cordis 无关的存储机制：私有根目录、会话目录、安全名称编码、排他写入 |
 
-### File naming and write
+### 文件命名与写入
 
-`suggestedName` is untrusted input, so `encodeSegment` escapes every character outside `[A-Za-z0-9._-]` (and `~` itself) into a `~XXXX` form, making the mapping injective over all JS strings: separators, `../`, NUL, and absolute paths can never escape one segment, and the whole-segment tokens `.`/`..` are escaped too. The write is `open(path, 'wx', 0o600)` — it fails on any existing path, symlink or not, so a pre-planted target cannot redirect it. Two saves of the same suggested name get distinct random prefixes.
+`suggestedName` 是不可信输入，因此 `encodeSegment` 会把 `[A-Za-z0-9._-]` 之外的每个字符以及 `~` 本身转义成 `~XXXX` 形式，使映射对所有 JS 字符串都是单射：分隔符、`../`、NUL 与绝对路径永远无法逃出单个路径段，整段 token `.`/`..` 也会被转义。写入采用 `open(path, 'wx', 0o600)`——任何已存在路径（无论是否符号链接）都会失败，因此预置目标无法重定向写入。对同一建议名的两次保存会得到不同的随机前缀。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough.
+当包级约定不够用时阅读以下页面。
 
-- [Spill storage service](../spill/README.md) — the `saveText` contract and vocabulary this backend implements.
-- [Spill package map](../README.md) — the three-package family and each role.
-- [dsh-spill-policy](../spill-policy/README.md) — the policy that calls this backend when a result is too large.
-- [Spill subsystem](../../../docs/subsystems/spill.md) — the exhaustive vocabulary and ownership.
-- [Tool output spill decision](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — the capability boundary and design rationale.
+- [spill 存储服务](../spill/README.zh.md)——此后端实现的 `saveText` 约定与词汇。
+- [spill 包映射](../README.zh.md)——三包家族与各自职责。
+- [dsh-spill-policy](../spill-policy/README.zh.md)——结果过大时调用此后端的策略。
+- [spill 子系统](../../../docs/subsystems/spill.zh.md)——穷尽式词汇与归属。
+- [工具输出 spill 决策](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)——能力边界与设计依据。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through spill consumers, which render the saved file path and read/grep retrieval guidance to the model.
+间接地，通过把已保存文件路径与 read/grep 取回指引渲染给模型的 spill 消费方。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+无直接失效；请求前缀变更由上述消费方负责。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the local backend is a poor fit or needs operational care. They are current package constraints.
+这些限制说明本地后端何时不合适或需要特别的运维注意。它们是当前的包约束。
 
-- **A long-lived deployment is not swept until restart** — the one-shot sweep runs only after activation, so files that cross the age cutoff during a run are reclaimed on the next start.
-- **Locators require a co-located filesystem consumer** — a remote or virtual deployment needs another `SpillStore` backend whose locator and retrieval hint are meaningful there.
+- **长期运行的部署要等到重启才会被扫描**——一次性扫描只在激活后运行，因此运行期间超过年龄截止值的文件会在下次启动时回收。
+- **定位信息需要与其位于同一文件系统的消费方**——远程或虚拟部署需要另一个 `SpillStore` 后端，其定位信息与取回提示在该环境中有明确含义。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open directions. It is explicitly non-authoritative.
+本开发备注是维护者的工作上下文：开放方向。它明确不具权威性。
 
-#### Future: workspace-confinement interplay
+#### 未来：工作区隔离的交互
 
-The retrieval model assumes the model's `read`/`grep` tools can inspect the returned path even when the spill directory is outside the session working directory. A future workspace-confinement policy must either allow local spill paths explicitly or use a non-file spill backend.
+取回模型假定模型的 `read`/`grep` 工具可以检查返回的路径，即使 spill 目录在会话工作目录之外。未来的工作区隔离策略必须显式允许本地 spill 路径，或者改用非文件 spill 后端。
 
 </details>

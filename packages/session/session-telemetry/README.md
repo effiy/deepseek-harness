@@ -1,129 +1,129 @@
 ---
-description: "Session-telemetry capture seam for deployments and backend authors choosing a reporting backend, mounting redaction rules, or implementing the backend contract."
+description: "面向部署方与后端作者的会话遥测捕获 seam 说明，用于选择上报后端、挂载脱敏规则或实现后端约定。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-telemetry
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Session telemetry lets deployments send ordered copies of session activity for reporting while preserving the canonical session log. Deployments choose one reporting backend and can redact each outbound copy before delivery; without redaction rules, captured data leaves the process unchanged. The handoff is non-blocking, so reporting does not delay session processing. Delivery is best effort, and queued records may be lost if the process crashes.
+会话遥测让部署方发送会话活动的有序副本用于上报，同时保留权威会话日志。部署方选择一个上报后端，并可在投递前脱敏每个外发副本；如果没有脱敏规则，捕获的数据将原样离开进程。交接以非阻塞方式完成，因此上报不会延迟会话处理。投递采用尽力而为方式；如果进程崩溃，队列中的记录可能丢失。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-As a deployment, choose a backend, mount it, and add redaction rules when records must not leave the process as captured. As a backend author, implement the three-member contract and compose the coordinator with a capture mode.
+作为部署方，选择一个后端并挂载它，当记录不能以捕获原样离开进程时添加脱敏规则。作为后端作者，实现三成员约定，并以一种捕获模式组装协调器。
 
-### Choosing and mounting a backend
+### 选择并挂载后端
 
-Load exactly one backend plugin; it registers `ctx.sessionTelemetry` with the capture coordinator and its delivery pipeline. A duplicate load throws. The required [`sharing` member](#the-sharing-disclosure) reports the deployment mode, not per-session admission or delivery. A consumer may report "not configured" only when no telemetry service is mounted. The `/feedback` command confirms recording without reading this policy.
+只加载一个后端插件；它把捕获协调器与投递流水线注册为 `ctx.sessionTelemetry`。重复加载会抛出异常。必需的 [`sharing` 成员](#the-sharing-disclosure) 报告部署模式，不代表会话准入或投递。只有在未挂载任何遥测服务时，消费方才可报告「未配置」。`/feedback` 命令确认记录，不读取此策略。
 
-### The backend contract
+### 后端约定
 
-A backend implements three members: `emit(record)` must be a non-blocking enqueue because it runs synchronously on the session-event path; optional `flush()` is a fire-and-forget hint after a turn ends, which most backends omit in favor of their SDK's own batching schedule; `shutdown()` drains queued records and resolves when the SDK stops, and disposal awaits it. A backend that implements `flush()` must order concurrent flushes with the final `shutdown()` drain.
+后端实现三个成员：`emit(record)` 必须是非阻塞入队，因为它会在会话事件路径上同步执行；可选的 `flush()` 是轮次结束后的即发即忘提示，多数后端为了遵循 SDK 自身的批处理计划而省略它；`shutdown()` 排空已入队记录，并在 SDK 停止后结束，dispose（资源释放）会等待它。实现 `flush()` 的后端必须安排并发 flush 与最终 `shutdown()` 排空的先后顺序。
 
-### What gets captured
+### 捕获内容
 
-Capture runs in one of two modes. `live` capture follows session events as they are appended, replays already-live sessions at mount time, and records lifecycle markers; `on-demand` capture reads the canonical session log only when the backend requests a prefix through `captureSession(session, throughSeq?)`. Coordinator options select whether stored history is included. Every canonical session event maps to one ledger record in order. An `assistant/message` or `assistant/attempt` record carries its complete embedded compact stream, including failed and retried output. Each ledger record also carries `session.id`, `session.format_version`, the numeric event identity, optional header facts, and a pre-mapped severity (`error` for `tool/result.isError`, `turn/end` error reasons, and `agent-error`; `info` otherwise).
+捕获以两种模式之一运行。`live` 捕获在追加时跟随会话事件、在挂载时回放已存活会话并记录生命周期标记；`on-demand` 捕获只在后端通过 `captureSession(session, throughSeq?)` 请求前缀时读取权威会话日志。协调器选项决定是否包含存储历史。每条权威会话事件都按顺序映射为一条 ledger 记录。`assistant/message` 或 `assistant/attempt` 记录会携带完整的嵌入式紧凑流，包括失败和重试输出。每条 ledger 记录还携带 `session.id`、`session.format_version`、数值型事件标识、可选 header 事实与预先映射的严重级别（`tool/result.isError`、`turn/end` 的错误原因与 `agent-error` 映射为 `error`；其余为 `info`）。
 
-Ledger records carry `sourceEvent` with the owning Session id and a copied event envelope excluding `data`. The redaction waterfall receives `body` as the only payload copy. Backends can reconstruct a complete exported event from the envelope and redacted body without bypassing redaction.
+ledger 记录携带 `sourceEvent`，其中包含所属 Session id 和不含 `data` 的事件信封副本。脱敏 waterfall 接收的 `body` 是唯一的载荷副本。后端可从信封和脱敏后的 body 重建完整导出事件，而不绕过脱敏。
 
-### The sharing disclosure
+### 共享披露
 
 <a id="the-sharing-disclosure"></a>
 
-Every backend discloses its deployment mode through `sharing`: `full`, `feedback-only`, or `disabled`. A backend may additionally restrict eligible Sessions. This property is not a delivery receipt; handoff is a non-blocking enqueue, and batching, retry, and loss policy belong to the backend SDK.
+每个后端通过 `sharing` 披露部署模式：`full`、`feedback-only` 或 `disabled`。后端还可限制符合条件的会话。该属性不是投递回执；交接是非阻塞入队，批处理、重试与丢失策略属于后端 SDK。
 
-### Redacting records
+### 脱敏记录
 
 <a id="the-redact-waterfall"></a>
 
-Every outbound record passes the `sessionTelemetry/record` waterfall after the coordinator copies its canonical event. This package ships no rules: with no listener mounted, records reach the backend exactly as captured, so exported data is as clean as the rules a deployment mounts. Listeners stack by transforming `next()`'s return value; a throwing listener withholds that one record fail-closed. Redaction applies to the outbound copy only — the canonical session log is never rewritten.
+协调器复制权威事件后，每条外发记录都会立即经过 `sessionTelemetry/record` waterfall（瀑布式事件）。本包不带任何规则：未挂载监听器时，记录以捕获时的原样到达后端，因此导出数据能干净到什么程度，恰恰取决于部署方挂载了什么规则。监听器通过变换 `next()` 的返回值来堆叠；抛出异常的监听器以 fail-closed 方式拦下这一条记录。脱敏只作用于外发副本——权威会话日志永不改写。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the capture design; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释捕获设计；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design concept
+### 设计理念
 
-The capture package owns complete event capture, redaction, and handoff cursors. Redaction rules must preserve `sourceEvent` for OTel upload; returning a fresh record without it withholds the event with a diagnostic. Its cloned envelope excludes `data`, which is carried only in `body`. The OTel backend owns byte/count scheduling and uses SDK transport/retries. The [historical revival Agent Note](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md) records capture and redaction rationale.
+捕获包负责完整事件捕获、脱敏和交接游标。脱敏规则必须保留 `sourceEvent` 才能通过 OTel 上传；返回不含它的新记录会阻止该事件上传并产生诊断。复制的 envelope 不含 `data`，数据仅由 `body` 携带。OTel 后端负责字节/条数调度并使用 SDK 传输和重试。[历史恢复遥测决策记录](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md) 说明捕获和脱敏依据。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service Definition: `SessionTelemetryBackend`/`SessionTelemetrySink` contract, record vocabulary, `session-telemetry/record` waterfall declaration |
-| [`src/coordinator.ts`](src/coordinator.ts) | Capture: live listeners, lifecycle-local on-demand replay, redaction, handoff cursor, containment |
+| [`src/index.ts`](src/index.ts) | Service Definition：`SessionTelemetryBackend`/`SessionTelemetrySink` 约定、记录词汇、`session-telemetry/record` waterfall 声明 |
+| [`src/coordinator.ts`](src/coordinator.ts) | 捕获：live 监听器、生命周期本地 on-demand 回放、脱敏、handoff 游标、异常隔离 |
 
-### Capture flow
+### 捕获流程
 
-Live capture registers Session events, flush hints, shutdown markers, and agent/error observers through the composing fiber’s effects. On-demand capture registers only the disposal effect and reads the requested canonical-log prefix under its history policy. Synchronous handlers contain failures so they cannot affect the agent loop or other listeners.
+实时捕获通过组合 fiber 的 effect 注册 Session 事件、刷新提示、关闭标记与 agent/error 观察器。按需捕获只注册释放 effect，并按历史策略读取请求的权威日志前缀。同步处理器隔离失败，避免影响 agent loop（智能体循环）或其他监听器。
 
-### The handoff cursor
+### handoff 游标
 
-A module-scope `WeakMap<Session, seq>` records the highest sequence handed off, not delivered. Re-adopting the same object resumes after that cursor. Capture starts at `firstLifecycleSeq`: a new fork includes its child-owned marker and closers, while a restored Session excludes its stored prefix, including prior child turns; explicit `includeHistory: true` starts an unhanded object at seq 0, including restored or fork history. The backend owns capture authorization. Stored history does not itself authorize capture; the OTel backend waits for new explicit feedback. Receivers deduplicate repeated records by `(session.id, session.format_version, event.seq)`.
+模块级 `WeakMap<Session, seq>` 记录已经移交的最高序号，而不是已送达的最高序号。再次接管同一对象时从该游标之后继续。采集从 `firstLifecycleSeq` 开始：新 fork 包含子会话自有的标记与 fork 结束事件；恢复的 Session 排除已存储前缀，包括先前的子会话轮次。显式 `includeHistory: true` 会让尚未移交的对象从 seq 0 开始，包括恢复或 fork 历史。Backend 负责采集授权；已有存储历史本身不构成授权，OTel backend 等待新的显式反馈。接收方通过 `(session.id, session.format_version, event.seq)` 对重复记录去重。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the seam contract is not enough. They move from the shipped backend to the subsystem reference and the decision evidence.
+当 seam 约定不够用时阅读以下页面。它们从随附后端逐步进入子系统参考与决策证据。
 
-- [OpenTelemetry telemetry backend](../session-telemetry-otel/README.md) — the shipped backend deployments load, with mode and exporter configuration.
-- [Session telemetry subsystem](../../../docs/subsystems/session-telemetry.md) — the capability split and type declarations.
-- [historical Session telemetry revival decision](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md) — rationale, trade-offs, and rejected alternatives.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [OpenTelemetry 遥测后端](../session-telemetry-otel/README.zh.md)——部署方加载的随附后端，含模式与导出器配置。
+- [会话遥测子系统](../../../docs/subsystems/session-telemetry.zh.md)——能力拆分与类型声明。
+- [历史会话遥测复活决策](../../../.agents/notes/archived/feature/2026-07-23-session-telemetry-otel-revival.md)——理由、权衡与被否决的替代方案。
+- [会话包映射](../README.zh.md)——相邻的持久化、投影、标题与遥测包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the seam observes the session stream and hands redacted copies outward; it registers nothing model-facing.
+无，因为该 seam 观察会话流并把脱敏后的副本交给外部；它不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; the package neither assembles nor sends a provider request.
+无；本包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the delivery and data-protection guarantees a deployment gets. They are current package constraints.
+这些限制定义部署方能得到的投递与数据保护保证。它们是当前包约束。
 
-- **Best-effort delivery** — the cursor marks handed-off, not delivered; a session torn down inside a reload window cannot be re-adopted, and whatever sits in a backend queue at crash time is lost. A durable outbox (spool, per-sink cursors, at-least-once) is deferred until a deployment states a crash-loss requirement.
-- **No built-in redaction rules** — with no `sessionTelemetry/record` listener mounted, records leave the process exactly as captured, including any credentials embedded in file contents or command output; a deployment exporting to a shared collector owns its rule set.
-- **On-demand redaction uses current state** — uncaptured events exist only in the canonical session log; a later `captureSession()` deep-copies and redacts their current values with the policy mounted at that time, and there is no capture-time telemetry snapshot or durable pre-capture spool.
+- **尽力而为的投递**——游标标记的是已交接而非已投递；在重载窗口内被拆除的会话无法重新收养，崩溃时留在后端队列中的内容会丢失。持久化 outbox（spool、每 sink 游标、at-least-once）推迟到有部署方提出明确的崩溃丢失要求时再实现。
+- **不内置脱敏规则**——未挂载 `sessionTelemetry/record` 监听器时，记录以捕获时的原样离开进程，包括文件内容或命令输出中内嵌的任何凭据；向共享 collector 导出的部署方自行负责其规则集。
+- **按需脱敏使用当前状态**——未捕获的事件只存在于权威会话日志中；后续的 `captureSession()` 会使用当时挂载的策略，深拷贝并脱敏其当前值，且不存在捕获时的遥测快照或持久化的捕获前 spool。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

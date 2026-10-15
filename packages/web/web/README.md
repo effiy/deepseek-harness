@@ -1,39 +1,39 @@
 ---
-description: "The web access service (ctx.web): how deployments and plugin authors search the web and fetch URLs through interchangeable providers, with one selection policy and error vocabulary."
+description: "web 访问服务（ctx.web）：部署方与插件作者如何通过可互换的提供方搜索 web 与抓取 URL，以及统一的选择策略与错误词汇。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-web
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-web` to search the web or fetch a URL without tying callers to a specific vendor. It selects a usable backend for each operation and gives callers consistent cancellation, errors, and result limits. Choose it for plugins or tools that call `ctx.web.search()` or `ctx.web.fetch()`; the shipped `dsh-tool-web` tools load it for you. A search or fetch requires a configured, usable provider because this package does not make network requests on its own.
+使用 `dsh-web` 搜索 web 或抓取 URL，而无需让调用方依赖特定厂商。它为每项操作选择可用后端，并为调用方提供一致的取消、错误和结果上限。在调用 `ctx.web.search()` 或 `ctx.web.fetch()` 的插件或工具中选择它；已交付的 `dsh-tool-web` 工具会为你加载它。搜索或抓取需要已配置且可用的提供方，因为本包自身不发起网络请求。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-A composition that needs web access loads the `dsh-web` service and mounts at least one backend — a search provider and/or a fetch provider — and plugin or tool authors then call `ctx.web.search()` and `ctx.web.fetch()` directly. The service resolves the backend for each call, so callers never see provider ids unless they configured one.
+需要 web 访问的组合会加载 `dsh-web` 服务并挂载至少一个后端——搜索提供方和／或抓取提供方——插件或工具作者随后直接调用 `ctx.web.search()` 与 `ctx.web.fetch()`。服务会为每次调用解析后端，因此除非调用方配置了提供方 id，否则它们看不到提供方 id。
 
-### When to choose it
+### 何时选择
 
-Choose the service when a plugin or tool must search or fetch without hard-coding a vendor; a deployment that only uses the shipped `web_search`/`web_fetch` tools gets it for free through `dsh-tool-web`. You do not need it when the composition never reaches the web. The service adds no network access of its own: without at least one usable provider, every call fails with a structured `WebError`.
+当插件或工具必须搜索或抓取、又不希望硬编码厂商时选择本服务；只使用已交付的 `web_search`／`web_fetch` 工具的组合会通过 `dsh-tool-web` 自动加载本服务。当组合从不访问 web 时，你不需要它。服务本身不增加任何网络访问能力：没有至少一个可用提供方时，每次调用都会以结构化 `WebError` 失败。
 
-### Minimal configuration
+### 最小配置
 
-Load the service and let a single mounted backend auto-select, or pin a provider id with `searchProvider`/`fetchProvider`. The environment variables `$DSH_WEB_SEARCH_PROVIDER` and `$DSH_WEB_FETCH_PROVIDER` feed the same fields and are not a separate priority chain.
+加载服务并让唯一挂载的后端自动选择，或用 `searchProvider`／`fetchProvider` 固定提供方 id。环境变量 `$DSH_WEB_SEARCH_PROVIDER` 与 `$DSH_WEB_FETCH_PROVIDER` 提供相同字段，不是另一条优先级链。
 
 ```yaml
 - name: '@deepseek-ai/dsh-web'
@@ -41,16 +41,16 @@ Load the service and let a single mounted backend auto-select, or pin a provider
 - name: '@deepseek-ai/dsh-web-fetch-http'
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `searchProvider` | (unset) | Pinned search provider id; unset auto-selects when exactly one is usable |
-| `fetchProvider` | (unset) | Pinned fetch provider id; unset auto-selects when exactly one is usable |
+| `searchProvider` | （未设置） | 固定的搜索提供方 id；未设置时仅在恰好一个可用时自动选择 |
+| `fetchProvider` | （未设置） | 固定的抓取提供方 id；未设置时仅在恰好一个可用时自动选择 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-web)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### Searching and fetching
+### 搜索与抓取
 
-`search()` runs one query and returns an optional provider answer plus a list of citeable sources; the service enforces `request.maxResults` by truncating `sources[]` and setting `truncated`. `fetch()` retrieves one URL and returns its final URL, status code, decoded body, and a truncation flag; a non-2xx response is a result, not an error.
+`search()` 执行一次查询，返回可选的提供方答案与可引用的来源列表；服务强制执行 `request.maxResults`：截断 `sources[]` 并设置 `truncated`。`fetch()` 获取一个 URL，返回其最终 URL、状态码、解码后的正文与截断标志；非 2xx 响应是结果，不是错误。
 
 ```text
 // Search the web; sources[] is capped to maxResults:
@@ -60,109 +60,109 @@ const result = await ctx.web.search({ query: 'deepseek harness', maxResults: 8 }
 const page = await ctx.web.fetch({ url: 'https://example.com' })
 ```
 
-Both calls accept an optional `AbortSignal` that is forwarded to the provider for cancellation. The normalized request and result shapes are the contract callers build on; the vocabulary section of the [web subsystem](../../../docs/subsystems/web.md) reference describes them exhaustively.
+两个调用都接受可选的 `AbortSignal`，用于把取消转发给提供方。规范化的请求与结果形状是调用方赖以构建的约定；[web 子系统](../../../docs/subsystems/web.zh.md) 参考中的词汇章节对其有穷尽式描述。
 
-### Provider selection
+### 提供方选择
 
-Each call resolves its provider at execution time, and registration or load order never matters. A configured provider id wins when it is registered and usable; without a configured id, the service runs the single usable provider or fails clearly:
+每次调用都在执行时解析提供方，注册或加载顺序从不影响结果。已配置的提供方 id 在已注册且可用时优先；没有配置 id 时，服务运行唯一可用的提供方，或在情况不明时明确失败：
 
-| Situation | Outcome |
+| 情况 | 结果 |
 |---|---|
-| configured id registered and usable | runs that provider |
-| configured id not registered | `WEB_PROVIDER_CONFIGURED_MISSING` |
-| configured id registered but unavailable | `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` |
-| no id, exactly one registered usable provider | runs it |
-| no id, no usable provider | `WEB_PROVIDER_UNAVAILABLE` |
-| no id, multiple usable providers | `WEB_PROVIDER_AMBIGUOUS` |
+| 已配置 id 已注册且可用 | 运行该提供方 |
+| 已配置 id 未注册 | `WEB_PROVIDER_CONFIGURED_MISSING` |
+| 已配置 id 已注册但不可用 | `WEB_PROVIDER_CONFIGURED_UNAVAILABLE` |
+| 无 id，恰好一个已注册的可用提供方 | 运行它 |
+| 无 id，没有可用提供方 | `WEB_PROVIDER_UNAVAILABLE` |
+| 无 id，多个可用提供方 | `WEB_PROVIDER_AMBIGUOUS` |
 
-A provider's availability is a cheap local check — for example whether its API key is present — and never makes network calls, so selection stays fast and deterministic.
+提供方的可用性是一项廉价的局部检查——例如其 API 密钥是否存在——并且从不发起网络调用，因此选择保持快速且确定。
 
-### Failures and recovery
+### 失败与恢复
 
-Failures throw `WebError` with a stable, machine-routable code; the message adds detail such as the missing provider id or the ambiguous candidate set. Callers route on the code and decide how to degrade. To change which backend a call uses, reconfigure the pinned id, mount or unmount providers, or fix the provider's configuration so its availability check passes.
+失败抛出 `WebError`，携带稳定、可按机器路由的 code；消息补充细节，例如缺失的提供方 id 或歧义候选集合。调用方按 code 路由并决定如何降级。要改变一次调用使用的后端，请重新配置固定的 id、挂载或卸载提供方，或修正提供方配置使其可用性检查通过。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the service; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释服务背后的设计决策；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-The package is built on one deliberate separation:
+本包建立在一个刻意的分离之上：
 
-- **One seam, two independent operations.** Search and fetch share no request schema and no business logic, but they share one service so provider selection, cancellation, errors, and product configuration have a single owner. The parallel `Search`/`Fetch` method pairs are intentional.
-- **Selection is never order-dependent.** A capability either pins a provider id or auto-selects when exactly one usable provider is registered; `search()`/`fetch()` resolve the provider at execution time.
-- **The service owns the result bound.** `maxResults` is enforced by the seam after the provider returns, so an over-returning provider can never leak more sources than the caller asked for.
+- **一个 seam，两个独立操作。** 搜索与抓取没有共享请求 schema 或业务逻辑，但它们共用一个服务，使提供方选择、取消、错误与产品配置只有一个归属方。并行的 `Search`／`Fetch` 方法对是有意为之。
+- **选择绝不依赖顺序。** 能力要么固定提供方 id，要么在恰好注册一个可用提供方时自动选择；`search()`／`fetch()` 在执行时解析提供方。
+- **服务拥有结果上限。** `maxResults` 由 seam 在提供方返回后强制执行，因此超量返回的提供方绝不可能泄漏超出调用方要求的来源。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: the `WebRuntime` service, both provider registries, and execution-time selection |
-| [`src/types.ts`](src/types.ts) | Vocabulary: request/result types, the closed `WebFetchBody` union, and the `WebError` taxonomy |
+| [`src/index.ts`](src/index.ts) | 插件入口：`WebRuntime` 服务、两个提供方注册表与执行时选择 |
+| [`src/types.ts`](src/types.ts) | 词汇：请求／结果类型、封闭的 `WebFetchBody` 联合与 `WebError` 分类体系 |
 
-### Data model
+### 数据模型
 
-The request and result types define the normalized vocabulary callers build on — one `Search` pair and one `Fetch` pair — and the exhaustive fields and JSDoc live in [`src/types.ts`](src/types.ts) and the [web subsystem](../../../docs/subsystems/web.md) reference. Two deliberate choices shape them: `WebFetchBody` is a closed union (`html` | `text`) owned here, so adding a kind breaks compilation until every consumer handles it; `WebError` extends `HarnessError` with an open-string `code`, so consumers must tolerate provider-specific values. Source fields stay optional because not every provider returns all of them.
+请求与结果类型定义了调用方赖以构建的规范化词汇——`Search` 请求／结果对与 `Fetch` 请求／结果对各一组——穷尽式字段与 JSDoc 见 [`src/types.ts`](src/types.ts) 与 [web 子系统](../../../docs/subsystems/web.zh.md) 参考。两个刻意的选择塑造了它们：`WebFetchBody` 是这里拥有的封闭联合（`html` | `text`），因此新增类型会破坏编译，直到每个消费方都处理它；`WebError` 继承 `HarnessError`，携带开放的字符串 `code`，因此消费方必须容忍提供方专有的取值。来源字段保持可选，因为并非每个提供方都返回全部字段。
 
-### Selection flow
+### 选择流程
 
-At call time the service resolves the provider — configured id first, then the unique usable provider — and throws the matching `WebError` when no clear winner exists. A search result then passes through `capSources`, which truncates `sources[]` to `maxResults` and flags `truncated`. Registration is effect-based: providers register with the calling fiber and unregister when it disposes, and a duplicate id within a capability kind is rejected at registration.
+执行时，服务先按配置 id、再按唯一可用提供方解析提供方，没有明确赢家时抛出对应的 `WebError`。搜索结果随后经过 `capSources`：把 `sources[]` 截断到 `maxResults` 并标记 `truncated`。注册基于 effect：提供方随调用 fiber 注册，fiber 释放时注销；同一能力类型下重复的 id 会在注册时被拒绝。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the shipped backends, the model-facing tools, and the design rationale.
+当包级约定不够用时阅读以下页面。它们从共享词汇逐步进入已交付后端、面向模型的工具与设计依据。
 
-- [Web subsystem](../../../docs/subsystems/web.md) — the exhaustive search/fetch requests and results, provider availability, and error codes.
-- [Web package map](../README.md) — the six-package family and each role.
-- [dsh-tool-web](../tool-web/README.md) — the model-facing `web_search` and `web_fetch` tools over this service.
-- [dsh-web-fetch-http](../web-fetch-http/README.md) — the shipped anonymous HTTP(S) fetch backend.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-web) — every accepted config field and its source declaration.
-- [Web capability seam decision](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md) — why search and fetch share one provider-selection service.
+- [web 子系统](../../../docs/subsystems/web.zh.md)——穷尽式的搜索／抓取请求与结果、提供方可用性与错误码。
+- [web 包映射](../README.zh.md)——六包家族与各角色。
+- [dsh-tool-web](../tool-web/README.zh.md)——构建于本服务之上的面向模型 `web_search` 与 `web_fetch` 工具。
+- [dsh-web-fetch-http](../web-fetch-http/README.zh.md)——已交付的匿名 HTTP(S) 抓取后端。
+- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-web)——每个受支持配置字段及其源声明。
+- [web 能力 seam 决策](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.zh.md)——搜索与抓取为何共用一项提供方选择服务。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through `dsh-tool-web`, which renders the seam's normalized search results and fetch bodies to the model while this service contributes no prompt or schema.
+间接地，通过 `dsh-tool-web`：该工具把 seam 规范化的搜索结果与抓取正文渲染给模型，而本服务不贡献任何提示词或 schema。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+不会直接导致 KV Cache 失效；请求前缀变更由上述消费方负责。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the service is incomplete on its own. They are current package constraints.
+这些限制说明本服务单独使用时在哪些方面不完整。它们是当前包约束。
 
-- **No observation surface** — there is no provider-change event and no capability-status query; availability is observable only by running a search or fetch and routing the thrown code, and the no-provider failure is the generic `WEB_PROVIDER_UNAVAILABLE` with no per-provider reason enumeration ([Agent Note](../../../.agents/notes/archived/simplification/2026-07-04-drop-unconsumed-web-observation-surface.md)).
-- **Search requests carry only `query` and `maxResults`** — provider-neutral controls (recency, domain filters, regional hints, search depth) are deferred until the backends can honor them ([seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.md)).
-- **`WebFetchBody` has no `pdf` arm** — text-extractable PDF support is named deferred work; the closed union makes adding it a compile-enforced change across the web packages.
-- **Provider-backed page extraction is out of scope of `fetch()`** — a Firecrawl/Tavily-style `web_extract` capability is deferred rather than widening the fetch operation.
+- **没有观测接口**：没有提供方变更事件或能力状态查询；可用性只能通过执行搜索或抓取并按抛出的 code 路由来观测，无提供方失败是通用的 `WEB_PROVIDER_UNAVAILABLE`，不枚举逐提供方原因（见 [Agent Note](../../../.agents/notes/archived/simplification/2026-07-04-drop-unconsumed-web-observation-surface.md)）。
+- **搜索请求只携带 `query` 与 `maxResults`**：提供方无关的控制项（新近程度、域名过滤条件、区域提示、搜索深度）暂缓至后端都能诚实支持时（见 [seam Agent Note](../../../.agents/notes/implemented/architecture/2026-06-24-web-capability-seam.zh.md)）。
+- **`WebFetchBody` 没有 `pdf` 分支**：可提取文本的 PDF 支持属于明确的延期工作；封闭联合会使新增该分支成为跨 web 包、由编译强制执行的变更。
+- **提供方支持的页面提取不属于 `fetch()` 范围**：Firecrawl/Tavily 风格的 `web_extract` 能力延期，而不会扩展抓取操作。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior, limits, and rationale live in the sections above and the linked Agent Notes.
+本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文和相关 Agent Note 为准。
 
-#### Future: observing provider state
+#### 未来：观测提供方状态
 
-No provider-change event or capability-status query exists; consumers observe availability only by executing a call and routing the thrown code. Restoring a small observation surface is possible if a consumer needs per-provider reasons, but the archived simplification note records why the earlier one was dropped.
+没有提供方变更事件或能力状态查询；消费方只能通过执行调用并按抛出的 code 路由来观测可用性。如果消费方需要逐提供方原因，恢复一个小的观测接口是可行的，但已归档的简化笔记记录了为何放弃此前的那个接口。
 
 </details>

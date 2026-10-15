@@ -1,186 +1,186 @@
 ---
-description: "Workspace-authorized model-facing session history tools for agent developers and maintainers choosing, configuring, or debugging prior-session search, tracing, and event reads."
+description: "面向 agent（智能体）开发者与维护者、经工作区授权且面向模型的会话历史工具，用于选择、配置或排查既往会话搜索、追踪与事件读取。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-session-query
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use the experimental `dsh-tool-session-query` tools to let a model search earlier sessions, inspect event matches, trace session or event relationships, and read exact event data. Its five read-only tools return cursor-free text and authorize cross-session access only when the target session's `cwd` exactly matches the caller's; callers without a `cwd` can inspect only themselves. Search excludes the caller session and asks the model to narrow its query when the deployment result cap is reached. The package is opt-in, and enabling it adds fixed guidance plus five tool schemas to every model request.
+使用实验性的 `dsh-tool-session-query` 工具可让模型搜索既往会话、检查事件匹配、追踪会话或事件关系，并读取精确事件数据。它的五个只读工具返回无游标文本；只有目标会话的 `cwd` 与调用方完全匹配时才允许跨会话访问，没有 `cwd` 的调用方只能检查自己。搜索会排除调用方会话，并在达到部署结果上限时要求模型缩小查询。本包是 opt-in；启用后，每次模型请求都会增加固定指引与五个工具 schema。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this package when the agent should be able to search its own prior sessions and inspect their relationships and events. The common path is explicit: mount the plugin over `ctx.sessionQuery` (backed by `dsh-session-query-sqlite`), then let the model call the tools.
+当 agent 应该能搜索自己的既往会话并检查其关系与事件时挂载本包。常用路径是显式的：在 `ctx.sessionQuery`（由 `dsh-session-query-sqlite` 支撑）之上挂载插件，然后让模型调用这些工具。
 
-### When to choose it
+### 何时选择
 
-Choose it when a deployment wants model-driven retrieval of prior work — for example a coding agent that searches what it did in earlier sessions before starting a task. Avoid it when only programmatic retrieval is needed: `ctx.sessionQuery` itself serves code callers without the model-facing schema, prompt, and authorization layer.
+当部署需要模型驱动的既往工作检索时选择它——例如 coding agent（编程智能体）在开始任务前搜索更早会话中做过的事。只需要程序化检索时避免使用：`ctx.sessionQuery` 本身服务代码调用方，无需面向模型的 schema、提示词与授权层。
 
-### Configuration
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `maxSearchResults` | `100` | Maximum authorized hits returned by one search call |
-| `searchTimeoutMs` | `30000` | Cooperative deadline attached to both full-text search tools |
+| `maxSearchResults` | `100` | 一次搜索调用返回的最大已授权命中数 |
+| `searchTimeoutMs` | `30000` | 附加到两个全文搜索工具的协作式截止时间 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-session-query) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-session-query)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### What the model can do
+### 模型可以做什么
 
-| Tool | What the model gets |
+| 工具 | 模型得到什么 |
 |---|---|
-| `session_search` | Sessions matching a literal query, ranked, with title and best-match excerpt; always omits the caller session |
-| `session_event_search` | Events matching a literal query inside one authorized session; for the current session it stops before the step that invoked it |
-| `session_trace` | The authorized ancestor chain and descendant tree of one session; unauthorized boundaries appear as markers without hidden ids |
-| `session_event_trace` | One event's positional replacements and cited source-event relationships |
-| `session_event_read` | One full unabridged event as JSON, plus optional neighboring event summaries |
+| `session_search` | 匹配字面查询的会话，经排序，带标题与最佳匹配摘录；始终省略调用方会话 |
+| `session_event_search` | 一个已授权会话内匹配字面查询的事件；针对当前会话时，在调用它的步骤之前停止 |
+| `session_trace` | 一个会话的已授权祖先链与后代树；未授权边界以不含隐藏 id 的标记出现 |
+| `session_event_trace` | 一个事件的位置替换与被引用源事件关系 |
+| `session_event_read` | 一个完整未删节事件（JSON），以及可选的相邻事件摘要 |
 
-Workspace authority is conservative: cross-session access requires exact `cwd` equality between target and caller session, and a caller without `cwd` can inspect only itself. Requested parent ids are deduplicated and authority-checked before search; missing and cross-workspace guesses behave identically. Search results are cursor-free: a capped result asks the model to narrow its query, and never exposes provider cursors, offsets, page sizes, or a model-controlled limit. Timestamps at the tool boundary are timezone-qualified ISO 8601 and become inclusive epoch-millisecond filters.
+工作区授权是保守的：跨会话访问要求目标与调用方会话的 `cwd` 严格相等，没有 `cwd` 的调用方只能检查自己。请求的父 id 会在搜索前去重并按权限检查；缺失与跨工作区猜测行为完全相同。搜索结果无游标：结果达到上限时请模型缩小查询，绝不暴露提供方游标、偏移、分页大小或模型可控上限。工具边界的时间戳是带时区限定的 ISO 8601，并转换为包含端点的 epoch 毫秒过滤器。
 
-### Failures and recovery
+### 失败与恢复
 
-Every trusted query-service call crosses one error sanitizer: caller cancellation is preserved exactly, corpus and provider diagnostics go to the internal log, and unsafe or unprintable failures fall back to the fixed `SESSION_QUERY_TOOL_FAILED` code and message. Local argument-validation and authorization errors keep their precise tool-owned messages (`SESSION_QUERY_TOOL_UNAUTHORIZED` for a target outside the caller workspace). The package performs no byte or character truncation and does not import a spill backend; deployments that need bounded inline output mount `@deepseek-ai/dsh-spill-policy`, which can replace oversized rendered text while retaining the complete result.
+每个可信查询服务调用都经过一个错误净化器：调用方取消被精确保留，语料库与提供方诊断进入内部日志，不安全或不可打印的失败回退到固定 `SESSION_QUERY_TOOL_FAILED` 代码与消息。本地参数校验与授权错误保留精确的工具自有消息（目标在调用方工作区之外时为 `SESSION_QUERY_TOOL_UNAUTHORIZED`）。本包不执行字节或字符截断，也不导入 spill 后端；需要限制内联输出的部署应挂载 `@deepseek-ai/dsh-spill-policy`，它可以在保留完整结果的同时替换过大的已渲染文本。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the tools and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释工具背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-The consumer is built on one separation and three commitments:
+本消费方建立在一个分离与三项承诺之上：
 
-- **Narrow read-only tools.** Five tools with flat snake-case schemas, each teaching one follow-up step; no cursor, offset, page-size, or model-controlled limit ever reaches the model.
-- **Authority derived from the caller, never the model.** Caller identity comes from `ToolExecution.exec.agent`; workspace is exact-string `cwd` equality, re-checked against the header observed with each result.
-- **One model-boundary sanitizer.** Every trusted `ctx.sessionQuery` call goes through the service boundary, which preserves cancellation and contains diagnostic and classification failures.
-- **No second truncation format.** Results stay complete; the generic spill policy owns bounded inline output.
+- **窄而只读的工具。** 五个带扁平 snake-case schema 的工具，每个都引导一个后续步骤；游标、偏移、分页大小或模型可控上限永远不会到达模型。
+- **授权来自调用方，绝不由模型提供。** 调用方身份来自 `ToolExecution.exec.agent`；工作区是字符串精确 `cwd` 相等，并对照每次结果观察到的 header 重新校验。
+- **一个模型边界净化器。** 每个可信 `ctx.sessionQuery` 调用都经过服务边界，它保留取消，并将诊断与分类失败限制在边界内。
+- **不引入第二种截断格式。** 结果保持完整；通用 spill 策略负责有界内联输出。
 
-The design history lives in the [model-facing session query tools note](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md) and the [session-search-not-shipped-default note](../../../.agents/notes/archived/feature/2026-08-02-session-search-not-shipped-default.md).
+设计历史记录在[面向模型的会话查询工具笔记](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md)与 [session-search-not-shipped-default 笔记](../../../.agents/notes/archived/feature/2026-08-02-session-search-not-shipped-default.md)中。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config, prompt section, five tool registrations |
-| [`src/input.ts`](src/input.ts) | Model schemas, argument normalization, filter construction |
-| [`src/workspace-access.ts`](src/workspace-access.ts) | Caller identity, workspace authorization, title access, lineage projection |
-| [`src/service-boundary.ts`](src/service-boundary.ts) | Trusted calls and model-safe error translation |
-| [`src/operations.ts`](src/operations.ts) | The five operation workflows |
-| [`src/presentation.ts`](src/presentation.ts) | Text result rendering and tool-call cards |
+| [`src/index.ts`](src/index.ts) | 插件入口：配置、提示词章节、五个工具注册 |
+| [`src/input.ts`](src/input.ts) | 模型 schema、参数规范化、过滤器构造 |
+| [`src/workspace-access.ts`](src/workspace-access.ts) | 调用方身份、工作区授权、标题访问、血缘投影 |
+| [`src/service-boundary.ts`](src/service-boundary.ts) | 可信调用与模型安全错误转换 |
+| [`src/operations.ts`](src/operations.ts) | 五个操作工作流 |
+| [`src/presentation.ts`](src/presentation.ts) | 文本结果渲染与工具调用卡片 |
 
-### Operation flow
+### 操作流程
 
-Each executor derives the caller, normalizes the model's arguments into service filters, authorizes the target (or the requested parent ids) against the caller workspace, and collects results through the service boundary. Both search tools page internally through provider cursors while the observed generation stays valid, stopping at `maxSearchResults`; because one search consumes generation-bound provider cursors, the two search tools execute exclusively with sibling tool calls, while the three exact trace/read tools opt into parallel execution. Lineage output replaces unauthorized ancestor and descendant boundaries with markers containing no hidden session id.
+每个执行器先派生调用方，把模型的参数规范化为服务过滤器，对照调用方工作区授权目标（或请求的父 id），然后通过服务边界收集结果。两个搜索工具在观察世代仍有效时内部翻页消费提供方游标，停在 `maxSearchResults`；由于一次搜索会消费与世代绑定的提供方游标，两个搜索工具与同级工具调用排他执行，而三个精确追踪/读取工具选择并行执行。血缘输出用不含隐藏会话 id 的标记替换未授权祖先与后代边界。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the tool surface to the underlying service, the schema catalog, and the design evidence.
+当包级约定不够用时阅读以下页面。它们从工具表面逐步进入底层服务、schema 目录与设计证据。
 
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-session-query) — the five tool schemas as the model sees them.
-- [dsh-session-query](../../session-query/session-query/README.md) — the service these tools call.
-- [dsh-session-query-sqlite](../../session-query/session-query-sqlite/README.md) — the full-text backend behind the two search tools.
-- [Session Query subsystem reference](../../../docs/subsystems/session-query.md) — the type-level contract under the tools.
-- [Model-facing session query tools](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md) — workspace authority, cursor-free results, and spill decisions.
+- [生成的工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-session-query)——模型看到的五个工具 schema。
+- [dsh-session-query](../../session-query/session-query/README.zh.md)——这些工具调用的服务。
+- [dsh-session-query-sqlite](../../session-query/session-query-sqlite/README.zh.md)——两个搜索工具背后的全文后端。
+- [会话查询子系统参考](../../../docs/subsystems/session-query.zh.md)——工具之下的类型级约定。
+- [面向模型的会话查询工具](../../../.agents/notes/archived/feature/2026-07-24-model-facing-session-query-tools.md)——工作区授权、无游标结果与 spill 决策。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### System prompt
+### 系统提示词
 
-#### What the model sees
+#### 模型看到什么
 
-The model receives one fixed prior-history guidance section.
+模型会收到一个固定的既往历史指引章节。
 
-##### Prior-history guidance
+##### 既往历史指引
 
 ```markdown
 Use session_search to find relevant work from prior sessions, or session_event_search to search earlier events in one session. Search results are cursor-free and workspace-scoped. Follow a useful hit with session_trace, session_event_trace, or session_event_read when you need lineage, relationships, or exact data.
 ```
 
-#### Token effect
+#### Token 影响
 
-One fixed concise section is present on each request while the plugin is mounted.
+插件挂载期间，每次请求都存在一个固定精简章节。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Prefix-stable while the plugin and guidance text are unchanged.
+插件与指引文本不变时，前缀稳定。
 
-### Tool schemas
+### 工具 schema
 
-#### What the model sees
+#### 模型看到什么
 
-The model sees the generated [`session_search`, `session_event_search`, `session_trace`, `session_event_trace`, and `session_event_read` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-session-query). Search filters add fixed schema tokens, while cursors, workspace paths, output pagination, and model-controlled result limits remain absent.
+模型会看到生成的 [`session_search`、`session_event_search`、`session_trace`、`session_event_trace` 与 `session_event_read` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-session-query)。搜索过滤器会增加固定 schema token，而游标、工作区路径、输出分页与模型可控结果上限仍不存在。
 
-#### Token effect
+#### Token 影响
 
-Five fixed read-only schemas are sent on each request while visible.
+可见期间，每次请求都会发送五个固定只读 schema。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Prefix-stable while tool visibility and definitions are unchanged.
+工具可见性与定义不变时，前缀稳定。
 
-### Tool results
+### 工具结果
 
-#### What the model sees
+#### 模型看到什么
 
-Each successful call emits one plain-text block. Search results include titles and best-match excerpts; traces include all authorized relationships; event reads include unabridged target JSON. The generic spill policy may replace oversized inline text with its preview, opaque locator, and retrieval hint.
+每次成功调用都会发出一个纯文本块。搜索结果包含标题与最佳匹配摘录；追踪包含全部已授权关系；事件读取包含未经删节的目标 JSON。通用 spill 策略可以用其预览、不透明定位信息与取回指引替换过大的内联文本。
 
-#### Token effect
+#### Token 影响
 
-Results are data-dependent and remain in logged tool history until compaction; `maxSearchResults` bounds search-hit count.
+结果取决于数据，并保留在已记录工具历史中直到压缩（compaction）；`maxSearchResults` 限制搜索命中数。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only result text follows the reusable request prefix and does not invalidate earlier cache entries.
+仅追加的结果文本位于可重用请求前缀之后，不会使较早的缓存条目失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this package is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+这些限制说明本包何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是任务积压。
 
-- **Search caps without continuation** — search returns at most the deployment cap and asks the model to narrow its query when more matches exist; there is no continuation token.
-- **Conservative workspace identity** — workspace identity is exact-string `cwd` equality, so symlink-equivalent paths do not share authority.
-- **Inline payloads without the spill policy** — custom compositions without the generic spill policy accept complete trace and event payloads inline.
+- **搜索有上限且无延续**——搜索最多返回部署上限，匹配更多时会请模型缩小查询；不提供延续 token。
+- **保守的工作区身份**——工作区身份是字符串精确 `cwd` 相等，因此符号链接等价的路径不共享权限。
+- **无 spill 策略时内联载荷**——未挂载通用 spill 策略的自定义组合会以内联方式接收完整追踪与事件载荷。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+本开发备注是维护者的工作上下文：开放设计问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-#### Future: broader workspace semantics
+#### 未来：更宽泛的工作区语义
 
-Exact-string `cwd` equality is deliberately conservative; symlink-aware or canonical-path workspace identity would change which sessions share authority and is undecided.
+字符串精确 `cwd` 相等是刻意保守的选择；符号链接感知或规范路径的工作区身份会改变哪些会话共享权限，尚未决定。
 
 </details>

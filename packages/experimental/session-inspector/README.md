@@ -1,105 +1,105 @@
 ---
-description: "Virtualized raw Session log and Chat group/node tables with streamed delta rows, pagination, and update highlighting."
+description: "原始 Session 日志与 Chat group/node 虚拟表格，支持流式分片子行、分页和更新高亮。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-session-inspector
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Inspect raw Session logs and Chat structures through the optional [Developer Tools bundle](../inspector-profile/README.md). Open **Session Log** from the Sidebar's new-tab menu or guide, then choose **Raw Log** or **Chat Group** from its upper-left selector. Follow object references between Nodes, Turns, and Steps, or locate a selected Node in Chat. Stream chunks appear as child rows, and Chat updates briefly highlight their rows. Both presentations support older history and resizable details without a composer.
+通过可选的[开发者工具组合包](../inspector-profile/README.zh.md)检查原始 Session 日志与 Chat 结构。从 Sidebar 的新建 tab 菜单或引导页打开**会话数据诊断**，再从左上角选择**原始数据**或**对话分组**。可以沿对象引用查看 Node、Turn 和 Step，也可以将选中 Node 定位到 Chat。流式分片显示为子行，Chat 更新时对应行短暂高亮。两种展示均支持更早历史和可调整高度的详情，不显示 composer。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-The Developer Tools bundle mounts this plugin as `session-inspector`. It registers the `session-inspector-log` Sidebar page for the Sidebar's current Session, without a Conversation View or header label. The selector initially shows Session Log, with the current row count alongside it. Changing presentation resets local selection, type filtering, and scroll state. This plugin requires no debugging argument, accepts no configuration, and changes no Session data.
+开发者工具组合包以 `session-inspector` 配置行挂载本插件。它为 Sidebar 当前 Session 注册 `session-inspector-log` 页面，不注册 Conversation View 或 header 标签。下拉框初始展示会话日志，旁边保留当前行数。切换展示形式会重置局部选中、类型筛选和滚动状态。本插件不需要调试参数，不接受配置，也不改变 Session 数据。
 
-Click the filter icon in the Type header to enter a type fragment. Suggestions update asynchronously from all loaded records. Enter or **Apply filter** confirms the fragment; clicking a suggestion or selecting it with arrow keys and Enter confirms that type. Matching ignores case and uses containment: `delta` and `*delta*` both match reasoning and tool-call deltas. Editing alone does not change the table. Escape, Cancel, or clicking outside discards the draft; clearing and confirming restores all types.
+点击类型列表头的筛选图标，输入类型片段。候选从所有已加载记录中异步更新。Enter 或**确认筛选**确认输入的片段；点击候选，或用方向键选中候选后按 Enter，则确认该类型。匹配忽略大小写，默认包含匹配：`delta` 和 `*delta*` 都能匹配 reasoning 与 tool-call delta。仅编辑不会改变表格。Esc、取消或点击外部会放弃草稿；清空后确认恢复全部类型。
 
-Filtered tables retain matching rows and their ancestor context, initially expanding folded ancestors. Context-only types appear muted and do not count toward the matching-row total. New and paginated rows use the confirmed filter. Confirming resets selection, disclosure choices, and reserved trailing space, and returns to the top. Following an object reference or picking a Chat element clears the filter if its target row is excluded, then reveals that row.
+筛选后的表格保留匹配行及其父级上下文，初始展开折叠父级。仅作上下文的类型使用淡色，不计入匹配行数。新增和分页加载的行沿用已确认的筛选。确认后重置选中、手动折叠和尾部预留空白，并回到顶部。沿对象引用或从 Chat 选取元素时，若目标行被排除，会先清除筛选再定位该行。
 
-Session Log groups records between `turn/start` and `turn/end`, with nested `step/start`–`step/end` ranges. The start record is the sticky group header; the end remains a raw child at the group's tail. Turn and Step groups stay expanded after completion and can be folded manually. Records between Steps belong to the Turn; records outside a loaded range remain ungrouped. Missing starts are not synthesized: loading an earlier start adds ancestry to the existing rows. Assistant streams retain their own nesting inside the Step.
+会话日志按 `turn/start` 到 `turn/end` 分组，内部再按 `step/start`–`step/end` 分组。start 原始记录作为吸顶组头，end 保留为组尾的原始子行。Turn 和 Step 完成后仍保持展开，可手动折叠。两个 Step 之间的记录属于 Turn，已加载区间之外的记录不分组。不伪造缺失的 start：加载到更早的 start 后，再为现有行补上层级。Assistant stream 在 Step 内保留自身嵌套。
 
-Assistant logs group original timed chunks beneath their matching `block-start`, including text, reasoning, and tool-call argument deltas. Unfinished blocks expand by default; `block-end` automatically collapses its block, which can then be reopened manually. Historical closed blocks start collapsed. Live chunks share an attempt row until settlement replaces them with the durable event. Chat Group nests actual group members below their group. Hidden or unlisted materialized Nodes remain root rows, inserted by event anchor between the existing roots instead of appended after the last Turn; the Inspector does not invent group membership. Inserts and updates briefly highlight unless the system requests reduced motion.
+Assistant 日志将原始带时间分片放到对应的 `block-start` 下，包括文本、推理和工具调用参数 delta。未闭合 block 默认展开；`block-end` 自动收起对应 block，之后可手动重新展开。历史中已闭合的 block 默认收起。直播分片归入同一 attempt 行，结算后由持久化事件替换。对话分组将实际 group 成员放在 group 下方；隐藏或未列出的已物化 Node 仍作为根行，按事件锚点插在已有根行之间，不会统一追加到最后一个 Turn 后，也不由检查器虚构分组归属。新增与更新短暂高亮，但系统要求减少动画时不播放。
 
-Use the disclosure arrow to fold children and select a row's type or data to inspect raw details. Horizontal data previews omit `type`, `seq`, and `sequence`, plus top-level `time`. Chat Node also omits top-level `key` and `kind`, which already have their own columns. When one field remains, only its value appears. Tool-call delta previews show only the argument fragment; reasoning delta previews show only the text. Preview filtering does not remove fields from raw details. Drag the detail panel's upper separator, or use its Up/Down keys, to resize it; selecting another row retains its height.
+使用展开箭头折叠子行，选择行的类型或数据查看原始详情。横向数据摘要省略 `type`、`seq`、`sequence` 和顶层 `time`。聊天节点还省略已有独立列展示的顶层 `key` 和 `kind`。过滤后只剩一个字段时只显示值。Tool-call delta 摘要只显示参数片段；reasoning delta 摘要只显示文本。摘要过滤不移除原始详情中的字段。拖动详情面板上边缘的分隔条，或使用其上下方向键，可以调整高度；切换记录会保留高度。
 
-A folded reasoning `block-start` omits `index` and shows `blockType: reasoning` followed by its joined reasoning deltas, within the normal preview length. Interleaved blocks keep separate summaries. Expanding the block restores its ordinary fields and original child rows; raw details retain the original block-start without synthesized text.
+折叠的 reasoning `block-start` 省略 `index`，在 `blockType: reasoning` 后显示拼接的 reasoning delta，沿用普通摘要长度限制。交错到达的 block 分别维护摘要。展开后恢复普通字段及原始子行；原始详情保留原来的 block-start，不加入合成文本。
 
-Chat details show a lazy object tree rather than JSON conversion. Maps retain object keys and values, Sets and arrays show members, and class instances retain their names and own fields. Collections expand in pages; getters are labelled without execution, and WeakMap/WeakSet contents remain opaque. The inspected root expands inline; unregistered cycles show their ancestor path. Expanded fields are cached until a Conversation publication changes, so mutable Turn/Step Data refreshes without resetting disclosure state or repeating enumeration for UI-only renders.
+聊天节点详情使用按需展开的对象树，不转换为 JSON。Map 保留对象 key 与 value，Set 和数组展示成员，类实例保留类型名及自身字段。集合分批展开；getter 只显示标记，不执行；WeakMap/WeakSet 不展开内部内容。正在检查的根对象直接展开；未登记的循环引用显示祖先路径。展开字段缓存到 Conversation 下一次发布，使可变 Turn/Step Data 刷新时保留展开状态，纯 UI 重渲染不重复枚举。
 
-Arrays and TypedArrays read only the disclosed index prefix, including sparse slots marked separately from explicit `undefined`. **Other properties** opens their non-index and symbol fields without invoking getters. The initial numeric page does not enumerate the whole collection; opening Other properties explicitly scans its own keys.
+数组和 TypedArray 只读取已展开的索引前缀；稀疏数组的空槽会单独标记，与显式 `undefined` 区分。**其他属性**提供非索引字段和 symbol 字段，不执行 getter。初始数字索引页不会枚举整个集合；显式展开其他属性时才扫描全部自身键。
 
-Nested Node, Group, Turn, Step, and Data objects have reference buttons. Activating a reference opens its current loaded value and adds a breadcrumb; selecting an earlier breadcrumb returns to that level and discards the later path. The first breadcrumb retains the original row even when reference navigation selects another table row. A reference with a row unfolds its enclosing Inspector group, scrolls to the row, and flashes it. Node Data also has an inline disclosure arrow: expanding it stays in the current tree, while clicking its title navigates. Repeated Node Data ancestors remain links rather than recursively expanding. Selecting a table row or a picked Chat element starts a new breadcrumb path; Session Log keeps JSON details without reference navigation.
+嵌套 Node、Group、Turn、Step 和 Data 对象提供引用按钮。点击引用后打开其当前已加载值，并增加一级面包屑；点击前面的面包屑可返回该级，同时移除后续路径。即使引用导航选中了另一个表格行，第一级仍保留最初的行。引用有对应行时，会展开其 Inspector 父级 group、滚动定位并闪烁该行。Node Data 另外提供原地展开箭头：展开时留在当前树内，点击标题才跳转。重复出现的 Node Data 祖先保留为链接，不递归展开。选择表格行或从 Chat 选取元素会开始新路径；会话日志保留 JSON 详情，不提供引用导航。
 
-Selecting a Chat row or following a reference uses the Inspector's [DOM matcher](src/client/views/chat-node/dom.ts) to find existing Node, call, Group, or Turn attributes in the same Session's displayed main Chat. Inspector dispatches the existing `beforematch` behavior to searchable folded ancestors, then uses native scrolling and a body-level highlight overlay without adding elements to Chat content. A visible target only flashes; an offscreen target scrolls smoothly before flashing, with immediate scrolling and no flash for reduced motion. ID columns remain narrow; hover or focus an ID to read its complete value in a tooltip.
+选择聊天节点行或沿引用跳转时，Inspector 的 [DOM 匹配函数](src/client/views/chat-node/dom.ts)在同一 Session 已显示的主 Chat 中查找现有 Node、call、Group 或 Turn 属性。Inspector 对可搜索的折叠祖先触发现有 `beforematch` 行为，再执行原生滚动并在 body 层绘制高亮，不向 Chat 内容添加元素。可见目标只闪烁，不可见目标先平滑滚动再闪烁；减少动画时立即滚动且不闪烁。ID 列保持窄宽度；悬停或聚焦 ID 时，提示框显示完整值。
 
-Missing, empty, or still-hidden occurrences do not stop navigation. When event coordinates are available, Inspector tries nearby loaded content in the same Step, then the same Turn, then other loaded Turns, ordered by event distance. Existing Group and Turn occurrences also provide fallback positions. If no candidate can render, Inspector highlights the visible Chat column without moving it.
+缺失、空内容或展开后仍隐藏的展示位置不会阻止定位。事件坐标可用时，Inspector 按事件距离依次尝试同一 Step、同一 Turn、其他已加载 Turn 中的附近内容。现有 Group 和 Turn 展示位置也可作为回退位置。没有可呈现的候选时，Inspector 高亮当前可见的 Chat 列，不移动它。
 
-Selecting a Session Log row passes the [original log coordinates](src/client/views/session-log/chat-target.ts) through the same DOM lookup while retaining the log presentation and JSON details. Inspector reads the existing Chat snapshot and prefers tool call identity, exact event anchors, and the owning Assistant step before applying the same fallback selection. Stream children inherit their owning event and prefer reasoning or response parts when available. Missing targets do not load history or switch the active View; an empty Chat has nothing to highlight.
+选择会话日志行时，将[原始日志坐标](src/client/views/session-log/chat-target.ts)交给同一 DOM 查找流程，保留日志展示形式和 JSON 详情。Inspector 读取现有 Chat 快照，优先匹配工具调用身份、精确事件锚点和所属 Assistant step，再使用同一套回退选择。流式子行沿用所属事件，并在可用时优先匹配推理或回复分片。目标缺失时不加载历史，也不切换当前 View；Chat 为空时没有可高亮区域。
 
-The crosshair beside the presentation selector installs a transparent click-catching mask over the displayed main Chat. Inspector uses `elementsFromPoint()` to look below its mask and preview, then matches existing data attributes. A click selects that record in the current Inspector presentation, reveals its table ancestors, and opens its details without activating the underlying Chat control. Wheel movement is forwarded to the underlying Chat scrollport. Escape, the crosshair button, changing presentation or Session, hiding or closing the Inspector, or leaving the window cancels picking. Each plugin instance permits one active picker; separate instances do not cancel one another. Plugin unload releases its picker without calling panel callbacks and prevents old panels from restarting it.
+展示形式下拉框旁的瞄准按钮在已显示的主 Chat 上覆盖透明的点击拦截蒙层。Inspector 使用 `elementsFromPoint()` 排除自身蒙层和预览层，再匹配底下元素的现有 data 属性。点击后选中当前 Inspector 展示形式中的对应记录，展开表格祖先并打开详情，不会激活底下的 Chat 控件。滚轮操作转发给下方 Chat 滚动区域。Esc、再次点击瞄准按钮、切换展示形式或 Session、隐藏或关闭 Inspector，以及窗口失焦都会取消选取。每个插件实例同一时刻只有一个选取器有效，不同实例不会互相取消。插件卸载会释放自己的选取器，不调用面板回调，并阻止旧面板重新启动选取。
 
-Chat picking prefers the exact Node and reasoning/response part, then its Group, Step, or Turn. Session Log picking prefers a matching tool call or Node log anchor, then its Assistant, Step, or Turn record; a reasoning part selects its first reasoning block when available. Picking stays active with a notice if the loaded table has no match. Text similarity is not used. The [element and Chat-row matchers](src/client/views/chat-node/pick-match.ts) and the [log model's picker](src/client/views/session-log/model.ts) own these adjustable rules; nested tool calls may resolve to their root Node or log anchor.
+聊天节点反查优先匹配精确 Node 和 reasoning/response 分片，再退到所属 Group、Step 或 Turn。会话日志反查优先匹配 tool call 或 Node 日志锚点，再退到对应 Assistant、Step 或 Turn 记录；有推理分片时优先选中其第一个 reasoning block。已加载表格没有匹配项时显示提示，并继续等待选取。不使用文本相似度。[元素及 Chat 行匹配函数](src/client/views/chat-node/pick-match.ts)和[日志模型的选取函数](src/client/views/session-log/model.ts)负责这些可调整规则；嵌套工具调用可能定位到根 Node 或其日志锚点。
 
-Session Log uses the same field renderer for parsed JSON, with every nested object and array initially expanded. Containers can be collapsed individually; there are no reference buttons, breadcrumbs, collection-property disclosures, or collection paging. JSON retains `[Circular]` markers and readable bigint strings. Inspection failures appear locally without disabling the table. Preview filtering never removes fields from either detail presentation.
+会话日志使用同一字段渲染器展示解析后的 JSON，所有嵌套对象和数组默认全部展开。可以单独收起各层，不提供引用按钮、面包屑、集合额外属性分组或集合分页。JSON 保留 `[Circular]` 标记和可读 bigint 字符串。检查错误只在局部显示，不禁用表格。摘要过滤不移除两种详情中的字段。
 
-Ancestor rows remain sticky beneath the table header, one nesting level below another, with an opaque tinted background. Each level follows the first row not covered by the header or earlier sticky levels. Automatic block closure keeps the visible row or surviving parent at its screen position and leaves unused space only below the data; new rows fill that space before normal tail following resumes. A manual disclosure keeps the clicked header at its measured viewport position and pauses following, retaining only the trailing space needed to keep it visible. **Follow Latest** clears reserved space and resumes following. Scrolling upward or choosing **Load earlier** also pauses following. Raw Log shows UTC timestamps with the server's millisecond precision; Chat Group has no time column.
+父级行按嵌套层次依次吸顶，位于表头下方，并使用不透底的主题底色；每一级依据未被表头及前面吸顶行遮挡的首行选择。block 自动闭合时，可见行或仍存在的父级保持原屏幕位置，空白只留在数据下方；新行先填入尾部空白，填满后恢复正常跟随末尾。手动调整折叠会保持被点击组头在视口中的实测位置并暂停跟随，只保留让它可见所需的尾部空白。**跟踪最新**清除预留空白并恢复跟随。向上滚动或点击**加载更早**也会暂停跟随。原始数据显示 UTC 时间戳，保留服务端的毫秒精度；对话分组不显示时间列。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现内部细节 — 点击展开</summary>
 
-[`src/index.ts`](src/index.ts) is the inert Host discovery entry. The [tab registration](src/client/views/index.ts) contributes a page type and its Session-scoped body, borrowing the Sidebar's existing Session reference. The [combined panel](src/client/views/View.tsx) selects between the [log model](src/client/views/session-log/model.ts) and [Chat model](src/client/views/chat-node/model.ts); only the selected table subscribes. The [object index](src/client/views/chat-node/objects.ts) uses weak identities for Node and Group snapshots, their data roots, and Turn/Step locations and Data readers. Named references read current values without retaining replaced snapshots. Node enumeration uses the existing `nodes.values()` reader. The [revealer](src/client/views/chat-node/reveal.ts) and [picker](src/client/views/chat-node/picker.ts) own all DOM interaction inside this package; neither adds a Chat or Conversation API. The shared [table](src/client/views/InspectorTable.tsx) uses TanStack Virtualizer.
+[`src/index.ts`](src/index.ts) 是不执行行为的 Host 发现入口。[Tab 注册](src/client/views/index.ts)贡献页面类型及 Session 作用域的正文，借用 Sidebar 已有的 Session 引用。[合并面板](src/client/views/View.tsx)在[日志模型](src/client/views/session-log/model.ts)和 [Chat 模型](src/client/views/chat-node/model.ts)之间切换，只有当前表格订阅来源。[对象索引](src/client/views/chat-node/objects.ts)通过弱引用身份标记 Node、Group 快照、各自 data 根对象，以及 Turn/Step 位置与 Data reader。具名引用读取当前值，不保留已替换的快照。节点枚举使用现有 `nodes.values()` reader。[定位器](src/client/views/chat-node/reveal.ts)和[选取器](src/client/views/chat-node/picker.ts)在本包内负责全部 DOM 交互，不增加 Chat 或 Conversation API。共享[表格](src/client/views/InspectorTable.tsx)使用 TanStack Virtualizer。
 
-Live log appends reuse historical row objects and the Turn/Step grouping cursor. Each chunk inserts one row into its block, replaces a closing header when needed, and shifts only following root offsets. Pagination, settlement, replacement, or missed revisions rebuild the hierarchy while preserving keyed record sources. DOM strings are matched to current Group references before registry access; ungrouped Chat keys retain their upstream string type without brand assertions.
+直播日志追加复用历史行对象与 Turn/Step 分组游标。每个分片只向对应 block 插入一行，按需替换闭合组头，并调整后续根行的偏移。分页、结算、替换或跳过版本时重建层级，同时保留按键缓存的原始记录来源。DOM 字符串先匹配当前 Group 引用，再访问注册表；未分组的 Chat key 沿用上游字符串类型，不使用品牌断言。
 
 </details>
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this Inspector adds no model-facing input.
+无，因为此 Inspector 不增加模型可见输入。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; the package does not modify model requests.
+无；本包不修改模型请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Loaded history** — tables inspect the Session's loaded window; older records require pagination. Live-to-durable row identities persist across window rebuilds and are released when their rows leave the window.
-- **Projection controls** — Session Log does not display projection control-stream updates.
-- **Publication cadence** — highlighting follows published Node changes, not every internal mutation between publications. Raw data is unredacted.
-- **Large windows** — each publication still copies the immutable row-reference array; filtering and table layout also scan the loaded rows. Appends do not regroup or recreate historical rows. Opening ordinary-object fields or Other properties scans all own keys.
-- **Live suggestions** — refreshing type candidates resets keyboard selection, even for an unchanged candidate list; reselect the candidate or click it before confirming.
-- **Chat DOM dependency** — location and picking depend on existing Slot/Chat attributes and searchable-fold behavior. They require the inspected Session's Chat to be displayed in the main area; they do not switch Views or Sessions, load history, or render absent business Nodes. Approximation cannot recover an unrendered message's exact location.
+- **已加载历史** — 表格检查 Session 已加载窗口；更早记录需要分页。从实时流延续到持久化日志的行身份在窗口重建时保留，行离开窗口后释放。
+- **Projection 控制帧** — 会话日志不展示 projection 控制流更新。
+- **发布节奏** — 高亮跟随已发布的 Node 变化，不表示两次发布之间的每次内部修改。原始数据不脱敏。
+- **大窗口成本** — 每次发布仍复制不可变的行引用数组，筛选和表格布局也会扫描已加载行。追加不会重新分组或创建历史行。展开普通对象字段或其他属性时会扫描全部自身键。
+- **实时候选** — 类型候选刷新会重置键盘选中项，即使候选列表未改变；确认前需要重新选中或点击候选。
+- **Chat DOM 依赖** — 定位和选取依赖现有 Slot/Chat 属性及可搜索折叠行为，要求被检查 Session 的 Chat 已显示在主区域；不会切换 View 或 Session、加载历史或渲染不存在的业务 Node。近似定位无法还原未渲染消息的精确位置。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文 — 点击展开</summary>
 
-None.
+无。
 
 </details>

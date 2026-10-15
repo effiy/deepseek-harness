@@ -1,74 +1,74 @@
 ---
-description: "Automation-only ACP stdio application profile for users and maintainers launching persistent harness agents."
+description: "面向启动持久 harness agent（智能体）的用户与维护者，说明纯自动化 ACP（Agent Client Protocol）stdio 应用 profile。"
 kind: "package-bundle"
 ---
 
 # `@deepseek-ai/dsh-acp-app`
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The automation-only ACP stdio application as a `dsh` profile bundle over [`dsh-base`](../base/README.md). It inherits the base's disabled module-HMR policy; its patch sets the coding-agent persona and default model route, mounts an app-owned zero-option command provider, and starts [`dsh-acp`](../../acp/acp/README.md) only after that provider accepts the invocation. `dsh --profile acp --help` therefore writes help and exits without claiming stdin or stdout.
+以 [`dsh-base`](../base/README.zh.md) 为基础的纯自动化 ACP stdio 应用 `dsh` profile 组合包。它继承 base 禁用模块 HMR（热模块替换）的策略；其 patch 设置 coding agent（编程智能体）persona 与默认模型路由、挂载应用自有的零选项命令提供方，并且只在该提供方接受调用后启动 [`dsh-acp`](../../acp/acp/README.zh.md)。因此，`dsh --profile acp --help` 会写出 help 并退出，不会占用 stdin 或 stdout。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Standard automation workflow](#standard-automation-workflow)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [标准自动化工作流](#standard-automation-workflow)
+- [模型体验](#model-experience)
+- [已知限制与待办事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-The startup provider binds stdin EOF to the launcher's bounded successful shutdown. ACP connection close, SIGINT, and SIGTERM drain the bridge-owned agents and the root profile tree before exit. Stdout is reserved for newline-delimited ACP JSON-RPC frames. The bundle disables model-generated session titles because ACP exposes no title surface; deterministic fallback titles remain durable without an auxiliary model request. The inherited projection cache checkpoints ACP-created sessions for later consumers; its durability barrier flushes each covered log prefix before publishing the cache row and may split otherwise coalesced JSONL runs. A deployment selects a different complete composition through profile bundles and patch files, not another app bin.
+启动提供方把 stdin EOF 绑定到启动器的有界成功关闭。ACP 连接关闭、SIGINT 与 SIGTERM 会在退出前排空 bridge 自有 agent 以及根 profile 树。Stdout 仅保留给换行分隔的 ACP JSON-RPC 帧。ACP 不提供标题呈现能力，因此本组合包禁用模型生成的会话 title；确定性的 fallback title 仍会持久化，但不发起辅助模型请求。继承的投影缓存会为 ACP 创建的会话写入检查点，供后续消费方使用；其持久性屏障会在发布缓存行前 flush 所覆盖的日志前缀，因此可能拆分原本会合并的 JSONL 连续段。部署方通过 profile 组合包与 patch 文件选择另一套完整组合，而不是使用另一个 app bin。
 
-The shipped row creates sessions with `deepseek-official` and `deepseek-v4-flash`; a later patch can replace that row's complete config. The base profile owns adapters, tools, persistence, policy, settings, credentials, and the per-session workspace supplied by the ACP client.
+随附配置项使用 `deepseek-official` 与 `deepseek-v4-flash` 创建会话；后续 patch 可以替换该配置项的完整配置。base profile 负责适配器、工具、持久化、策略、设置、凭据，以及 ACP client 为每个会话提供的工作区。
 
 -----
 
 <a id="standard-automation-workflow"></a>
-## Standard automation workflow
+## 标准自动化工作流
 
-An ACP v1 SDK client initializes `dsh --profile acp`, creates a session with an absolute `cwd` and optional standard stdio/HTTP MCP declarations, chooses an advertised `model` or `reasoning_effort`, prompts while observing standard semantic updates, then calls `session/close`. Another process can use `session/list` and `session/resume` against the same profile persistence root; resume reconnects the MCP declarations supplied by that request and does not replay history.
+ACP v1 SDK 客户端先初始化 `dsh --profile acp`，再用绝对 `cwd` 与可选的标准 stdio／HTTP MCP 声明创建会话，选择公开的 `model` 或 `reasoning_effort`，在观察标准语义更新的同时提交提示词，最后调用 `session/close`。另一个进程可以针对同一个 profile 持久化根目录使用 `session/list` 与 `session/resume`；恢复会重新连接该请求提供的 MCP 声明，但不会回放历史。
 
-The complete supported method matrix, MCP trust model, update mapping, and stop reasons live in the [`dsh-acp` protocol contract](../../acp/acp/README.md#standard-acp-v1-surface). This profile adds no private method, capability, `_meta`, environment variable, or transport field. The keyless control-surface conformance test drives the real profile through the public ACP SDK.
+完整的受支持方法矩阵、MCP 信任模型、更新映射与停止原因见 [`dsh-acp` 协议约定](../../acp/acp/README.zh.md#standard-acp-v1-surface)。该 profile 不增加私有方法、能力、`_meta`、环境变量或传输字段。免密钥控制面一致性测试通过公开 ACP SDK 驱动真实 profile。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
 ### ACP coding-agent persona
 
-#### What the model sees
+#### 模型看到什么
 
-The profile supplies `You are a coding agent powered by the {{model}} model.` before first-party guidance; the ACP route resolves `{{model}}`. Each Session receives its current directory in required user-role context from [`dsh-working-directory`](../../session/working-directory/README.md).
+profile 在第一方指导之前提供 `You are a coding agent powered by the {{model}} model.`；ACP 路由解析 `{{model}}`。每个 Session 通过 [`dsh-working-directory`](../../session/working-directory/README.zh.md) 提供的必需 user-role 上下文接收当前目录。
 
-#### Token effect
+#### Token 影响
 
-One short stable persona plus the data-dependent base prompt sections and selected tool schemas.
+一段简短稳定的 persona，加上 base 提示词中随数据变化的部分与已选工具 schema。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Stable for a fixed profile, provider, model, and tool roster. Profile changes take effect on the next process because the shipped ACP profile uses startup-only patches.
+固定 profile、提供方、模型与工具集合下保持稳定。随附 ACP profile 只在启动时加载 patch，因此 profile 更改会在下一个进程生效。
 
-## Known Limitations and Deferred Work
+## 已知限制与待办事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **A profile can omit the ACP bridge** — a custom ACP launch profile must retain this bundle or another `dsh-acp` row; otherwise no peer answers the client.
-- **User plugins can violate stdout purity** — profile and per-launch patches are trusted application composition. The shipped bundle writes no non-protocol stdout, but it cannot contain an arbitrary inserted plugin.
-- **Configuration changes require restart** — the `acp-app` bundle disables HMR in YAML so one stdio connection never observes a replacement bridge or Agent dependency.
+- **profile 可以省略 ACP bridge**：自定义 ACP 启动 profile 必须保留本组合包或另一个 `dsh-acp` 配置项；否则没有 peer 响应 client。
+- **用户插件可能破坏 stdout 纯净性**：profile 与单次启动 patch 属于受信任的应用组合。随附组合包不会向 stdout 写入非协议内容，但无法约束任意插入的插件。
+- **配置更改需要重启**：`acp-app` 组合包在 YAML 中禁用 HMR，确保一条 stdio 连接不会观察到 bridge 或 Agent 依赖被替换。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,45 +1,45 @@
 ---
-description: "The POSIX SSH provider family: shared connection, remote filesystem, managed subprocesses and file-effect sandbox."
+description: "POSIX SSH 提供方家族：共享连接、远端文件系统、托管子进程及文件效果沙箱。"
 kind: "package-group"
 ---
 
-# ssh/ — POSIX remote execution providers
+# ssh/ — POSIX 远端执行提供方
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This family runs files, ordinary processes, terminals and sandbox enforcement on one POSIX SSH host while the Harness stays local. A shared OpenSSH connection and installed helper support the existing filesystem, subprocess and sandbox interfaces. Use it in headless or custom profiles whose consumers honor provider-owned paths.
+本家族将文件、普通进程、终端及沙箱执行放在同一台 POSIX SSH 主机上，Harness 保留在本地。共享 OpenSSH 连接与已安装辅助程序支持现有文件系统、子进程及沙箱接口。适用于消费方遵守提供方路径语义的 headless 或自定义配置组合。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Responsibility | Service |
+| 包 | 职责 | 服务 |
 |---|---|---|
-| [`ssh`](ssh/README.md) | Connection, helper identity and transport lifecycle | `ctx.ssh` |
-| [`ssh-helper-runtime`](ssh-helper-runtime/README.md) | Private Node-free executable distribution | — |
-| [`fs-ssh`](fs-ssh/README.md) | Remote file identity, reads and guarded atomic mutations | `ctx.fs` |
-| [`subprocess-ssh`](subprocess-ssh/README.md) | Executable lookup, processes, control streams and terminals | `ctx.subprocess` |
-| [`sandbox-ssh`](sandbox-ssh/README.md) | Remote file-effect confinement and enforcement facts | `ctx.sandbox` |
+| [`ssh`](ssh/README.zh.md) | 连接、辅助程序身份及传输生命周期 | `ctx.ssh` |
+| [`ssh-helper-runtime`](ssh-helper-runtime/README.zh.md) | 无须安装 Node 的私有可执行文件发行包 | — |
+| [`fs-ssh`](fs-ssh/README.zh.md) | 远端文件身份、读取及带保护的原子修改 | `ctx.fs` |
+| [`subprocess-ssh`](subprocess-ssh/README.zh.md) | 可执行文件查找、进程、控制流及终端 | `ctx.subprocess` |
+| [`sandbox-ssh`](sandbox-ssh/README.zh.md) | 远端文件效果限制及执行信息 | `ctx.sandbox` |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [SSH subsystem](../../docs/subsystems/ssh.md) — shared execution coordinates and transport ownership.
-- [POSIX SSH decision](../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.md) — alternatives, consequences and verification requirements.
+- [SSH 子系统](../../docs/subsystems/ssh.zh.md) — 共享执行坐标及传输归属。
+- [POSIX SSH 决策](../../.agents/notes/implemented/architecture/2026-09-11-posix-ssh-runtime.zh.md) — 替代方案、影响及验证要求。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文 — 点击展开</summary>
 
-Remote capability implementations retain the shared asynchronous terminal and cancellation interfaces. Local path access must never be inferred from a remote path string.
+远端能力实现保留共享异步终端及取消接口。绝不能从远端路径字符串推断本地路径访问能力。
 
 </details>

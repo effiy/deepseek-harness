@@ -1,96 +1,96 @@
 ---
-description: "Share per-Session browser ownership and MCP activation across experimental browser providers."
+description: "在实验性浏览器提供方之间共享按 Session 管理的浏览器所有权与 MCP 激活。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-experimental-browser-use-runtime
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Browser providers use this library to reuse a browser across one Session's turns and close its resources when that Session's runtime is disposed. Operations for one Session run in order, while isolated Sessions can proceed independently. Attachment mode reserves one external browser for a single Session. The library also connects provider-owned MCP servers and discovers their tools before the Session's first model request.
+浏览器提供方使用此库，在一个 Session 的多个轮次之间复用浏览器，并在该 Session 的运行时释放时关闭其资源。一个 Session 的操作按顺序运行，隔离的 Session 则可以独立推进。附加模式将一个外部浏览器保留给单个 Session。此库还连接提供方拥有的 MCP 服务器，并在 Session 首次模型请求前发现其工具。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-This public experimental library is a dependency of the browser providers. It has no plugin entry or mount configuration. The [browser-use service](../../browser-use/browser-use/README.md) remains independent of the library.
+此公共实验性库是浏览器提供方的依赖。它没有插件入口或挂载配置。[浏览器操作服务](../../browser-use/browser-use/README.zh.md)保持独立于此库。
 
-Native providers construct `SessionResources` from the package root, supplying resource acquisition and cleanup callbacks. Calls pass the exact live Agent to `run()`; stale owners and a second owner of an exclusive attachment fail before acquisition. Canceling an acquisition wait leaves initialization available to other callers in the same Session; Session disposal aborts and awaits that initialization. Providers keep their registration until `dispose()` finishes.
+原生提供方从包根入口构造 `SessionResources`，提供资源获取与清理回调。调用向 `run()` 传递确切的实时 Agent；失效的所有者与独占附加的第二个所有者在获取资源前失败。取消资源获取等待不会终止初始化，同一 Session 的其他调用方仍可继续等待；释放 Session 会中止并等待该初始化结束。提供方将注册保留到 `dispose()` 完成。
 
-MCP providers use `mountSessionMcp` from `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp`, supplying their fixed server name, executable, arguments, and ownership policy. The mounting context must provide `workingDirectory`. Acquisition uses the [working-directory service](../../session/working-directory/README.md) to validate or recover the current directory and set the MCP server process's initial directory. Retained servers keep that directory when the Session later selects another. The helper awaits one scoped client startup and discovery attempt within each future Agent's `agent/created` event. Agent creation or resume completes after discovery, before queued input runs; a successful client remains owned by that Session across turns.
+MCP 提供方使用 `@deepseek-ai/dsh-experimental-browser-use-runtime/mcp` 中的 `mountSessionMcp`，提供固定服务器名称、可执行文件、参数与所有权策略。挂载上下文必须提供 `workingDirectory`。获取连接时通过[工作目录服务](../../session/working-directory/README.zh.md)验证或恢复当前目录，并将其设为 MCP 服务器进程的初始目录。Session 后续选择其他目录时，保留的服务器继续使用该目录。辅助库在每个后续 Agent 的 `agent/created` 事件中等待一次有作用域的客户端启动与发现尝试。Agent 创建或恢复在发现完成后结束，随后才运行排队输入；成功的客户端跨轮次归该 Session 所有。
 
-A busy attachment skips startup permanently for that live activation while its other work continues. Releasing the attachment does not retry skipped activations; a newly created or resumed Agent can acquire it. Startup failure or cancellation rejects Agent creation or resume and triggers creation rollback, including client cleanup. Reconnection is disabled. Loading or reloading a provider applies only to future Agent activations.
+附加连接被占用时，本次激活永久跳过启动，但其他工作继续运行。连接释放不会触发被跳过激活的重试；新创建或恢复的 Agent 可以获取连接。启动失败或取消会拒绝 Agent 创建或恢复，并触发包含客户端清理的创建回滚。重连已禁用。加载或重新加载提供方只作用于后续的 Agent 激活。
 
-Callers can inspect prompt assembly and scoped tool definitions after awaited Agent creation or resume completes.
+调用方在等待 Agent 创建或恢复完成后，即可检查提示词组装和作用域工具定义。
 
-Browser tools and resource requests targeting this server use the same queue and require the calling Session's own connection. Other MCP servers remain usable. Inherited server instructions are omitted without ownership; the shared server-name inventory keeps its normal scope behavior.
+指向此服务器的浏览器工具调用与资源请求使用同一队列，且要求调用 Session 自己拥有连接。其他 MCP 服务器仍可使用。没有所有权时会省略继承的服务器指导；共享服务器名称目录保留常规作用域行为。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现内部机制 — 点击展开</summary>
 
-The [resource manager](src/index.ts) keys ownership by live Agent identity and joins operation cancellation with owner disposal. Each resource has one acquisition promise and one operation queue. Failed acquisition releases its reservation only after the provider callback rolls back acquired resources.
+[资源管理器](src/index.ts)以实时 Agent 身份为所有权键，并将操作取消与所有者释放关联起来。每个资源只有一个获取 promise 和一个操作队列。获取失败时，仅在提供方回调回滚已获取资源后释放保留。
 
-Disposed-cause cancellation starts resource cleanup before AgentHandle waits for idle. Cleanup closes resources before waiting for running operations, allowing connection teardown to interrupt upstream APIs without abort support. A failed close rejects disposal and retains ownership. Agent-scoped cleanup prevents a resumed Session with the same durable id from inheriting a previous browser.
+因释放而取消时，在 AgentHandle 等待空闲前开始资源清理。清理先关闭资源再等待运行中的操作，使连接清理能够中断不支持 abort 的上游 API。关闭失败会拒绝释放并保留所有权。Agent 作用域清理防止使用同一持久 id 恢复的 Session 继承之前的浏览器。
 
-The [MCP helper](src/mcp.ts) connects within serial `agent/created`; [AgentLoop](../../core/agent-loop/README.md#understand-the-implementation) holds queued input and owns creation rollback. Prompt assembly reads the initialized catalog. The helper retains the provider registration through resource cleanup and uses the [MCP client](../../mcp/mcp-client/README.md) for transport, schema discovery, result conversion, and durable image admission.
+[MCP 辅助库](src/mcp.ts)在串行 `agent/created` 中建立连接；[AgentLoop](../../core/agent-loop/README.zh.md#understand-the-implementation)保留排队输入并负责创建回滚。提示词组装读取已初始化的目录。辅助库在资源清理期间保留提供方注册，并通过 [MCP 客户端](../../mcp/mcp-client/README.zh.md)处理传输、schema 发现、结果转换与持久图像接纳。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 延伸阅读
 
-- [Browser use](../../../docs/subsystems/browser-use.md) — provider selection and Session ownership.
-- [MCP client](../../mcp/mcp-client/README.md) — discovery, cancellation, and result admission.
-- [Browser ownership decision](../../../.agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md) — registration-only service and resource lifetime.
+- [浏览器操作](../../../docs/subsystems/browser-use.zh.md) — 提供方选择与 Session 所有权。
+- [MCP 客户端](../../mcp/mcp-client/README.zh.md) — 发现、取消与结果接纳。
+- [浏览器所有权决策](../../../.agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.zh.md) — 仅注册名称的服务与资源生命周期。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through provider-owned browser tools discovered before model request assembly and through [working-directory recovery](../../session/working-directory/README.md); providers and the MCP client own tool descriptions, schemas, results, and image behavior, while the directory service owns directory context.
+通过在模型请求组装前发现的提供方浏览器工具，以及[工作目录恢复](../../session/working-directory/README.zh.md)间接影响模型；提供方与 MCP 客户端拥有工具描述、schema、结果与图像行为，目录服务拥有目录上下文。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Discovered tool schemas and provider guidance determine request-prefix changes; ordinary browser resource reuse does not alter those schemas. Directory recovery appends user context without replacing the system-prompt prefix.
+发现的工具 schema 与提供方指导决定请求前缀变化；常规浏览器资源复用不改变这些 schema。目录恢复追加用户上下文，不替换系统提示词前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Providers remain responsible for the browser operations they supply.
+提供方仍负责自己提供的浏览器操作。
 
-- **MCP activation** — providers do not adopt existing live Agents; a busy attachment is not retried within that activation.
-- **Attachment scope** — exclusive ownership applies to one resource manager, not separate providers, processes, or external browser clients.
-- **Cancellation** — abort signals and connection closure cannot undo browser actions already delivered. An upstream operation that ignores both can delay cleanup.
-- **Recovery** — a failed close retains ownership; this manager does not retry disposal or restore browser state from the Session log.
-- **Shared host runtimes** — a profile installs this package beside the dsh installation, so `@deepseek-ai/dsh-scope` and `@deepseek-ai/dsh-mcp-client` stay peer dependencies. A dependency edge ships a second `dsh-scope` copy whose scope tags host registries cannot read: each Agent's MCP tools would register in the global tool layer and the second Agent's creation would fail.
+- **MCP 激活** — 提供方不接管已有的活动 Agent；被占用的附加连接不会在本次激活中重试。
+- **附加范围** — 独占所有权作用于一个资源管理器，不约束独立提供方、进程或外部浏览器客户端。
+- **取消** — abort 信号与连接关闭无法撤销已交付的浏览器操作。同时忽略两者的上游操作可能延迟清理。
+- **恢复** — 关闭失败会保留所有权；此管理器不重试释放，也不从 Session 日志恢复浏览器状态。
+- **共享宿主运行时** — profile 会把本包与 dsh 安装并排安装，因此 `@deepseek-ai/dsh-scope` 与 `@deepseek-ai/dsh-mcp-client` 保持为 peer 依赖。写成 `dependencies` 会再装一份 `dsh-scope`，它的作用域标记宿主注册表读不到：每个 Agent 的 MCP 工具都会注册到全局工具层，第二个 Agent 的创建随之失败。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文 — 点击展开</summary>
 
-None.
+无。
 
 </details>

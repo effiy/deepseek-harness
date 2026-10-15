@@ -1,41 +1,41 @@
 ---
-description: "The model-facing persistent bash tool for users and maintainers choosing, configuring, or debugging owner-scoped shell state that survives across calls."
+description: "面向模型的持久 bash 工具，供选择、配置或排查跨调用保留的按所有者隔离 shell 状态的使用者与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-bash-persistent
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This package gives an agent a `bash` tool whose cwd, exported variables, functions, and background jobs persist across calls. Each agent receives an isolated shell, and its commands run sequentially. Choose it for workflows that depend on cross-call state; use `dsh-tool-bash` when every command should start clean. Configure the PTY backend and per-command timeout; `exit`, timeout, or cancellation resets the shell, while interactive commands that wait for stdin may run until timeout.
+本包为 agent（智能体）提供 `bash` 工具，使 cwd、导出的变量、函数与后台任务跨调用保留。每个 agent 都有隔离的 shell，其命令串行执行。需要跨调用状态的工作流应选择本包；每条命令都应从干净环境开始时使用 `dsh-tool-bash`。配置 PTY 后端与单条命令的超时；`exit`、超时或取消会重置 shell，而等待 stdin 的交互式命令可能一直运行到超时。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-A new shell starts in the Session's current working directory. Once created, its directory and environment remain independent of later Session directory changes.
+新 shell 从 Session 的当前工作目录启动。创建后，shell 的目录与环境独立保留，不受后续 Session 目录切换影响。
 
-Load this plugin in any composition where the agent should keep shell state between commands — for example long build sessions, activated environments, or scripts that export variables for later steps. It registers the `bash` tool and requires the `ctx.tools` and `ctx.terminals` services plus an owning agent session at execution time.
+在 agent 需要在命令之间保持 shell 状态的任何组合中加载本插件——例如长时间构建会话、已激活的环境，或为后续步骤导出变量的脚本。它注册 `bash` 工具，需要 `ctx.tools` 与 `ctx.terminals` 服务，并在执行时需要拥有者 agent 会话。
 
-### When to choose it
+### 何时选择
 
-Choose the persistent tool when work depends on cross-call state: a one-shot `dsh-tool-bash` call cannot remember a `cd` or an exported variable. Choose the one-shot tool when every command should start from a known, clean environment, or when the command is short and self-contained. Commands that need interactive stdin are unsupported here — a foreground child that reads input blocks until the command timeout — so interactive work belongs to the terminal tools.
+当工作依赖跨调用状态时选择持久工具：一次性 `dsh-tool-bash` 调用无法记住 `cd` 或导出的变量。当每条命令都应从已知、干净的环境开始，或命令又短又独立时，选择一次性工具。这里不支持需要交互 stdin 的命令——读取输入的前台子进程会一直阻塞到命令超时——因此交互工作属于 terminal 工具。
 
-### Minimal configuration
+### 最小配置
 
-The default `shell` backend starts an interactive bash through `dsh-terminal-bash`; deployments may register another PTY backend and select it by name.
+默认的 `shell` 后端通过 `dsh-terminal-bash` 启动交互式 bash；部署方可以注册其他 PTY 后端并按名称选择。
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -43,118 +43,118 @@ The default `shell` backend starts an interactive bash through `dsh-terminal-bas
 - name: '@deepseek-ai/dsh-tool-bash-persistent'
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `backendType` | `shell` | Registered PTY backend used for each agent's shell |
-| `timeoutMs` | `300,000` | Wall-clock limit for one command; timeout closes the shell |
-| `maxOutputChars` | `16,000` | Maximum retained command-output characters; fixed diagnostics are added afterward |
-| `description` | `Run commands in a persistent bash shell. State, including the current directory and exported environment variables, persists across calls for this agent.` | Model-facing environment contract; deployments may describe their environment |
+| `backendType` | `shell` | 用于每个 agent shell 的已注册 PTY 后端 |
+| `timeoutMs` | `300,000` | 单条命令的墙钟上限；超时关闭 shell |
+| `maxOutputChars` | `16,000` | 保留的命令输出字符上限；固定诊断信息在其后追加 |
+| `description` | `Run commands in a persistent bash shell. State, including the current directory and exported environment variables, persists across calls for this agent.` | 面向模型的环境约定；部署方可描述自己的环境 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash-persistent) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-bash-persistent)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### What the agent can rely on
+### agent 可以依赖什么
 
-Commands share one shell per agent, so state persists until an `exit`, a timeout, or a reset — each of which closes the shell and tells the agent the next call starts from the workspace with a fresh directory and environment. Results exclude the private completion markers; every settled command appends `[Command finished with exit code N]`, and a shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]`, then resets. Long output keeps the earliest retained prefix plus a clipping notice; if the terminal has already dropped that prefix, the result says so explicitly rather than presenting a tail as complete output.
+命令共享每个 agent 一个 shell，因此状态一直保留到 `exit`、超时或重置——每一种都会关闭 shell 并告诉 agent 下一次调用从工作区的新目录与环境开始。结果排除私有完成标记；每条完成的命令都追加 `[Command finished with exit code N]`，而在报告该状态前就退出的 shell 改为追加 `[shell exited: code N]`、`[shell killed by signal: SIG]` 或 `[shell exited]`，然后重置。长输出保留最早的已保留前缀并附裁剪通知；若 terminal 已经丢弃该前缀，结果会明确说明，而不是把尾部当作完整输出呈现。
 
-### What can go wrong
+### 可能出什么问题
 
-A call without an owning agent session fails with `bash requires an owning agent session`, and a composition without a PTY backend activates the tool but fails its first call with `no PTY backend registered for "shell"`. An interactive foreground child (for example a REPL) returns early with partial output only where the backend proves its stdin wait; elsewhere the call runs to `timeoutMs`, which closes the uncertain shell and reports the reset. Cancellation also resets and discards the result, even when a complete status marker is already observable. After cleanup settles, ToolRuntime publishes `Error: tool call aborted` with code `ABORTED`; cancellation reasons are not rendered as command output. A queued cancelled call sends no command.
+没有拥有者 agent 会话的调用会以 `bash requires an owning agent session` 失败，没有 PTY 后端的组合会激活该工具，但首次调用以 `no PTY backend registered for "shell"` 失败。交互式前台子进程（例如 REPL）只有在后端证明其 stdin 等待时才提前返回部分输出；否则调用一直运行到 `timeoutMs`，随后关闭不确定的 shell 并报告重置。取消也会重置并丢弃结果，即使完整状态标记已经可观察。清理完成后，ToolRuntime 发布 `Error: tool call aborted`，错误码为 `ABORTED`；取消原因不作为命令输出渲染。排队期间被取消的调用不发送命令。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the tool and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释工具背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-- **One shell per owner, nothing shared.** The shell registry keys every session by the calling `Agent`, so concurrent agents never share state, and commands for the same agent are serialized through a per-owner queue.
-- **Marker-anchored extraction.** Each command is wrapped with unique start/end markers carrying the exit status; the tool polls the PTY scrollback and extracts the span between the real markers, so prompts and echoed input never leak into results.
-- **Reset, never repair.** Any uncertain state — an explicit `exit`, a timeout, a send failure, an abort — closes the shell and starts the next call fresh, because a half-known shell is worse than a clean one.
-- **Owner-scoped lifecycle.** Shells are created lazily on first use and killed on plugin disposal or owner teardown; the owner-scoped `ctx.terminals` service fences every operation to the owning agent.
+- **每个 owner 一个 shell，互不共享。** shell 注册表按调用方 `Agent` 为每个会话建键，因此并发 agent 永不共享状态，同一 agent 的命令通过按 owner 的队列串行化。
+- **标记锚定提取。** 每条命令都用携带退出状态的唯一起止标记包装；工具轮询 PTY scrollback 并提取真实标记之间的区间，因此提示符与回显输入永不泄漏进结果。
+- **重置，而非修复。** 任何不确定状态——显式 `exit`、超时、发送失败、中止——都会关闭 shell 并让下一次调用从全新状态开始，因为半知情的 shell 不如干净的 shell。
+- **按 owner 的生命周期。** shell 在首次使用时惰性创建，在插件释放或 owner 拆除时终止；按所有者隔离的 `ctx.terminals` 服务把每个操作都围栏到拥有它的 agent。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: shell registry, command wrapping, scrollback polling, extraction and rendering |
+| [`src/index.ts`](src/index.ts) | 插件入口：shell 注册表、命令包装、scrollback 轮询、提取与渲染 |
 
-### Command flow
+### 命令流程
 
-A first command spawns the shell through `ctx.terminals.spawn`, disables input echo (`stty -echo`), and waits for readiness. Each command is then wrapped into one physical line — a printf of the start marker, the command body escaped with `$'…'`, and a printf of the end marker plus `$?` — so embedded newlines cannot leak terminal prompts into the result. The tool polls the scrollback in 1,000-line pages until the end marker appears, extracts the span, and renders it with any status marker. A timeout aborts the deadline, captures the partial output, and resets the shell.
+首条命令通过 `ctx.terminals.spawn` 生成 shell，禁用输入回显（`stty -echo`），并等待就绪。随后每条命令都包装成一行物理文本——printf 起始标记、用 `$'…'` 转义的命令体、printf 结束标记加 `$?`——因此内嵌换行无法把终端提示符泄漏进结果。工具以 1,000 行一页轮询 scrollback，直到出现结束标记，提取区间并连同任何状态标记一起渲染。超时会中止截止时间、捕获部分输出并重置 shell。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the terminal family to the seam, the backends, and the design note behind owner-scoped sessions.
+当包级约定不够用时阅读以下页面。它们从 terminal 家族逐步进入 seam、后端，以及按所有者会话背后的设计笔记。
 
-- [terminal package map](../../terminal/README.md) — the persistent PTY capability family.
-- [terminal seam](../../terminal/terminal/README.md) — the `ctx.terminals` service behind the tool.
-- [terminal-bash backend](../../terminal/terminal-bash/README.md) — the default `shell` backend.
-- [tool-terminal](../../experimental/tool-terminal/README.md) — six model-facing terminal tools for interactive work.
-- [Persistent PTY sessions Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the owner-scoped session design and its rationale.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash-persistent) — the exact `bash` argument schema.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-bash-persistent) — every accepted config field and its source declaration.
+- [terminal 包映射](../../terminal/README.zh.md)——持久 PTY 能力家族。
+- [terminal seam](../../terminal/terminal/README.zh.md)——工具背后的 `ctx.terminals` 服务。
+- [terminal-bash 后端](../../terminal/terminal-bash/README.zh.md)——默认的 `shell` 后端。
+- [tool-terminal](../../experimental/tool-terminal/README.zh.md)——面向交互工作的六个模型侧 terminal 工具。
+- [持久 PTY 会话 Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.zh.md)——按所有者会话的设计及其理由。
+- [生成的工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-bash-persistent)——`bash` 参数 schema 的确切内容。
+- [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-bash-persistent)——每个受支持配置字段及其源声明。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Tool schema
+### 工具 schema
 
-#### What the model sees
+#### 模型看到什么
 
-The generated [`bash` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-bash-persistent), including the configured `description`. The plugin contributes no standalone system-prompt section; the deployment owns persona and environment guidance.
+生成的 [`bash` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-bash-persistent)，包括配置的 `description`。本插件不贡献独立的系统提示词区段；人设与环境指引由部署方负责。
 
-#### Token effect
+#### Token 影响
 
-Fixed schema cost while `bash` is visible.
+`bash` 可见期间产生固定 schema 开销。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Prefix-stable while the configured description and schema remain unchanged.
+只要配置的描述与 schema 不变，前缀就保持稳定。
 
-### Tool results
+### 工具结果
 
-#### What the model sees
+#### 模型看到什么
 
-Commands share one shell per agent, so cwd, exported variables, activated environments, functions, and background jobs persist across calls. Results exclude private completion markers. When the shell reads stdin again without having printed the completion marker — after `exec`, an interrupt, or an interactive foreground child whose stdin wait the provider proves — the call returns the captured partial output, which can end with the backend's own prompt text. Every settled command appends `[Command finished with exit code N]`; a shell that exits before reporting that status instead appends `[shell exited: code N]`, `[shell killed by signal: SIG]`, or `[shell exited]` when the backend supplies neither, then resets and tells the model that the next call starts fresh. Long output keeps the earliest retained prefix plus a clipping notice. If the PTY has already dropped that prefix, the result says so explicitly instead of presenting a tail as complete output. Timeout returns bounded partial output followed by `[Command timed out or OOM]`, closes the uncertain shell, and reports the reset.
+命令共享每个 agent 一个 shell，因此 cwd、导出的变量、已激活的环境、函数与后台任务都会跨调用保留。结果排除私有完成标记。当 shell 在没有打印完成标记的情况下再次读取 stdin——`exec`、中断，或提供方证明其 stdin 等待的交互式前台子进程之后——调用返回捕获的部分输出，它可能以后端自己的提示符文本结尾。每条完成的命令都追加 `[Command finished with exit code N]`；在报告该状态前就退出的 shell 改为追加 `[shell exited: code N]`、`[shell killed by signal: SIG]`，或后端两者都未提供时的 `[shell exited]`，然后重置并告诉模型下一次调用从全新状态开始。长输出保留最早的已保留前缀并附裁剪通知。若 PTY 已经丢弃该前缀，结果会明确说明，而不是把尾部当作完整输出呈现。超时返回有界部分输出并追加 `[Command timed out or OOM]`、关闭不确定的 shell 并报告重置。
 
-#### Token effect
+#### Token 影响
 
-Data-dependent. `maxOutputChars` bounds retained command output; fixed clipping, lost-prefix, status, timeout, and reset diagnostics can extend the result.
+依数据而定。`maxOutputChars` 限制保留的命令输出；固定的裁剪、丢失前缀、状态、超时与重置诊断可能延长结果。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only tool results follow the reusable request prefix.
+仅追加的工具结果位于可复用请求前缀之后。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tool is a poor fit or needs special care. They are current package constraints, not a task backlog.
+这些限制说明工具何时不合适或需要特别小心。它们是当前包约束，不是任务积压。
 
-- **The tool requires an owning agent and a real PTY backend** — agent-less calls and backends that cannot start an interactive shell fail.
-- **An interactive foreground child returns early with partial output only where the subprocess provider proves its stdin wait** — elsewhere the call runs to `timeoutMs`.
-- **Explicit `exit` and timeout discard shell state** — cancellation also resets and discards the result, even when a complete status marker is already observable; the next call starts a fresh shell.
-- **Environment facts such as network access and package mirrors belong in the configured `description`** — not this package's default.
+- **工具需要拥有者 agent 与真实的 PTY 后端**——无 agent 的调用与无法启动交互 shell 的后端都会失败。
+- **交互式前台子进程只在子进程提供方证明其 stdin 等待时才提前返回部分输出**——否则调用一直运行到 `timeoutMs`。
+- **显式 `exit` 与超时会丢弃 shell 状态**——取消同样重置并丢弃结果，即使完整状态标记已经可观察；下一次调用启动全新 shell。
+- **网络访问与包镜像等环境事实属于配置的 `description`**——而不是本包的默认描述。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,58 +1,58 @@
 ---
-description: "The out-of-process SDK subagent backend for users and maintainers choosing a delegation provider, configuring a child Harness runtime, or debugging local nested child runs."
+description: "面向用户与维护者的进程外 SDK subagent 后端，用于选择委派提供方、配置子 Harness 运行时，或排查本地嵌套子 agent（智能体）的运行问题。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent-dsh-sdk
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-subagent-dsh-sdk` runs each delegated task in a fresh DeepSeek Harness subprocess with its own profile, session, model route, and tools. The parent provides the task and working directory, while each child uses its configured runtime and remains isolated from the parent conversation. The parent receives the child's final assistant text or a safe error; intermediate messages and tool traffic stay inside the child process. Choose this backend when delegation needs a complete Harness runtime rather than shared in-process state, and accept the cost of starting a new process for every run.
+`dsh-subagent-dsh-sdk` 在全新的 DeepSeek Harness 子进程中运行每个委派任务，子进程拥有自己的 profile、会话、模型路由与工具。父级提供任务与工作目录，每个子进程使用其已配置的运行时，并与父级对话保持隔离。父级只会收到子进程最终的 assistant 文本或安全错误；中间消息与工具流量保留在子进程内。当委派需要完整的 Harness 运行时而不是共享进程内状态时，选择此后端，并接受每次运行都要启动新进程的成本。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this provider when a delegation should run as a complete Harness runtime in its own process. The common path is explicit: mount the seam, mount this provider, configure `dshBin` when needed, and select the child `profile` and ordered `patches`.
+当委派应以完整 Harness 运行时在独立进程中运行时，挂载本提供方。常用路径是显式的：挂载 seam、挂载本提供方，按需配置 `dshBin`，并选择子级 `profile` 与有序 `patches`。
 
-### When to choose it
+### 何时选择
 
-Choose this backend when the child must be a full harness peer — its own composition, session persistence, model route, and tools — rather than an agent that shares the parent's process. Choose an in-process backend when the child must share the parent's composition or honor parent-enforced non-route capabilities: this provider accepts agent route options but rejects structured output, depth caps, tool filters, and personas rather than silently omitting them.
+当子进程必须是完整的 harness 对等体——拥有自己的组合、会话持久化、模型路由与工具——而不是共享父进程的 agent 时，选择此后端。当子进程必须共享父级组合或遵守父级强制的非路由能力时，请选择进程内后端：本提供方接受 agent 路由选项，但会拒绝结构化输出、深度上限、工具过滤或 persona，而不是静默省略。
 
-The provider advertises `agentOptions: true`, with `outputSchema`/`depthLimit`/`toolFilter`/`persona` false, and `inheritsParentContext: false`. Its immutable `agentRouteDefaults` publish the configured provider/model baseline to `dsh-tool-subagent` before model overrides and exact-route preflight; the backend applies the same configuration defaults during activation startup, including `maxTokens`. Agent route values cross the SDK wire as an explicit whitelist; the child remains a fresh runtime in another process, and the child process uses the selected effective directory while its Session retains the parent origin directory. `dsh-tool-subagent` deployments over this provider set `maxDepth: 'provider-managed'` — the child harness owns its own recursion budget.
+提供方声明 `agentOptions: true`，同时保持 `outputSchema`/`depthLimit`/`toolFilter`/`persona` 为 false，并且 `inheritsParentContext: false`。不可变的 `agentRouteDefaults` 会在模型覆盖与确切路由预检前，把配置的 provider／model 基线公开给 `dsh-tool-subagent`；后端在 activation 启动时应用同一份配置默认值，包括 `maxTokens`。agent 路由值通过显式白名单跨越 SDK 协议；子进程仍是另一进程里的全新运行时，子进程使用所选有效目录，而其 Session 保留父级起始目录。基于本提供方的 `dsh-tool-subagent` 部署应设置 `maxDepth: 'provider-managed'`——子 harness 拥有自己的递归预算。
 
-### Configuration
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `providerName` | `dsh-sdk` | Registry name on `ctx.subagents` |
-| `dshBin` | SDK dependency | Explicit dsh CLI module, resolved and checked at plugin load; omission uses the SDK dependency |
-| `profile` | `sdk` | Named child profile |
-| `patches` | `[]` | Ordered per-launch profile patch files, resolved and checked at plugin load |
-| `dshHome` | required | Absolute isolated Harness home for every nested child process |
-| `provider` | `deepseek-official` | Provider route sent in the child's `initialize` |
-| `model` | `deepseek-v4-flash` | Model sent in the child's `initialize` |
-| `maxTokens` | adapter/provider route default | Per-request output-token cap sent in the child's `initialize` |
-| `env` | `{}` | Explicit child environment layered over the credential-scrubbed parent environment |
-| `shutdownTimeoutMs` | `1000` | Bound on the protocol `shutdown` exchange during dispose |
-| `disposeEofGraceMs` | `6000` | Grace after stdin EOF before platform termination |
-| `disposeGraceMs` | `3000` | Exit-confirmation grace after termination |
+| `providerName` | `dsh-sdk` | `ctx.subagents` 上的注册表名称 |
+| `dshBin` | SDK 依赖 | 显式 dsh CLI（命令行界面）模块，在插件加载时解析并校验；省略则使用 SDK 依赖 |
+| `profile` | `sdk` | 具名子 profile |
+| `patches` | `[]` | 每次启动的有序 profile patch 文件，在插件加载时解析并校验 |
+| `dshHome` | 必填 | 每个嵌套子进程的绝对隔离 Harness home |
+| `provider` | `deepseek-official` | 写入子进程 `initialize` 的提供方路由 |
+| `model` | `deepseek-v4-flash` | 写入子进程 `initialize` 的模型 |
+| `maxTokens` | 适配器／提供方路由默认值 | 写入子进程 `initialize` 的单次请求输出 token 上限 |
+| `env` | `{}` | 叠加在已清理凭据的父环境之上的显式子环境 |
+| `shutdownTimeoutMs` | `1000` | dispose（资源释放）期间协议 `shutdown` 交换的时限 |
+| `disposeEofGraceMs` | `6000` | stdin EOF 之后、平台终止之前的宽限 |
+| `disposeGraceMs` | `3000` | 终止后的退出确认宽限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-dsh-sdk) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-subagent-dsh-sdk)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-Request `agentOptions` override `provider`, `model`, and `maxTokens` independently. `reasoningEffort` has no provider-instance default: an omitted request leaves it absent so the selected child model resolves its own default. The model-facing subagent tool can select provider/model/reasoning per call; `maxTokens` remains deployment-controlled through tool config or this provider's default.
+请求 `agentOptions` 会分别覆盖 `provider`、`model` 与 `maxTokens`。`reasoningEffort` 没有提供方实例默认值：请求省略时保持缺省，由所选子模型解析自身默认值。面向模型的 subagent 工具可在每次调用时选择提供方／模型／推理强度；`maxTokens` 仍由工具配置或本提供方默认值在部署侧控制。
 
 ```yaml
 - id: subagent-dsh-sdk
@@ -70,118 +70,118 @@ Request `agentOptions` override `provider`, `model`, and `maxTokens` independent
   config: { provider: dsh-sdk, toolName: subagent, maxDepth: 'provider-managed' }
 ```
 
-### What you get
+### 你会得到什么
 
-A successful run returns the child's final assistant text (or accumulated partial text after cancellation) as result output. The child's model route, tools, and session come from the child runtime itself — the parent supplies the task, working directory, and `initialize` route. The child's last durable `turn/end` maps into the seam vocabulary: `completed` and `max-tokens` pass through, `blocked` becomes `refusal`, and an unexpected or missing terminal becomes `error`. An `aborted` result stays aborted; only a child-side `disposed` cause adds a `child-disposed` diagnostic.
+成功的运行会把子进程最终的 assistant 文本（或取消后累积的部分文本）作为结果输出返回。子进程的模型路由、工具与会话来自子运行时自身——父级提供任务、工作目录与 `initialize` 路由。子进程最后一个持久化 `turn/end` 会映射进 seam 词汇：`completed` 与 `max-tokens` 原样通过，`blocked` 变为 `refusal`，意外终态或缺少终态变为 `error`。`aborted` 结果保持中止；只有子进程侧 `disposed` 原因会附加 `child-disposed` 诊断。
 
-### Failure and recovery
+### 失败与恢复
 
-The configured SDK runtime must implement `session/wait`; a runtime without it reports an execution failure. Update the provider and a separately configured `dshBin` runtime together. An already-aborted request fails before path resolution or spawn. A route, spawn, handshake, or pre-publication cancellation failure ordinarily rejects only after the subprocess is reaped. If initialization and cleanup both fail, the ordered safe facts preserve both failures without claiming quiescence. A child runtime that fails after publication settles through the run rather than rejecting it; partial output stays separate from the safe diagnostic. Diagnostics expose only the provider plus `initialize`, `session-run`, or `shutdown` stage and a fixed category. They never copy SDK messages, stderr, paths, task content, environment values, credentials, or protocol payloads.
+配置的 SDK 运行时必须实现 `session/wait`；不支持该请求的运行时会报告执行失败。请一并更新提供方与单独配置的 `dshBin` 运行时。已取消的请求会在路径解析或 spawn 之前失败。路由、spawn、握手或发布前取消失败通常只在子进程被回收后拒绝；如果初始化与清理均失败，有序安全事实会保留两项失败，而不会宣称已完全停稳。子运行时在发布后失败时会通过运行本身结算，而不是拒绝；部分输出与安全诊断保持分离。诊断只公开提供方、`initialize`、`session-run` 或 `shutdown` 阶段，以及固定类别。SDK 消息、stderr、路径、任务内容、环境值、凭据和协议载荷绝不会复制到诊断中。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains how the backend drives a child Harness runtime and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+本节解释后端如何驱动子 Harness 运行时，以及可观察行为从何而来；完整约定见[使用本包](#use-this-package)。
 
-### Design concept
+### 设计理念
 
-- **Full harness peer.** Each child is a complete Harness runtime in its own process — own composition, session, model route, and tools; only the resolved working directory and the `initialize` route cross from the parent.
-- **One runtime per run.** Every run spawns a fresh runtime process; there is no pooling.
-- **The JSON-RPC wire is the serialization boundary.** Same-process subagent values are not defensively cloned; the protocol is where hostile input is validated.
+- **完整 harness 对等体。** 每个子进程都是独立进程中的完整 Harness 运行时——拥有自己的组合、会话、模型路由与工具；只有解析后的工作目录与 `initialize` 路由从父级跨越。
+- **每次运行一个运行时。** 每次运行都 spawn 全新运行时进程；没有进程池。
+- **JSON-RPC 协议格式（wire format）是序列化边界。** 同进程 subagent 值不会为防御目的克隆；协议才是校验不可信输入的地方。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, provider registration |
-| [`src/run.ts`](src/run.ts) | The SDK run lifecycle, answer extraction, and stop-reason mapping |
+| [`src/index.ts`](src/index.ts) | 插件入口：config schema、提供方注册 |
+| [`src/run.ts`](src/run.ts) | SDK 运行生命周期、答案提取与停止原因映射 |
 
-### Run flow
+### 运行流程
 
-A start resolves the child's working directory and one process-wide SDK route before spawning. Each declared `request.agentOptions` field (`provider`, `model`, `reasoningEffort`, or `maxTokens`) overrides the matching provider-instance default; omission preserves the configured provider/model and optional cap, while reasoning effort remains absent unless the request supplies it. The provider spawns the runtime through the SDK client and completes the `initialize` handshake, including exact-model and effort validation, before it fulfills. A route, spawn, handshake, or pre-publication cancellation failure rejects only after the subprocess is reaped; a working-directory resolution failure rejects before spawning. After publication the provider subscribes to the child Session, queues its prompt, and waits through `session/wait` for managed descendants and subsequent root turns. It reads the child's answer from the ordered session events: the last complete non-empty `assistant/message` (an empty-content message that records usage is skipped), or the accumulated `text-delta` stream when no such message exists. Disposal is idempotent: it settles the result locally as `aborted`, sends a bounded protocol `shutdown` request, then escalates through stdin EOF → SIGTERM → SIGKILL to actual exit. The activation manager owns that run after acceptance; the caller's startup signal no longer cancels the child. Each activation executes once, and its receipt cancels execution and awaits cleanup.
+一次启动会在 spawn 前解析子进程工作目录与一条进程级 SDK 路由。`request.agentOptions` 中每个已声明字段（`provider`、`model`、`reasoningEffort` 或 `maxTokens`）都会覆盖对应的提供方实例默认值；省略时保留已配置的提供方／模型与可选上限，而推理强度只有在请求提供时才会出现。随后，提供方通过 SDK 客户端 spawn 运行时，并在履行前完成 `initialize` 握手，其中包括确切模型与推理强度校验。路由、spawn、握手或发布前取消失败时，只会在子进程被回收后拒绝；工作目录解析失败则会在尚未 spawn 任何内容时拒绝。发布后，提供方先订阅子会话，再排入提示词，并通过 `session/wait` 等待受管理后代与根 Agent 后续轮次。它从有序会话事件中读取答案：最后一条完整且非空的 `assistant/message`（记录 usage 的空内容消息会被跳过）；若没有这类消息，则取累积的 `text-delta` 流。dispose 是幂等的：先在本地把结果确定为 `aborted`，发出有界的协议 `shutdown` 请求，再经 stdin EOF → SIGTERM → SIGKILL 升级到实际退出。任务接受后由 activation 管理器拥有该运行；此后调用方的启动信号不再取消子任务。每个 activation 只执行一次，其凭据用于取消执行并等待清理。
 
-### Stop-reason mapping
+### 停止原因映射
 
-The child's last `turn/end` reason maps into the shared stop-reason vocabulary in [`src/run.ts`](src/run.ts).
+子进程最后一个 `turn/end` 的原因会映射进共享的停止原因词汇，实现见 [`src/run.ts`](src/run.ts)。
 
-### Process boundary
+### 进程边界
 
-The child environment is the subprocess seam's credential-scrubbed parent environment with explicit `config.env` values merged after the scrub. The child is spawned by the SDK client rather than through `ctx.subprocess` — the documented exception for SDK-managed transports — which is why this backend applies the scrub itself.
+子进程环境以子进程 seam 中已清除凭据的父环境为基础，并在清除之后合并显式 `config.env` 值。子进程由 SDK 客户端 spawn，而不是经由 `ctx.subprocess`——这是 SDK 托管传输的文档化例外——因此本后端会自行执行环境清理。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from this backend to the seam it plugs into and the SDK it drives.
+当包级约定不够用时阅读以下页面。它们从本后端逐步进入它接入的 seam 与它驱动的 SDK。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
-- [dsh-subagent seam](../subagent/README.md) — the registry and start API this provider registers on.
-- [ACP subagent backend](../subagent-acp/README.md) — the sibling out-of-process provider over the Agent Client Protocol.
-- [TypeScript SDK client](../../sdk/client/README.md) — the stdio JSON-RPC client this backend drives the child through.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-dsh-sdk) — every accepted config field and its source declaration.
+- [Subagent 子系统](../../../docs/subsystems/subagent.zh.md)——服务约定、提供方约定与终态结果语义。
+- [dsh-subagent seam](../subagent/README.zh.md)——本提供方注册于其上的注册表与启动 API。
+- [ACP subagent 后端](../subagent-acp/README.zh.md)——经 Agent Client Protocol 的兄弟进程外提供方。
+- [TypeScript SDK 客户端](../../sdk/client/README.zh.md)——本后端用以驱动子进程的 stdio JSON-RPC 客户端。
+- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-subagent-dsh-sdk)——每个受支持配置字段及其源声明。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Child-agent request
+### 子 agent 请求
 
-#### What the model sees
+#### 模型看到什么
 
-The child runtime's model receives the standalone task as its user message plus that runtime's own configured system prompt, tools, and fresh session. It receives no parent conversation. A parent tool call may choose the child provider, model, and reasoning effort for this run; the selected route and any deployment-owned output cap are fixed for the new child process. Persona, tool filtering, depth enforcement, and structured output remain unsupported and are rejected instead of silently omitted.
+子运行时的模型会收到作为用户消息的独立任务，以及该运行时自身配置的系统提示词、工具和全新会话。它不会收到父级对话。父级工具调用可以为本次运行选择子级提供方、模型与推理强度；所选路由和由部署控制的可选输出上限会固定到这个新子进程。persona、工具过滤、深度强制与结构化输出仍不受支持，并会被拒绝而不是静默省略。
 
-#### Token effect
+#### Token 影响
 
-The child pays for an independent full context and its own multi-step history. These tokens never enter the parent's context.
+子运行时会为独立的完整上下文及其多步骤历史消耗 token。这些 token 绝不会进入父级上下文。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Independent of the parent request cache. Each SDK child can reuse only prefixes identical under its own provider, model, composition, and history; child steps otherwise grow append-only.
+与父级请求缓存相互独立。每个 SDK 子进程只能复用其自身提供方、模型、组合和历史均相同时的前缀；除此之外，子 agent 的步骤仅追加增长。
 
-### Parent tool result, indirectly
+### 父级工具结果（间接）
 
-#### What the model sees
+#### 模型看到什么
 
-Through `dsh-tool-subagent`, the parent model first receives a child id, then a completion notice containing final or partial assistant text, the stop reason, and safe diagnostic. The parent Session independently retains the external task identity and complete terminal result. Intermediate messages and tool traffic do not enter the parent Session.
+通过 `dsh-tool-subagent`，父模型先收到 child id，随后收到含最终或部分 assistant 文本、停止原因与安全诊断的完成通知。父会话独立保存外部任务身份和完整终态结果。中间消息与工具通信不进入父会话。
 
-#### Token effect
+#### Token 影响
 
-Parent input grows by the start acknowledgement and completion notice, whose size depends on the result data and persists until compaction. This provider adds no parent schema by itself.
+父级输入增加启动确认与完成通知，内容大小取决于数据，并保留到压缩（compaction）为止。本提供方自身不会向父级添加任何 schema。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a general SDK comparison or a task backlog.
+这些限制说明本后端何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是通用 SDK 对比或任务积压。
 
-- **A fresh runtime process per run** — no pooling; a harness runtime boots a full plugin tree, so per-run spawn cost is higher than the ACP backend's typical child.
-- **No non-route start-time capabilities** — the parent can select the child agent route but cannot enforce `outputSchema`, depth, tool filters, or persona inside the child process; configure the selected child profile and its ordered patches instead.
-- **The child's transcript stays in the child's own session root** — the parent log retains the external task identity and full result, while the streamed `session.event` channel is consumed for output extraction rather than transcript replication.
-- **Local child processes only** — the resolved working directory is a local path; a remote runtime would need its own backend.
+- **每次运行都使用全新的运行时进程**——不使用进程池；harness 运行时需要启动完整的插件树，因此每次运行的 spawn 成本高于 ACP 后端通常使用的子进程。
+- **不支持路由之外的启动时能力**——父级可以选择子 agent 路由，但无法在子进程内强制执行 `outputSchema`、深度限制、工具过滤或 persona；应改为配置所选子 profile 及其有序 patch。
+- **子任务转录保留在子进程自己的会话根目录中**——父日志保留外部任务身份与完整结果；流式 `session.event` 通道用于提取输出，不用于复制子任务转录。
+- **仅支持本地子进程**——解析出的工作目录是本地路径；远程运行时需要独立的后端。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为与限制以上文和包代码为准。
 
-- **Spawn cost** — the full plugin tree per run is the price of full isolation; pooling would change that trade-off.
-- **Remote runtimes** — a remote runtime would need its own backend and workspace mapping.
+- **Spawn 成本**——每次运行加载完整插件树是彻底隔离的代价；池化会改变这一权衡。
+- **远程运行时**——远程运行时需要独立的后端与工作区映射。
 
 </details>

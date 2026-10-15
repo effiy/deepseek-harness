@@ -1,121 +1,121 @@
 ---
-description: "In-app browsing backend of the directory-picker seam: one-level directory listing and child-directory creation for the web GUI host, serving remote clients too."
+description: "目录选择 seam 的应用内浏览后端：为 web GUI 宿主提供单层目录列举与子目录创建，也能服务于远程客户端。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-directory-picker-browse
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Users who cannot reach an OS chooser still pick a workspace directory through `dsh-host-directory-picker-browse`: it provides one-level directory listing and child-directory creation over Node's standard library, and nothing renders on the host display — so it serves the remote clients the native backend cannot reach. Listings return directories only, name-sorted, with symlink-to-directory following and a host-owned `hidden` flag; creation is non-recursive and validates a single path segment. One composition row also fills the workspace flow's directory holes with the in-app **Select Workspace Directory** dialog.
+无法触达 OS 选择器的用户仍能通过 `dsh-host-directory-picker-browse` 选择工作区目录：它基于 Node 标准库提供单层目录列举与子目录创建，宿主屏幕上不渲染任何东西——因此它能服务原生后端无法触及的远程客户端。列举只返回目录、按名称排序，跟随指向目录的符号链接，并携带宿主判定的 `hidden` 标志；创建不递归，且把名称校验为单个路径段。一行组合配置还会用应用内**选择工作区目录**对话框填满工作区流程的目录扩展位。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Compose this backend when a workspace directory must be chosen without an OS chooser — remote browsers, SSH-forwarded sessions, or unattended hosts. The workspace flow drives `directoryPicker/list` and `directoryPicker/createDirectory`; both primitives answer from the host filesystem.
+在远程浏览器、SSH 转发会话或无人值守宿主等无法使用 OS 选择器的场景中，如果必须选择工作区目录，请组合此后端。工作区流程驱动 `directoryPicker/list` 与 `directoryPicker/createDirectory`；两个原语都基于宿主文件系统返回结果。
 
-### Listing a directory
+### 列举目录
 
-`list(path?)` returns one directory level: name-sorted child directories with their absolute paths, a `hidden` flag (dot-prefixed on POSIX), a `home` anchor, and `crumbs` — the root-to-target ancestor chain where every crumb is a jump target and the root is labeled by its full path. An absent path lists the host account's home directory. One call returns at most `maxEntries` rows (config, default 1,000 — the bound GitHub's web UI applies to directory listings), and a cut level reports `truncated: true` so the client can say the level is incomplete. Symlinks to directories are followed; broken and cyclic links are skipped.
+`list(path?)` 返回一个目录层级：按名称排序的子目录及其绝对路径、`hidden` 标志（POSIX 上为点前缀）、`home` 锚点，以及 `crumbs`——从根到目标的祖先链，其中每个 crumb 都是跳转目标，根以完整路径标注。不带路径时列举宿主账户的家目录。单次调用至多返回 `maxEntries` 行（配置项，默认 1,000——GitHub 网页端对目录列举采用的同一上限），被截断的层级会报告 `truncated: true`，供客户端提示层级不完整。指向目录的符号链接会被跟随；断链与循环链接被跳过。
 
-### Creating a directory
+### 创建目录
 
-`createDirectory(path, name)` creates one child directory under an existing parent. It is non-recursive — a missing parent is a real failure, not a level to invent — and rejects anything but a single non-blank path segment (`name` must not contain separators and must not be `.` or `..`).
+`createDirectory(path, name)` 在既有父目录下创建一个子目录。它不递归——父目录缺失是真实失败，不是要补造的层级——并且拒绝任何非单个非空白路径段的内容（`name` 不得包含分隔符，也不得为 `.` 或 `..`）。
 
-### Observable failures
+### 可观察的失败
 
-Both primitives refuse a path that is not fully qualified — relative forms, and on Windows the rooted drive-less forms (`\foo`, `/foo`) and incomplete UNC prefixes that `isAbsolute` accepts — with `directory-unreadable` or `directory-create-failed`, instead of resolving it under the host process working directory. Creation of an existing child answers `directory-exists`. A caller's `AbortSignal` stops an in-flight scan, so a disconnect or timeout does not leave the scan outliving the caller.
+两个原语都拒绝非完全限定的路径——相对形态，以及 Windows 上 `isAbsolute` 会放行的无盘符有根形态（`\foo`、`/foo`）与不完整的 UNC 前缀——报 `directory-unreadable` 或 `directory-create-failed`，而不是把它解析到宿主进程工作目录之下。创建已存在的子目录时返回 `directory-exists`。调用方的 `AbortSignal` 会停止进行中的扫描，因此断连或超时不会让扫描比调用方活得更久。
 
-### Configuration
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `maxEntries` | `1,000` | Complete-result bound of one listing level; hidden rows count toward it |
+| `maxEntries` | `1,000` | 单个列举层级的完整结果上限；隐藏行计入该上限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-host-directory-picker-browse) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-host-directory-picker-browse)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-### Design concept
+### 设计理念
 
-The backend streams one directory level through a bounded name-sorted window so memory stays O(maxEntries) no matter how many children the directory holds: a cut level keeps the name-sorted head, hidden rows count against the bound, only windowed candidates are probed, and the level reports `truncated: true`. Window insertion is binary with an O(1) full-window tail rejection, so an oversized level costs O(1) per candidate past the head instead of a window scan.
+后端把单个目录层级流式送入一个有界、按名排序的窗口，因此无论目录有多少子项，内存都保持 O(maxEntries)：被截断的层级保留按名排序的头部、隐藏行计入上限、只探测窗口内候选，并报告 `truncated: true`。窗口插入为二分查找、满窗尾部单次比较即拒绝，因此超大型层级在头部之后的每个候选都只需 O(1)，而不是窗口扫描。
 
-### The fully-qualified fence
+### 完全限定栅栏
 
-`fullyQualified` rejects any path that does not name one fixed filesystem location regardless of process state: POSIX-absolute on POSIX; on Windows only drive-qualified (`C:\…`) or complete UNC (`\\server\share…`) forms. Rooted drive-less forms and incomplete UNC prefixes pass `isAbsolute` yet still resolve against the process's current drive, so the backend refuses them rather than rebasing a wire value.
+`fullyQualified` 拒绝任何不指向一个与进程状态无关的固定文件系统位置的路径：POSIX 上要求 POSIX 绝对路径；Windows 上只接受盘符限定（`C:\…`）或完整 UNC（`\\server\share…`）形态。无盘符有根形态与不完整 UNC 前缀能通过 `isAbsolute`，却仍会解析到进程的当前盘符，因此后端会拒绝它们，而不是重新定位协议传入的值。
 
-### Abort and probing
+### 中止与探测
 
-Every filesystem await races the caller's signal (`raceAbort`), so a stalled network filesystem cannot keep a departed caller's request alive; an abandoned read's late settlement is swallowed. Symlink enterability is decided by a `stat` probe — failure means not enterable — and a windowed broken symlink is not backfilled from beyond the window, because an eviction already marked the level truncated.
+每次等待文件系统操作时，都会通过 `raceAbort` 与调用方的信号竞争，因此停滞的网络文件系统无法让已离开的调用方请求继续存活；已放弃的读取操作即使稍后结束，其结果也会被忽略。符号链接的可进入性由 `stat` 探测决定——失败即不可进入——窗口内的断链符号链接不会从窗口外回填，因为发生过驱逐本身已把层级标记为截断。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `BrowseDirectoryPicker` service: listing, creation, bounded window, error mapping |
+| [`src/index.ts`](src/index.ts) | `BrowseDirectoryPicker` 服务：列举、创建、有界窗口、错误映射 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these when the backend contract is not enough: the seam definition first, then the decision record and the native alternative.
+当后端约定不够用时阅读以下内容：先看 seam 定义，再看决策记录与原生替代方案。
 
-- [Directory-picker seam](../directory-picker/README.md) — the `browse` capability contract and the typed error vocabulary.
-- [Directory-picker capability seam decision](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md) — the policy decisions behind listing and creation.
-- [Native backend](../directory-picker-native/README.md) — the OS-chooser alternative for local operators.
-- [Adaptive chooser](../directory-picker-auto/README.md) — boot-time resolution between the two backends.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-host-directory-picker-browse) — every accepted config field and its source declaration.
+- [目录选择 seam](../directory-picker/README.zh.md)——`browse` 能力约定与类型化错误词汇。
+- [目录选择能力 seam 决策](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md)——列举与创建背后的策略裁决。
+- [原生后端](../directory-picker-native/README.zh.md)——面向本地操作者的 OS 选择器替代方案。
+- [自适应选择器](../directory-picker-auto/README.zh.md)——两个后端之间的启动时判定。
+- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-host-directory-picker-browse)——每个受支持配置字段及其源声明。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the GUI-host picking backend registers nothing model-facing.
+无。GUI 宿主的目录选择后端不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；该包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the browse interaction is incomplete or intentionally unscoped. They are current package constraints, not a task backlog.
+这些限制说明浏览交互在何处不完整或有意不限定范围。它们是当前包约束，不是任务积压。
 
-- **Windows hidden attribute is not read** — Node dirents do not expose `FILE_ATTRIBUTE_HIDDEN`, so `hidden` means dot-prefixed on every platform until a native probe is worth its cost.
-- **No drive-root enumeration** — on Windows the ancestry stops at the drive root; crossing drives waits for the browser UI's path-entry affordance rather than an enumeration primitive here.
-- **Whole-filesystem scope** — there is no per-deployment browse-root restriction; `workspace.create` accepts arbitrary paths, so a root here would be UX scoping rather than a security boundary.
+- **不读取 Windows 隐藏属性**——Node 的 dirent 不暴露 `FILE_ATTRIBUTE_HIDDEN`，因此在所有平台上 `hidden` 都意味着点前缀，直到原生探测值得付出相应成本为止。
+- **不枚举盘符根**——Windows 上祖先链止于盘符根；跨盘依赖浏览器 UI 的路径输入入口，而不是这里的枚举原语。
+- **全盘可浏览**——没有按部署限定的浏览根；`workspace.create` 接受任意路径，因此这里的根会限定 UX 范围，而不是安全边界。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

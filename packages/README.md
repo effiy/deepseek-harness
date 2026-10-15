@@ -1,117 +1,117 @@
 ---
-description: "The DeepSeek Harness package workspace: how the npm packages under packages/ are grouped, what each group owns, and the conventions that bind them."
+description: "DeepSeek Harness 包工作区：packages/ 下的 npm 包如何分组、每个组负责什么，以及约束它们的约定。"
 kind: "package-group"
 ---
 
-# Packages
+# 包
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The harness is assembled from npm packages under `packages/`, grouped by capability family: sessions and the agent loop, model-facing tools, shell and filesystem execution, web access, subagents, and the rest. Use this page as the top-level map: find the owning group, then open its README for the package list. Every package is scoped `@deepseek-ai/dsh-*` and lives in exactly one group; each group README is the authoritative package map for its family.
+harness 由 `packages/` 下的 npm 包组装而成，按能力系列分组：会话与 agent loop（智能体循环）、面向模型的工具、shell 与文件系统执行、Web 访问、subagent 等等。把本页当作顶层地图使用：先找到拥有某能力的组，再打开其 README 查看包列表。每个包都以 `@deepseek-ai/dsh-*` 为作用域、只属于一个组；每个组的 README 都是该能力系列的权威包映射。
 
-## Table of Contents
+## 目录
 
-- [Package groups](#package-groups)
-- [Release expectations](#release-expectations)
-- [Dependencies](#dependencies)
-- [Package README contracts](#package-readme-contracts)
-- [Dev Note](#dev-note)
+- [包分组](#package-groups)
+- [发布预期](#release-expectations)
+- [依赖](#dependencies)
+- [包 README 约定](#package-readme-contracts)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="package-groups"></a>
-## Package groups
+## 包分组
 
-Every package lives in exactly one group; new packages join existing groups, and a new group updates its own README and this table.
+每个包只属于一个组；新包加入现有组，新组则更新其自身 README 与本表。
 
-| Group | Role |
+| 组 | 职责 |
 |---|---|
-| [`core/`](core/README.md) | Product API spine: sessions, prompts, tools, agent services, and the concrete loop |
-| [`api/`](api/README.md) | Remote BFF assembly and Typert RPC gateway |
-| [`typert/`](typert/README.md) | Type graph generation, artifact loading, and runtime registry |
-| [`goal/`](goal/README.md) | Same-session goal persistence and lifecycle |
-| [`schedule/`](schedule/README.md) | Host-owned scheduled follow-ups |
-| [`feedback/`](feedback/README.md) | Human feedback capture and command |
-| [`telemetry/`](telemetry/README.md) | Shared Cordis OTel reporting channels |
-| [`identity/`](identity/README.md) | Shared anonymous identity |
-| [`llm/`](llm/README.md) | LLM capability family: abstract service + provider adapters |
-| [`subprocess/`](subprocess/README.md) | Subprocess capability family: Service Definition + local process-tree provider |
-| [`ssh/`](ssh/README.md) | POSIX remote connection with paired filesystem, subprocess and sandbox providers |
-| [`shell/`](shell/README.md) | Bash capability family: executor seam, local impl, model-facing tools |
-| [`terminal/`](terminal/README.md) | Persistent PTY service with owner-scoped sessions and a local shell backend |
-| [`ptc-runtime/`](ptc-runtime/README.md) | PTC execution capability family: Service Definition + sandboxed Node provider + PTC mode Consumer |
-| [`computer-use/`](computer-use/README.md) | Exclusive named desktop-provider registration |
-| [`browser-use/`](browser-use/README.md) | Exclusive named browser-provider registration |
-| [`sandbox/`](sandbox/README.md) | Process-confinement seam; bwrap/Landlock/Seatbelt backends |
-| [`deliverables/`](deliverables/README.md) | Turn deliverables: explicit file delivery and recorded workspace changes |
-| [`fs/`](fs/README.md) | Filesystem capability family: seam, local impl, model-facing file tools, discovery tools |
-| [`lsp/`](lsp/README.md) | LSP capability family: seam, generic stdio provider, and the `lsp` tool |
-| [`skill/`](skill/README.md) | Skill capability family: provider registry, local provider, model-facing catalog/loader |
-| [`compaction/`](compaction/README.md) | Compaction capability family: Service Definition + basic provider + command Consumer |
-| [`context/`](context/README.md) | Model-visible request context: workspace instructions, time context, references |
-| [`subagent/`](subagent/README.md) | Subagent capability family: provider-registry contract and model-facing delegation tools |
-| [`jobs/`](jobs/README.md) | Generic background-job runtime and model-facing job control tools |
-| [`experimental/`](experimental/README.md) | Capabilities under evaluation; [status and support policy](experimental/README.md#status) |
-| [`workflow/`](workflow/README.md) | Workflow seam, PTC process engine, and the model-facing `workflow` tool |
-| [`web/`](web/README.md) | Web capability family: seam, search/fetch providers, model-facing web tools |
-| [`document/`](document/README.md) | Shared Host Office-to-PDF conversion |
-| [`attachment/`](attachment/README.md) | Durable attachment identity, validation, local content-addressed storage |
-| [`spill/`](spill/README.md) | Spill capability family: storage seam, local impl, tool-result spill policy |
-| [`todo/`](todo/README.md) | The model-facing `todo_write` tool |
-| [`plan/`](plan/README.md) | Plan collaboration state with a direct entry command and reviewed exit |
-| [`preset/`](preset/README.md) | Per-session agent composition from preset `cordis.yml` files |
-| [`guard/`](guard/README.md) | Loop-hygiene guards: advisory repeat-call reminders + the `tools/execute` deadline enforcer |
-| [`bundle/`](bundle/README.md) | Installable `dsh --profile` patch layers |
-| [`extensions/`](extensions/README.md) | Agent runtime self-modification: live plugin/service inspection and model-written mount/unmount |
-| [`mcp/`](mcp/README.md) | External Model Context Protocol servers exposed as native tools |
-| [`session/`](session/README.md) | Durable session data plane: persistence seam + backends, projection seam, log-backed titles, session reporting |
-| [`session-query/`](session-query/README.md) | Session retrieval family: logical corpus, bounded reads, lineage, semantic filtering, SQLite full-text search |
-| [`settings/`](settings/README.md) | User-settings seam + file-backed provider |
-| [`credentials/`](credentials/README.md) | Credential-reference and credential-record seam + env-over-`.env` provider + authorization flows that ask a human |
-| [`storage/`](storage/README.md) | Non-session storage hub + backends + domain form |
-| [`workspace/`](workspace/README.md) | Workspace entity |
-| [`sdk/`](sdk/README.md) | Out-of-process SDK: JSON-RPC protocol and TypeScript client/server |
-| [`acp/`](acp/README.md) | Automation-only Agent Client Protocol server |
-| [`interaction/`](interaction/README.md) | Human-collaboration plane: approval/interaction seams, permission preset, commands, ask-user tool |
-| [`boot/`](boot/README.md) | Shared app-bin boot glue |
-| [`host/`](host/README.md) | Web GUI host services, directory picking, application launch, plugin inventory, and product telemetry |
-| [`client/`](client/README.md) | Web-GUI browser half: shell, wire, object services, slots, `ui-*` plugins |
-| [`test-support/`](test-support/README.md) | Test infrastructure (testkits, replay, Loader smokes) |
-| [`util/`](util/README.md) | Low-level zero-dependency utilities shared across groups (`Branded<B>`, home/path helpers, timeout, retention) |
+| [`core/`](core/README.zh.md) | 产品 API 主干：会话、提示词、工具、agent 服务与具体循环 |
+| [`api/`](api/README.zh.md) | Remote BFF 装配与 Typert RPC 网关 |
+| [`typert/`](typert/README.zh.md) | 类型图生成、产物加载与运行时注册表 |
+| [`goal/`](goal/README.zh.md) | 同会话 goal 的持久化与生命周期 |
+| [`schedule/`](schedule/README.zh.md) | Host 拥有的定时后续操作 |
+| [`feedback/`](feedback/README.zh.md) | 人类反馈的采集与命令 |
+| [`telemetry/`](telemetry/README.zh.md) | 共享 Cordis OTel 上报通道 |
+| [`identity/`](identity/README.zh.md) | 共享匿名身份 |
+| [`llm/`](llm/README.zh.md) | LLM（大语言模型）能力系列：抽象服务 + 提供方适配器 |
+| [`subprocess/`](subprocess/README.zh.md) | 子进程能力系列：Service Definition + 本地进程树提供方 |
+| [`ssh/`](ssh/README.zh.md) | POSIX 远端连接及配套文件系统、子进程与沙箱提供方 |
+| [`shell/`](shell/README.zh.md) | Bash 能力系列：执行器 seam、本地实现、面向模型的工具 |
+| [`terminal/`](terminal/README.zh.md) | 持久 PTY 服务：限定所有者范围的会话与本地 shell 后端 |
+| [`ptc-runtime/`](ptc-runtime/README.zh.md) | PTC 执行能力族：Service Definition + 沙箱 Node 提供方 + PTC mode Consumer |
+| [`computer-use/`](computer-use/README.zh.md) | 按名称独占注册桌面提供方 |
+| [`browser-use/`](browser-use/README.zh.md) | 按名称独占注册浏览器提供方 |
+| [`sandbox/`](sandbox/README.zh.md) | 进程限制 seam；bwrap、Landlock、Seatbelt 后端 |
+| [`deliverables/`](deliverables/README.zh.md) | 轮次交付物：显式文件交付与记录的工作区改动 |
+| [`fs/`](fs/README.zh.md) | 文件系统能力系列：seam、本地实现、面向模型的文件工具、发现工具 |
+| [`lsp/`](lsp/README.zh.md) | LSP 能力系列：seam、通用 stdio 提供方和 `lsp` 工具 |
+| [`skill/`](skill/README.zh.md) | skill（技能）能力系列：提供方注册表、本地提供方、面向模型的目录／loader |
+| [`compaction/`](compaction/README.zh.md) | 压缩（compaction）能力系列：Service Definition + 基础提供方 + 命令 Consumer |
+| [`context/`](context/README.zh.md) | 模型可见请求上下文：workspace 指令、时间上下文、引用 |
+| [`subagent/`](subagent/README.zh.md) | subagent 能力系列：提供方注册表约定和面向模型的委托工具 |
+| [`jobs/`](jobs/README.zh.md) | 通用后台任务运行时和面向模型的作业控制工具 |
+| [`experimental/`](experimental/README.zh.md) | 仍在评估中的能力；[状态与支持策略](experimental/README.zh.md#status) |
+| [`workflow/`](workflow/README.zh.md) | 工作流 seam、PTC 进程引擎、面向模型的 `workflow` 工具 |
+| [`web/`](web/README.zh.md) | Web 能力系列：seam、搜索／获取提供方、面向模型的 Web 工具 |
+| [`document/`](document/README.zh.md) | 共享宿主 Office 到 PDF 转换 |
+| [`attachment/`](attachment/README.zh.md) | 持久附件标识、校验、本地内容寻址存储 |
+| [`spill/`](spill/README.zh.md) | spill 能力系列：存储 seam、本地实现、工具结果 spill 策略 |
+| [`todo/`](todo/README.zh.md) | 面向模型的 `todo_write` 工具 |
+| [`plan/`](plan/README.zh.md) | Plan 协作状态，提供直接进入命令与经评审的退出 |
+| [`preset/`](preset/README.zh.md) | 由 preset `cordis.yml` 按会话组装 agent |
+| [`guard/`](guard/README.zh.md) | 循环卫生守卫：建议性重复调用提醒 + `tools/execute` 截止时间强制执行器 |
+| [`bundle/`](bundle/README.zh.md) | 可安装的 `dsh --profile` 补丁层 |
+| [`extensions/`](extensions/README.zh.md) | agent 运行时自修改：实时插件／服务检查与模型所写挂载／卸载 |
+| [`mcp/`](mcp/README.zh.md) | 将外部 Model Context Protocol 服务器的工具接入为原生工具 |
+| [`session/`](session/README.zh.md) | 持久会话数据平面：持久化 seam + 后端、投影 seam、基于日志的标题、会话上报 |
+| [`session-query/`](session-query/README.zh.md) | 会话检索系列：逻辑语料库、有界读取、血缘、语义过滤、SQLite 全文搜索 |
+| [`settings/`](settings/README.zh.md) | 用户设置 seam + 基于文件的提供方 |
+| [`credentials/`](credentials/README.zh.md) | 凭据引用与凭据记录 seam + 环境变量优先于 `.env` 的提供方 + 需要向人询问的授权流程 |
+| [`storage/`](storage/README.zh.md) | 非会话存储中枢 + 后端 + 领域形式 |
+| [`workspace/`](workspace/README.zh.md) | Workspace 实体 |
+| [`sdk/`](sdk/README.zh.md) | 进程外 SDK：JSON-RPC 协议与 TypeScript 客户端／服务器 |
+| [`acp/`](acp/README.zh.md) | 仅面向自动化的 ACP（Agent Client Protocol）服务器 |
+| [`interaction/`](interaction/README.zh.md) | 人机协作平面：批准／交互 seam、权限预设、命令、询问用户的工具 |
+| [`boot/`](boot/README.zh.md) | 共享的 app bin 启动粘合层 |
+| [`host/`](host/README.zh.md) | Web GUI 宿主服务、目录选择、应用启动、插件清单和产品遥测 |
+| [`client/`](client/README.zh.md) | web GUI 浏览器半侧：shell、协议层、对象服务、slot、`ui-*` 插件 |
+| [`test-support/`](test-support/README.zh.md) | 测试基础设施（testkit、回放、Loader 冒烟测试） |
+| [`util/`](util/README.zh.md) | 组间共享的低层零依赖工具（`Branded<B>`、home／路径辅助函数、超时、留存） |
 
 -----
 
 <a id="release-expectations"></a>
-## Release expectations
+## 发布预期
 
-Product groups have maintained product roles, while their public APIs remain pre-stable. [Experimental status](experimental/README.md#status) is independent of publication, installation, and optional delivery. Nonexperimental runtime packages must have product use or an explicit [package classification](../scripts/product-package-policy.ts); SDK, build, test, and declaration infrastructure have separate classifications.
+产品组承担维护职责，但其公开 API 仍处于预稳定阶段。[实验性状态](experimental/README.zh.md#status)独立于发布、安装和可选交付。非实验运行时包必须被产品使用或在[包分类策略](../scripts/product-package-policy.ts)中明确列出；SDK、构建、测试与声明基础设施分别分类。
 
 -----
 
 <a id="dependencies"></a>
-## Dependencies
+## 依赖
 
-The dependency graph is generated: [docs/module-graph.md](../docs/module-graph.md) (`pnpm run gen-module-graph`, freshness-gated in CI).
+依赖图由工具生成：[docs/module-graph.md](../docs/module-graph.zh.md)（`pnpm run gen-module-graph`，CI 中有新鲜度门禁）。
 
-**Extension plugins depend on Service Definitions, never concrete providers.** `dsh-agent-loop` is swappable; UI, hook, and tool plugins use `dsh-agent`. Composition bundles may depend on spine plugins. Capabilities separate Service Definition / Service Provider / Consumer roles when they evolve independently; see [capability seams](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md).
+**扩展插件依赖 Service Definition，绝不依赖具体提供方。** `dsh-agent-loop` 可替换；UI、钩子和工具插件使用 `dsh-agent`。组合包可以依赖主干插件。能力在需要独立演进时分离 Service Definition／Service Provider／Consumer 角色；详见[能力 seam](../.agents/notes/implemented/architecture/2026-06-13-capability-seams.zh.md)。
 
 -----
 
 <a id="package-readme-contracts"></a>
-## Package README contracts
+## 包 README 约定
 
-Every package README covers purpose, configuration, extension points, and [Model Experience](../docs/cookbook/adding-a-package.md#4-write-the-package-readme) unless the model-agnostic [omission allowlist](../scripts/verify-package-readme-model-experience.ts) exempts it. It also carries `## Known Limitations and Deferred Work` or uses its [allowlist](../scripts/verify-package-readme-limitations.ts). Package conventions — exports, service access, tests — live in [packages/AGENTS.md](AGENTS.md).
+每个包 README 都覆盖用途、配置、扩展点与[模型体验](../docs/cookbook/adding-a-package.zh.md#4-write-the-package-readme)，列入模型无关[省略允许清单](../scripts/verify-package-readme-model-experience.ts)的包除外。它还要包含 `## Known Limitations and Deferred Work`，或列入其[允许清单](../scripts/verify-package-readme-limitations.ts)。包约定——导出、服务访问、测试——见 [packages/AGENTS.md](AGENTS.md)。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

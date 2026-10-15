@@ -94,6 +94,9 @@
     - id: llm-retry
       name: '@deepseek-ai/dsh-llm-retry'
 
+    - id: llm-xingrui
+      name: '@deepseek-ai/dsh-llm-xingrui'
+
     # Live Config forms persist through the active profile patch.
 
     # Live configuration forms persist through the launcher's profile.

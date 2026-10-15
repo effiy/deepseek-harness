@@ -1,64 +1,64 @@
 ---
-description: "Package map for shared utilities: atomic file writes, branded ids, deques, JSON values, harness home paths, launch environment, native commands, output retention, time zones, and timeouts."
+description: "共享工具家族的包映射：原子文件写入、品牌化 id、双端队列、JSON 值、harness 主目录路径、启动环境、原生命令、输出保留、时区与超时。"
 kind: "package-group"
 ---
 
-# util/ — shared utilities
+# util/：共享工具
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The `util/` group gives capability packages shared mechanical primitives instead of duplicate implementations. It covers atomic writes, branded ids, deques, lossless JSON values, UUIDs, Harness-home paths, launch environments, outbound proxy policy, native commands, output retention, time-zone canonicalization, and timeout handling. Every root entry here is a library: it registers no product service or event, and the consuming capability retains the business semantics.
+`util/` 组为能力包提供共享的机制原语，避免重复实现。它涵盖原子写入、品牌化 id、双端队列、无损 JSON 值、UUID、Harness home 路径、启动环境、出站代理策略、原生命令、输出保留、时区规范化和超时处理。这里的每个根入口都是库：它不注册产品服务或事件，业务语义仍由消费它的能力负责。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-Each package provides one primitive; open a package page for how to use it.
+每个包提供一个原语；打开对应包页面了解如何使用。
 
-| Package | Role |
+| 包 | 职责 |
 |---|---|
-| [`brand/`](brand/README.md) | Nominal string types and their stateless constructor |
-| [`package-manifest/`](package-manifest/README.md) | Shared TypeScript declarations for package manifests |
-| [`crypto/`](crypto/README.md) | Mints RFC 9562 v4 UUIDs from the cross-runtime `crypto.getRandomValues` primitive |
-| [`deque/`](deque/README.md) | Provides amortized constant-time queue operations with bounded vacant storage |
-| [`chunked-list/`](chunked-list/README.md) | Retains immutable list versions with bounded append copying and checkpoint validation |
-| [`values/`](values/README.md) | Validates, snapshots, compares, and freezes lossless JSON-compatible values |
-| [`home-paths/`](home-paths/README.md) | Resolves the single Harness home and joins shared user-data paths |
-| [`http-proxy/`](http-proxy/README.md) | Resolves one outbound proxy policy and installs it for `fetch`, SDK agents, and spawned children |
-| [`launch-environment/`](launch-environment/README.md) | Frozen launch environment that remembers which layer supplied each value |
-| [`atomic-write/`](atomic-write/README.md) | Atomic file replacement and cross-process writer locking |
-| [`lazy-require/`](lazy-require/README.md) | Loads CommonJS-compatible Host dependencies on first use with caller-relative resolution |
-| [`native-command/`](native-command/README.md) | Runs host-native commands directly, never through a shell string |
-| [`workspace-path/`](workspace-path/README.md) | Provides browser-safe Workspace path and display helpers |
-| [`code-language/`](code-language/README.md) | Maps a filename suffix to the syntax-highlighting language that the Code preview, diff review, and the read card render |
-| [`output-retention/`](output-retention/README.md) | Bounds model-facing output and reports exact omission metadata |
-| [`time/`](time/README.md) | Validates and canonicalizes a caller-reported IANA time zone |
-| [`timeout/`](timeout/README.md) | Deadline arithmetic, signal fusion, and timeout-versus-cancel classification |
+| [`brand/`](brand/README.zh.md) | 提供名义字符串类型及其无状态构造函数 |
+| [`package-manifest/`](package-manifest/README.zh.md) | 包 manifest（元数据清单）的共享 TypeScript 声明 |
+| [`crypto/`](crypto/README.zh.md) | 基于跨运行时 `crypto.getRandomValues` 原语生成 RFC 9562 v4 UUID |
+| [`deque/`](deque/README.zh.md) | 提供摊销常数时间的队列操作和有界空闲存储 |
+| [`chunked-list/`](chunked-list/README.zh.md) | 通过有界追加复制和检查点校验保留不可变列表版本 |
+| [`values/`](values/README.zh.md) | 校验、创建快照、比较和冻结无损 JSON 兼容值 |
+| [`home-paths/`](home-paths/README.zh.md) | 解析统一的 Harness 主目录并拼接共享的用户数据路径 |
+| [`http-proxy/`](http-proxy/README.zh.md) | 解析出唯一的出站代理策略，并为 `fetch`、SDK agent（智能体）与 spawn 的子进程安装它 |
+| [`launch-environment/`](launch-environment/README.zh.md) | 冻结的启动环境，记住每个值来自哪一层 |
+| [`atomic-write/`](atomic-write/README.zh.md) | 原子文件替换与跨进程写锁 |
+| [`lazy-require/`](lazy-require/README.zh.md) | 在首次使用时按调用方位置加载兼容 CommonJS 的 Host 依赖 |
+| [`native-command/`](native-command/README.zh.md) | 直接运行宿主原生命令，绝不拼 shell 字符串 |
+| [`workspace-path/`](workspace-path/README.zh.md) | 提供浏览器安全的 Workspace 路径与显示辅助函数 |
+| [`code-language/`](code-language/README.zh.md) | 把文件名后缀映射为 Code 预览、diff 审阅与 read 卡片所渲染的语法高亮语言 |
+| [`output-retention/`](output-retention/README.zh.md) | 限制面向模型的输出并报告精确的省略元数据 |
+| [`time/`](time/README.zh.md) | 校验并规范化调用方所报的 IANA 时区 |
+| [`timeout/`](timeout/README.zh.md) | 截止时间运算、信号融合与超时和取消分类 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [Root package map](../README.md) — where `util/` sits among all package groups.
-- [Generated configuration catalog](../../docs/config-catalog.md) — the library-package index this group forms part of.
-- [Adding a package cookbook](../../docs/cookbook/adding-a-package.md) — how a new shared primitive lands in this group.
+- [根包映射](../README.zh.md)——`util/` 在所有包组中的位置。
+- [生成配置目录](../../docs/config-catalog.zh.md)——本组所属的库包索引。
+- [添加包实操手册](../../docs/cookbook/adding-a-package.zh.md)——新的共享原语如何落入本组。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

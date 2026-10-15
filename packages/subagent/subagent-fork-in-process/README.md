@@ -1,43 +1,43 @@
 ---
-description: "In-process fork subagent backend for users and maintainers choosing, configuring, or debugging children seeded with the parent's completed turns."
+description: "面向用户与维护者的进程内 fork subagent 后端说明，用于选择、配置或排查以父级已完成轮次作初始内容的子 agent（智能体）。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent-fork-in-process
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-subagent-fork-in-process` is an in-process subagent backend that seeds each child with the parent's completed conversation turns: the child sees every finished turn and none of the in-flight one, so follow-up work builds on the conversation without duplicating it. A delegation tool reaches it under the `fork` provider name, and its behavior matches the spawn backend except for the session seed. Choose it when a subtask continues this conversation; choose spawn when the child must stand alone. The seed is a one-time snapshot taken at fork time: later parent turns never reach the child.
+`dsh-subagent-fork-in-process` 是一个进程内 subagent 后端：它以父级已完成的对话轮次作为每个子 agent 的初始内容——子 agent 能看到所有已完成轮次，但看不到进行中的轮次，因此后续工作可以在对话基础上继续，而无需重复提供对话内容。委派工具以 `fork` 提供方名称找到它，其行为与 spawn 后端一致，唯一差异是会话初始内容。当子任务延续当前对话时选择它；当子 agent 必须独立运行时选择 spawn。初始内容是 fork 时的一次性快照：此后父级记录的任何内容都不会到达子 agent。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this backend when delegated work must build on the parent's conversation. The common path mirrors spawn: load the subagent service and this backend, then point a delegation tool such as `dsh-tool-subagent` at the `fork` provider.
+当委派的工作必须建立在父级对话之上时，挂载此后端。常用路径与 spawn 相同：加载 subagent 服务与本后端，再把 `dsh-tool-subagent` 之类的委派工具指向 `fork` 提供方。
 
-### When to choose it
+### 何时选择
 
-Choose fork when the child needs the conversation's completed turns — a follow-up analysis, a review, a continuation. Choose spawn when the child should start clean, or an out-of-process backend when the child must not share this process. The seed carries conversation history only: the child still gets a fresh tool scope and none of the parent's authority.
+当子 agent 需要对话的已完成轮次时——后续分析、审查、延续——选择 fork。当子 agent 应全新开始时选择 spawn；当子 agent 不能共享本进程时选择进程外后端。初始内容只传递对话历史：子 agent 仍获得全新的工具作用域，且不继承父级的任何权限。
 
-### Seed boundary
+### 初始内容边界
 
-The seed ends at the parent's last completed turn. A parent's current tool-calling turn is still open when a subagent starts, so that in-flight turn is never included; before the first completed turn the seed is empty and the child behaves like a fresh spawn.
+初始内容止于父级最后一个已完成的轮次。subagent 启动时，父级当前的工具调用轮次仍在进行，因此该进行中的轮次绝不会被包含；在第一个已完成轮次之前，初始内容为空，子 agent 的行为与全新 spawn 相同。
 
-### Minimal configuration
+### 最小配置
 
-Load the subagent service and this backend, then configure a delegation tool. This composition exposes a `subagent` tool backed by fork:
+先加载 subagent 服务与本后端，再配置一个委派工具。此组合暴露由 fork 支撑的 `subagent` 工具：
 
 ```yaml
 - name: '@deepseek-ai/dsh-subagent'
@@ -47,109 +47,109 @@ Load the subagent service and this backend, then configure a delegation tool. Th
     provider: fork
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `providerName` | `fork` | Provider name registered on `ctx.subagents` |
+| `providerName` | `fork` | 注册到 `ctx.subagents` 的提供方名称 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-fork-in-process) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-subagent-fork-in-process)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### What a fork delegation does
+### 一次 fork 委派会做什么
 
-One tool call creates a background child and returns its session id immediately. The child works in its own session; the parent receives its final answer in a completion notice. The child can also send messages through `send_message`. A rejected start leaves no published child. Programmatic callers such as workflows can await the activation result directly.
+一次工具调用创建后台子 agent 并立即返回子会话 ID。子级在自己的会话中工作，父级通过完成通知收到其最终答案。子级也可以通过 `send_message` 发送消息。被拒绝的启动不会留下已发布的子 agent；工作流等程序调用方可以直接等待 activation 的结果。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the backend and where the behavior in [Use this package](#use-this-package) comes from.
+本节解释后端背后的设计决策，以及[使用本包](#use-this-package)中行为的来源。
 
-### Design concept
+### 设计理念
 
-This backend supplies the balanced completed-turn prefix of the parent log as the child session seed. The subagent service records the inherited range so results contain only the child’s own output.
+本后端把父级日志中已配平的已完成轮次前缀作为子会话初始内容。subagent 服务记录继承范围，因此结果只包含子级自己的输出。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Provider registration: prefix computation, `Config` schema, capability declaration |
+| [`src/index.ts`](src/index.ts) | 提供方注册：前缀计算、`Config` schema、能力声明 |
 
-### Run flow
+### 运行流程
 
-`prepareContinuable()` captures the parent’s completed-turn prefix once at creation. `startActivation()` creates the child with that seed, and the subagent service applies persona, tool filtering, and structured output for this activation. The provider advertises the same agent options, output, depth, filter, and persona capabilities as spawn.
+`prepareContinuable()` 在创建时捕获一次父级已完成轮次前缀。`startActivation()` 以此创建子 agent，并由 subagent 服务应用 persona、工具过滤与本次 activation 的结构化输出设置。提供方声明与 spawn 相同的 `agentOptions`、输出、深度、过滤及 persona 能力。
 
-### Lifecycle binding
+### 生命周期绑定
 
-The delegation tool creates a background activation and returns a stable child session id. Parent and child share the same messaging tool definitions and ordering; the parent id and return guidance follow inherited history in the initial task. Workflows await results with caller delivery and send no completion notice to the parent.
+委派工具以后台 activation 创建子级，并返回稳定的子会话 ID。父级与子级共享相同的消息工具定义及顺序；父级 ID 与返回指导位于继承历史之后的初始任务中。工作流以调用方收集模式等待结果，不向父级发送完成通知。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough; they move from the shared subagent model to the sibling backends and the design evidence for preserving the inherited request prefix.
+当包级约定不够用时阅读以下页面；它们从共享 subagent 模型进入兄弟后端，以及保留继承请求前缀的设计证据。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — start requests, results, provider contract, and in-process depth and seed.
-- [dsh-subagent-spawn-in-process](../subagent-spawn-in-process/README.md) — the fresh-child sibling backend.
-- [dsh-tool-subagent](../tool-subagent/README.md) — the model-facing delegation tool that reaches this provider.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-fork-in-process) — every accepted config field and its source declaration.
-- [Forked children preserve the parent request prefix](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md) — why continuable fork preserves the inherited request prefix.
+- [Subagent 子系统](../../../docs/subsystems/subagent.zh.md)——启动请求、结果、提供方约定与进程内深度和初始内容。
+- [dsh-subagent-spawn-in-process](../subagent-spawn-in-process/README.zh.md)——全新子级的兄弟后端。
+- [dsh-tool-subagent](../tool-subagent/README.zh.md)——指向该提供方的面向模型委派工具。
+- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-subagent-fork-in-process)——每个受支持配置字段及其源声明。
+- [Fork child 保留 parent 请求前缀](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)——可继续 fork 为何保留继承的请求前缀。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Child-agent history and envelope
+### 子 agent 历史与包络
 
-#### What the model sees
+#### 模型看到什么
 
-The child receives the parent's balanced completed-turn prefix, then the new task content verbatim. A configured persona shadows prompt text in the child's fresh scope; a tool restriction filters its global wire schemas, executable lookup, and PTC mode SDK bindings but not standalone guidance. The parent's tool view and authority are not inherited; an optional structured-output request adds a child-only contract; the parent's current in-flight turn is excluded.
+子 agent 先接收由父级已配平的已完成轮次构成的前缀，再逐字接收新的任务内容。配置的 persona 会在子 agent 的全新作用域中遮蔽提示词文本；工具限制会过滤其全局协议 schema、可执行工具查找与 PTC mode SDK 绑定，但不影响独立指导内容。父级的工具视图与权限不会被继承；可选的结构化输出请求会添加仅属于子 agent 的约定；父级当前进行中的轮次会被排除。
 
-#### Token effect
+#### Token 影响
 
-Forking duplicates retained completed history into the child's request, which then accumulates its own tokens independently. A persona changes repeated prompt cost; filtering changes schema or generated SDK cost; a first-turn fork has no inherited history.
+fork 会把保留的已完成历史复制到子 agent 的请求中，子 agent 随后独立累积自己的 token。persona 会改变重复提示词的成本；过滤会改变 schema 或生成 SDK 的成本；首轮 fork 没有继承历史。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-The child may reuse the inherited byte-identical prefix under the same provider and model. Persona, tool-filter, generated-SDK, or route changes may invalidate reuse before inherited history; later child history is append-only. Continuable messaging adds no child-only system-prompt section or tool schema; the parent id and return guidance follow inherited history in the initial user task ([cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md)).
+在提供方与模型相同的前提下，子 agent 可以复用继承的逐字节相同前缀。persona、工具过滤、生成 SDK 或路由变化可能在继承历史之前使复用失效；后续子 agent 历史仅追加。可继续消息不会增加子级专属的系统提示词区段或工具 schema；父级 ID 与返回指导在初始用户任务中位于继承历史之后（见[保持 fork 缓存的 Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)）。
 
-### Parent tool result, indirectly
+### 父级工具结果（间接）
 
-#### What the model sees
+#### 模型看到什么
 
-Through `dsh-tool-subagent`, the parent first receives the child session id, then a completion notice with its final answer. Child-authored messages arrive through `send_message`; the inherited prefix and internal work remain in the child session.
+父级通过 `dsh-tool-subagent` 先收到子会话 ID，随后收到包含最终答案的完成通知。子级自行编写的消息通过 `send_message` 到达；继承的前缀与内部工作保留在子会话中。
 
-#### Token effect
+#### Token 影响
 
-Parent input grows by one data-dependent final result retained until compaction.
+父级输入增加一个取决于数据的最终结果，并保留到上下文压缩（context compaction）为止。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the backend is the wrong choice; they are current package constraints.
+这些限制说明何时选择该后端是错误的；它们是当前包约束。
 
-- **The seed is a one-time snapshot** — the child sees the parent's completed turns as of the fork and nothing the parent logs afterwards; there is no live context sharing.
-- **Prefix reuse depends on matching request inputs** — parent and child messaging definitions match byte for byte; explicit persona, tool filtering, generated-SDK, or route changes can still break equality. Rationale: the [cache-preserving fork Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.md).
-- **Shipped fork tools do not expose child LLM route selection** — they inherit the parent's provider and model so the copied history remains eligible for KV Cache reuse. Route selection stays disabled until a change can preserve reuse or expose a bounded recomputation cost.
+- **初始内容是一次性快照**——子 agent 只能看到 fork 时父级已完成的轮次，看不到父级此后记录的任何内容；不会实时共享上下文。
+- **前缀复用取决于请求输入是否匹配**——父级与子级的消息定义都逐字节相同；显式 persona、工具过滤、生成 SDK 或路由变化仍可破坏相等性。理由见[保持 fork 缓存的 Agent Note](../../../.agents/notes/implemented/architecture/2026-08-10-fork-children-stay-one-shot.zh.md)。
+- **随附 fork 工具不公开子级 LLM（大语言模型）路由选择**——它们继承父级提供方与模型，使复制的历史仍有资格复用 KV Cache。在某项改动能保留复用或公开有界重算成本前，路由选择保持禁用。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,37 +1,37 @@
 ---
-description: "Host half of open-in-app: resolving installed editors, Git GUIs, terminals, and file managers to verified launchers on macOS, Windows, and Linux, and serving the catalog, icons, and launch endpoint as three webServer routes."
+description: "open-in-app 的主机半边：在 macOS、Windows、Linux 上把已安装的编辑器、Git GUI、终端与文件管理器解析为已验证的启动器，并以三条 webServer 路由提供目录、图标与启动端点。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-open-in-app
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-host-open-in-app` with its [browser companion](../../client/ui-open-in-app/README.md) to let users open a workspace directory in an installed editor, Git GUI, terminal, or file manager. It offers a fixed application catalog and shows only entries that the host can verify; newly installed applications appear after restart, while missing launchers are removed when detected. Requests require the deployment's browser authentication and host-origin trust checks. Detection and launch commands use configurable deadlines and do not pass inherited credentials to launched applications.
+将 `dsh-host-open-in-app` 与其[浏览器配套包](../../client/ui-open-in-app/README.zh.md)一起使用，让用户能在已安装的编辑器、Git GUI、终端或文件管理器中打开 workspace 目录。本包提供固定的应用目录，并只显示主机能够验证的条目；新安装的应用在重启后出现，而检测到启动器缺失时会移除对应条目。请求须通过部署的浏览器认证与主机来源信任检查。检测与启动命令使用可配置的期限，且不会把继承的凭据传给启动的应用。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount the package in a composition that carries `webServer`, `connection`, and `subprocess`, normally beside its browser surface [`dsh-client-ui-open-in-app`](../../client/ui-open-in-app/README.md); the pair puts an "Open In..." split button in the Web Session header whenever the host resolved at least one installed catalog application.
+把本包挂进携带 `webServer`、`connection` 与 `subprocess` 的组合，通常与其浏览器表面 [`dsh-client-ui-open-in-app`](../../client/ui-open-in-app/README.zh.md) 并排；只要主机解析出目录中至少一个已安装的应用，这对包就会在 Web 会话头部放上 "Open In..." 分体按钮。
 
-### When to choose it
+### 何时选择
 
-Choose it for a Web deployment whose users work beside a local editor, Git GUI, terminal, or file manager and want the workspace directory opened there in one click. Avoid it for opening one path with the OS-default application from host code — that is `dsh-apiproxy`'s `openPath`; this package's subject is *which* application, with per-application resolution and launchers.
+当 Web 部署的用户在本地编辑器、Git GUI、终端或文件管理器旁工作、希望一键在其中打开 workspace 目录时选择本包。若只需从主机代码用系统默认应用打开一个路径，请用 `dsh-apiproxy` 的 `openPath`——本包的主体是*用哪个*应用，带逐应用解析与启动器。
 
-### Minimal configuration
+### 最小配置
 
 ```yaml
 - name: '@deepseek-ai/dsh-host-open-in-app'
@@ -41,85 +41,85 @@ Choose it for a Web deployment whose users work beside a local editor, Git GUI, 
     launchWatchMs: 1000
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `probeTimeoutMs` | required | Per-command deadline in milliseconds for catalog-resolution host commands (`xcode-select`, the Windows registry reads). |
-| `iconTimeoutMs` | required | Per-command deadline in milliseconds for icon-extraction host commands (`plutil`/`sips` on macOS, the PowerShell extraction on Windows). |
-| `launchWatchMs` | required | Early-failure watch window per launch: a launcher still running when the window closes counts as launched and keeps running, so this bounds how long the open route holds a successful launch. |
+| `probeTimeoutMs` | 必填 | 目录解析主机命令（`xcode-select`、Windows 注册表读取）的逐命令期限（毫秒）。 |
+| `iconTimeoutMs` | 必填 | 图标提取主机命令（macOS 的 `plutil`/`sips`、Windows 的 PowerShell 提取）的逐命令期限（毫秒）。 |
+| `launchWatchMs` | 必填 | 每次启动的早期失败看护窗口：窗口关闭时仍在运行的启动器计为已启动并继续运行，因此它约束的是 open 路由挂起一次成功启动的时长。 |
 
-The three deadlines are independent so tuning one operation never changes another's response time; timeouts are failure bounds, not latency budgets, so the conservative resolution/icon values cost nothing when commands are healthy. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-host-open-in-app) is the exhaustive source for every accepted field.
+三个期限彼此独立，调整一种操作的超时不会改变其他操作的响应时间；超时是失败上界而非延迟预算，命令健康时保守的解析/图标期限没有任何代价。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-host-open-in-app)是所有可接受字段的详尽来源。
 
-### The catalog and how it resolves
+### 目录及其解析方式
 
-The catalog is a fixed whitelist covering editors and IDEs (Cursor, VS Code and Insiders, Windsurf, Zed, Sublime Text, Xcode, Android Studio, and the JetBrains IDEs IntelliJ IDEA, PyCharm, WebStorm, PhpStorm, GoLand, Rider, RustRover), Git GUIs (Fork, Sourcetree, GitHub Desktop, Tower, GitKraken, SmartGit, Sublime Merge), terminals (Ghostty, Warp, iTerm2, kitty, Terminal, Windows Terminal, Git Bash, GNOME Terminal, Konsole), and per-platform file managers (Finder, File Explorer, `xdg-open`). Each entry declares per-platform launcher sources tried in order, and every source yields a **verified launcher** — an artifact this host actually holds — never a bare install record:
+目录是一份固定白名单，覆盖编辑器与 IDE（Cursor、VS Code 与 Insiders、Windsurf、Zed、Sublime Text、Xcode、Android Studio，以及 JetBrains 系 IntelliJ IDEA、PyCharm、WebStorm、PhpStorm、GoLand、Rider、RustRover）、Git GUI（Fork、Sourcetree、GitHub Desktop、Tower、GitKraken、SmartGit、Sublime Merge）、终端（Ghostty、Warp、iTerm2、kitty、Terminal、Windows Terminal、Git Bash、GNOME Terminal、Konsole）与各平台文件管理器（Finder、文件资源管理器、`xdg-open`）。每个条目按平台声明按序尝试的启动器来源，且每个来源产出的都是**已验证的启动器**——本机实际持有的产物——绝不是一条裸的安装记录：
 
-- **macOS** checks the known application directories (`/Applications`, `~/Applications`) for the entry's bundle spellings and launches `open -a <resolved bundle>`; Xcode follows `xcode-select -p`, so Beta or renamed installs are found. No Launch Services query and no disk scan runs.
-- **Windows** reads the `App Paths` registry keys, then the Uninstall records (kept only when they prove an executable on disk), then well-known install paths and the newest versioned install directory where an application uses one. GitHub Desktop resolves its versioned executable together with the packaged `cli.js` and invokes the supported `github open <path>` behavior without a command shell. Registry reads are batched, one `reg.exe query` per root per resolution pass.
-- **Linux and Windows CLI names** resolve in-process through the composition's subprocess capability (PATH/PATHEXT stat, no shell, no `which`); Linux GUI entries whose CLI is off PATH fall back to their XDG desktop entry's verified `TryExec`/`Exec` executable, and the `xdg-open` file-manager entry appears only when the host announces a display server.
+- **macOS** 在已知应用目录（`/Applications`、`~/Applications`）中查找条目的 bundle 拼写，启动 `open -a <解析出的 bundle>`；Xcode 跟随 `xcode-select -p`，因此能找到 Beta 或改名的安装。不做 Launch Services 查询，也不扫描磁盘。
+- **Windows** 依次读取 `App Paths` 注册表键、Uninstall 记录（仅当它们能证明磁盘上存在可执行文件时才采用）、已知安装路径，以及采用版本化安装目录的应用中最新的目录。GitHub Desktop 会同时解析版本化可执行文件与随包提供的 `cli.js`，不经命令 shell 调用受支持的 `github open <path>` 行为。注册表读取按批进行，每次解析每个根只跑一条 `reg.exe query`。
+- **Linux 与 Windows 的 CLI（命令行界面）名称**经组合的 subprocess 能力在进程内解析（PATH/PATHEXT stat，无 shell、无 `which`）；CLI 不在 PATH 上的 Linux GUI 条目回退到其 XDG desktop 条目验证过的 `TryExec`/`Exec` 可执行文件，且只有主机声明了 display server 时才提供 `xdg-open` 文件管理器条目。
 
-### What to expect
+### 预期行为
 
-When the inherited process layer of the [launch environment](../../util/launch-environment/README.md) contains a non-empty `SSH_CONNECTION` or `SSH_TTY`, the application list is empty and the Web header hides Open In, including any remembered choice. Project and user `.env` values do not establish an SSH launch. The host skips application probing and refuses icon and launch requests for unavailable applications. This rule also applies when an SSH session carries a display or VS Code IPC connection; it does not identify remote deployments whose launchers remove both SSH markers.
+[启动环境](../../util/launch-environment/README.zh.md)中继承的进程层的 `SSH_CONNECTION` 或 `SSH_TTY` 非空时，应用列表为空，Web 头部隐藏 Open In，包括已记住的应用选择。项目与用户 `.env` 中的值不作为 SSH 启动的依据。主机跳过应用探测，并拒绝不可用应用的图标和启动请求。SSH 会话即使携带显示服务或 VS Code IPC 连接，也遵循此规则；若启动器移除了两个 SSH 标记，本规则无法识别该远端部署。
 
-Resolution runs lazily, once per host process, on the first request that needs it; installing an application takes effect on the next restart, while an uninstalled one heals immediately — a launch that finds its executable gone re-resolves that one entry and drops it from the list when nothing proves it anymore. The icon route serves the real application icon on every platform where one is extractable: the bundle's `.icns` as a 128px PNG on macOS, the executable's associated icon as a 32px PNG on Windows, and the desktop entry's hicolor-theme icon (PNG or SVG) on Linux; a missing icon answers 404 and the browser surface renders a generic glyph.
+解析惰性执行，每主机进程一次，在首个需要它的请求上进行；安装应用要下次重启后生效，卸载方向则立即自愈——启动时发现可执行文件已消失会只重解析该条目一次，无法再证明时把它从列表中移除。图标路由在每个可提取的平台上提供应用真实图标：macOS 上 bundle 的 `.icns` 转 128px PNG，Windows 上可执行文件的关联图标转 32px PNG，Linux 上 desktop 条目在 hicolor 主题中的图标（PNG 或 SVG）；提取不到的图标应答 404，浏览器表面渲染通用占位图形。
 
-### The `./shared` subpath
+### `./shared` 子路径
 
-The route paths and wire payload types are published as the browser-safe `./shared` subpath (constants and types only, no runtime identity); the browser package inlines it into its client bundle. A route or payload change lands in `src/shared.ts` and both packages pick it up from there.
+路由路径与 wire 载荷类型以浏览器安全的 `./shared` 子路径发布（只有常量与类型，没有运行时身份）；浏览器包把它内联进自己的 client bundle。路由或载荷的变更落在 `src/shared.ts`，两个包都从那里获取。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
-Linux desktop-entry fields and icons use the shared [native-command](../../util/native-command/README.md) helpers. Directory launchers come from this package’s installed application catalog; file handlers come from the operating system’s associations.
+Linux 桌面文件字段和图标使用共享的 [native-command](../../util/native-command/README.zh.md) 工具。目录打开器来自本包的已安装应用列表，文件打开器来自操作系统的文件关联。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现内幕——点击展开</summary>
 
-The package splits into a data table and three roles. [`src/catalog.ts`](src/catalog.ts) is the compile-time table: each entry's per-platform locator chain (`fixed`, `app`, `xcode`, `cli`, `file`, `scan`, `app-paths`, `install-record`, `github-desktop`, `desktop`) plus, on Linux, the desktop-entry id owning its icon. [`src/resolver.ts`](src/resolver.ts) resolves the table against this host: one pass yields a map of catalog id to verified launch (primary and optional fallback argv plus the icon source), sharing one batched Windows-registry read; argv launches spawn detached with a credential-scrubbed environment (`scrubbedParentEnv`) plus explicit adapter entries, and keep Windows GUI processes visible unless the adapter hides a CLI process that launches the GUI separately. `shell-open` launches (the file managers) run the OS shell's open verb through `dsh-native-command`'s path opener under the same watch window, and a spawn `ENOENT` is classified as `missing` so the routes can refresh a stale entry. [`src/icons.ts`](src/icons.ts) extracts icons per platform: `plutil`/`sips` over the resolved bundle on macOS, a generated PowerShell `ExtractAssociatedIcon` script over the resolved executable on Windows (positional `-File` args keep paths out of command-line parsing), and desktop-entry/hicolor/pixmaps filesystem lookup on Linux.
+本包拆为一张数据表与三个角色。[`src/catalog.ts`](src/catalog.ts) 是编译期表格：每个条目按平台的 locator 链（`fixed`、`app`、`xcode`、`cli`、`file`、`scan`、`app-paths`、`install-record`、`github-desktop`、`desktop`），以及 Linux 上拥有其图标的 desktop 条目 id。[`src/resolver.ts`](src/resolver.ts) 把表格解析到本机：一趟产出目录 id 到已验证启动的映射（主/回退 argv 加图标来源），共享一次批量的 Windows 注册表读取；argv 启动以清理过凭据的环境（`scrubbedParentEnv`）叠加适配器显式环境后 detached 派生，Windows GUI 默认保持可见，只有负责另行打开 GUI 的 CLI 适配器会隐藏自己的进程。`shell-open` 启动（文件管理器）在同一看护窗口下经 `dsh-native-command` 的路径打开器执行 OS shell 的 open verb，spawn 的 `ENOENT` 被归类为 `missing`，让路由能刷新失效条目。[`src/icons.ts`](src/icons.ts) 按平台提取图标：macOS 在解析出的 bundle 上跑 `plutil`/`sips`，Windows 在解析出的可执行文件上跑生成的 PowerShell `ExtractAssociatedIcon` 脚本（`-File` 位置参数让路径不经过命令行解析），Linux 走 desktop 条目/hicolor/pixmaps 的文件系统查找。
 
-[`src/index.ts`](src/index.ts) registers the three routes on `ctx.webServer`: `GET /open-in-app/apps` (the resolution map's keys), `GET /open-in-app/icon/<id>` (the extracted icon, cached in memory per process), and `POST /open-in-app/open` (launches the map's verified launcher directly — never a re-detection). Every route asks the composition's `connection` service for a rejection first; the complete trust story — the Host/Origin fence and browser authentication — has one home in the [`src/index.ts`](src/index.ts) module comment. On top of that fence the open route validates its body at the wire: an `application/json` media type, a 64 KiB ceiling, a resolved-available catalog id, and an absolute path naming an existing directory. Resolution and icon commands run through [`@deepseek-ai/dsh-native-command`](../../util/native-command/README.md) (argv, never a shell) under their respective deadlines; PATH names go through `ctx.subprocess.resolveExecutable()` in-process.
+[`src/index.ts`](src/index.ts) 在 `ctx.webServer` 上注册三条路由：`GET /open-in-app/apps`（解析映射的 keys）、`GET /open-in-app/icon/<id>`（提取的图标，进程内内存缓存）、`POST /open-in-app/open`（直接使用映射中已验证的启动器——绝不重新检测）。每条路由都先向组合的 `connection` 服务询问是否拒绝；完整的信任叙述——Host/Origin 栅栏与浏览器认证——唯一的出处在 [`src/index.ts`](src/index.ts) 的模块注释。在该栅栏之上，open 路由在 wire 边界校验请求体：`application/json` 媒体类型、64 KiB 上限、解析为可用的目录 id、指向现存目录的绝对路径。解析与图标命令经 [`@deepseek-ai/dsh-native-command`](../../util/native-command/README.zh.md)（argv，绝不走 shell）在各自期限内执行；PATH 名称走 `ctx.subprocess.resolveExecutable()` 进程内解析。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [dsh-client-ui-open-in-app](../../client/ui-open-in-app/README.md) — the browser split button consuming these routes.
-- [dsh-subprocess](../../subprocess/subprocess/README.md) — the capability providing in-process PATH resolution and the scrubbed child environment.
-- [dsh-native-command](../../util/native-command/README.md) — the no-shell host command runner for resolution and icon commands.
-- [dsh-host-webserver](../webserver/README.md) — the route registry carrying the three HTTP endpoints.
-- [Host package map](../README.md) — the GUI-host family this package belongs to.
+- [dsh-client-ui-open-in-app](../../client/ui-open-in-app/README.zh.md)——消费这三条路由的浏览器分体按钮。
+- [dsh-subprocess](../../subprocess/subprocess/README.zh.md)——提供进程内 PATH 解析与清理过的子进程环境的能力。
+- [dsh-native-command](../../util/native-command/README.zh.md)——解析与图标命令的免 shell 主机命令运行器。
+- [dsh-host-webserver](../webserver/README.zh.md)——承载三条 HTTP 端点的路由注册表。
+- [Host 包地图](../README.zh.md)——本包所属的 GUI 主机家族。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package opens host applications for a human and touches no prompt, message, schema, stream, or tool result.
+无。本包为人打开主机应用，不触及任何提示词、消息、schema、流或工具结果。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; the package never assembles or sends provider requests.
+无；本包从不组装或发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延后工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The catalog is fixed at build time.** A deployment cannot add its own editor or Git GUI from cordis.yml; extending the list means extending `OPEN_IN_APP_CATALOG` and the browser package's dictionaries together. The operating system can locate known applications but cannot establish that every installed application accepts a workspace directory or which launch protocol it requires, so the package does not enumerate an unrestricted OS application list. Configurable custom handlers remain deferred; their user-supplied labels are user data rather than locale-owned product copy.
-- **macOS detection is known-paths only.** A bundle renamed beyond the catalog's spellings or moved outside `/Applications` and `~/Applications` is not detected; there is no Launch Services query (a native LaunchServices/NSWorkspace lookup needs an addon the repository does not carry) and deliberately no disk scan.
-- **Icon fidelity is platform-bound.** Windows icons come from `ExtractAssociatedIcon` at 32px — the most the stock .NET surface yields without a native addon — which can render slightly soft on high-DPI displays; Linux icons follow the hicolor theme and pixmaps only, not the user's active icon theme; several entries (CLI-only launchers without a desktop entry) have no icon source and keep the generic glyph.
-- **New installs appear after a restart.** Resolution runs once per host process; only the uninstall direction self-heals (a missing launcher re-resolves its one entry on the spot).
+- **目录在构建期固定。** 部署无法从 cordis.yml 增加自己的编辑器或 Git GUI；扩展列表意味着同时扩展 `OPEN_IN_APP_CATALOG` 与浏览器包的词典。操作系统可以定位已知应用，但无法证明每个已安装应用都能接收 workspace 目录，也无法给出各应用需要的启动协议，因此本包不会无边界地枚举 OS 应用。可配置的 custom handler 仍然延后；其中由用户提供的 label 属于用户数据，不是 locale 拥有的产品文案。
+- **macOS 检测只查已知路径。** bundle 改名超出目录收录的拼写、或挪到 `/Applications` 与 `~/Applications` 之外就不会被检测；不做 Launch Services 查询（原生 LaunchServices/NSWorkspace 查询需要仓库尚无的 addon），也刻意不扫描磁盘。
+- **图标保真度受平台约束。** Windows 图标来自 32px 的 `ExtractAssociatedIcon`——不带原生 addon 时 .NET 标准面能给出的最大尺寸——在高分屏上可能略微发软；Linux 图标只查 hicolor 主题与 pixmaps，不追用户的自定义图标主题；若干条目（没有 desktop 条目的纯 CLI 启动器）没有图标来源，保持通用占位图形。
+- **新安装要重启后出现。** 解析每主机进程一次；只有卸载方向自愈（启动器缺失时当场只重解析该条目）。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作语境——点击展开</summary>
 
-The promotion decisions — the host/`ui-` package split, why raw webServer routes instead of a Typert Remote, why the catalog stays compile-time fixed, the resolver redesign (verified launchers, one resolution pass, no per-click re-detection), the three-deadline configuration, and the per-platform icon strategies with their rejected alternatives — are recorded in the [historical promotion Agent Note](../../../.agents/notes/archived/feature/2026-08-25-promote-open-anywhere-plugin.md).
+转正期的各项决定——host/`ui-` 分包、为什么用裸 webServer 路由而非 Typert Remote、目录为什么保持编译期固定、resolver 重设计（已验证启动器、单趟解析、点击不再重新检测）、三期限配置、以及各平台图标策略与被拒的替代方案——记录在[历史转正 Agent Note](../../../.agents/notes/archived/feature/2026-08-25-promote-open-anywhere-plugin.md)。
 
 </details>

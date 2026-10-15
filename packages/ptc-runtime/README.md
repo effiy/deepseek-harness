@@ -1,52 +1,52 @@
 ---
-description: "Package map for the PTC execution capability family: what program execution does for you, and which package owns each part."
+description: "PTC 执行能力族的包映射：程序执行能为你做什么，以及每个部分由哪个包负责。"
 kind: "package-group"
 ---
 
-# ptc-runtime/ — PTC execution capability family
+# ptc-runtime/——PTC 执行能力族
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The `ptc-runtime/` group lets a model write one program that calls host-provided functions as ordinary async calls, then returns only the program's printed output and return value. Choose the TypeScript backend for execution in a fresh Node process under the configured sandbox policy, or the experimental Python backend when a CPython process is required. Each run starts without state from earlier programs. Failures are returned as results so callers can diagnose them or provide them to the model.
+`ptc-runtime/` 组让模型编写一个程序，以普通异步调用的方式调用宿主提供的函数，然后只返回程序的打印输出和返回值。如需在全新 Node 进程中按所配沙箱策略执行，请选择 TypeScript 后端；如需 CPython 进程，请选择实验性 Python 后端。每次运行都不会保留之前程序的状态。失败会作为结果返回，供调用方诊断或提供给模型。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-These three packages together provide program execution; each README describes what its part does.
+这三个包共同提供程序执行能力；每个 README 描述其各自部分做什么。
 
-| Package | Role | ctx key |
+| 包 | 角色 | ctx 键 |
 |---|---|---|
-| [`ptc-runtime/`](ptc-runtime/README.md) | Defines what a PTC runtime does: run one program against host-provided bindings and report what it printed and returned | `ctx.ptcRuntime` |
-| [`ptc-runtime-node/`](ptc-runtime-node/README.md) | Executes TypeScript in fresh managed Node processes under the resolved sandbox policy | registers `ctx.ptcRuntime` |
-| [`experimental/ptc-runtime-python/`](../experimental/ptc-runtime-python/README.md) | The experimental Python backend: owns the fd-3 wire protocol between a Node host and a CPython subprocess and the CPython runtime implementation | — |
+| [`ptc-runtime/`](ptc-runtime/README.zh.md) | 定义 PTC 运行时做什么：针对宿主提供的绑定运行一个程序，并报告其打印和返回的内容 | `ctx.ptcRuntime` |
+| [`ptc-runtime-node/`](ptc-runtime-node/README.zh.md) | 在全新受管 Node 进程中按已解析沙箱策略执行 TypeScript | 注册 `ctx.ptcRuntime` |
+| [`experimental/ptc-runtime-python/`](../experimental/ptc-runtime-python/README.zh.md) | 实验性 Python 后端：负责 Node 宿主与 CPython 子进程之间的 fd-3 协议，以及 CPython 运行时实现 | — |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-Start with the subsystem reference for the service contract, then the PTC mode design that consumes this capability and the capability-seam model it follows.
+先从子系统参考了解服务约定，再看消费此能力的 PTC mode 设计，以及它所遵循的能力 seam 模型。
 
-- [PTC runtime subsystem reference](../../docs/subsystems/ptc-runtime.md) — request/result vocabulary, bindings, and the `ctx.ptcRuntime` Cordis surface.
-- [PTC mode Agent Note](../../.agents/notes/implemented/feature/2026-06-15-ptc.md) — how the tool registry presents `run_code` to the model.
-- [Capability seams](../../docs/capability-seams.md) — the Service Definition / Service Provider / Consumer split this family follows.
+- [PTC 运行时子系统参考](../../docs/subsystems/ptc-runtime.zh.md)——请求／结果词汇、绑定与 `ctx.ptcRuntime` 的 Cordis 接口面。
+- [PTC mode Agent Note](../../.agents/notes/implemented/feature/2026-06-15-ptc.zh.md)——工具注册表如何把 `run_code` 呈现给模型。
+- [能力 seam](../../docs/capability-seams.zh.md)——本家族遵循的 Service Definition / Service Provider / Consumer 拆分。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

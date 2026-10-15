@@ -1,89 +1,89 @@
 ---
-description: "Low-level Win32 process primitives for maintainers implementing or debugging the Windows ACL sandbox and ordinary subprocess Job runner."
+description: "面向实现或排查 Windows ACL 沙箱与普通子进程 Job runner 的维护者，说明底层 Win32 进程原语。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-win32-process
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This low-level Win32 process library is consumed by the Windows ACL sandbox and the ordinary subprocess Job runner. It owns the repository's one Koffi binding table for reusable process, stdio, and Job Object operations; it is not a Cordis service and does not choose sandbox policy or public child behavior. Read this page when maintaining either native process path or checking its handle-lifetime limits.
+供 Windows ACL 沙箱与普通子进程 Job runner 消费的底层 Win32 进程库。它唯一拥有仓库中可复用 process、stdio 与 Job Object 操作的 Koffi 绑定表；它不是 Cordis 服务，也不决定沙箱策略或公共 child 行为。维护任一原生进程路径或检查句柄生命周期限制时，请阅读本页。
 
-## Table of Contents
+## 目录
 
-- [Behavior](#behavior)
-- [Header verification](#header-verification)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [行为](#behavior)
+- [头文件验证](#header-verification)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="behavior"></a>
-## Behavior
+## 行为
 
-- **One reusable ABI owner** — `abi.ts` owns the Win32 constants and x64 layout values consumed by both process paths. `ffi.ts` lazily loads `kernel32.dll` and `advapi32.dll`, verifies `STARTUPINFOW` and `PROCESS_INFORMATION`, exposes typed operations and error formatting, and lets sandbox policy bind its remaining APIs through the same loaded libraries.
-- **Restricted-token creation** — `RestrictedProcessSpawnOptions` requires the sandbox's primary token and uses `CreateProcessAsUserW`. Piped and inherited-stdio paths share command-line quoting, cwd, the restricted-token null-environment policy, checked return values, and handle cleanup.
-- **Piped process primitive** — `spawnPipedProcess()` creates anonymous stdin/stdout/stderr pipes, closes stdin immediately, returns the two read ends, and leaves process waiting and pipe draining to the caller. Every partial failure closes the handles already owned by the operation, and every Koffi out-parameter or struct allocation is freed after its Win32 lifetime.
-- **Inherited-stdio Job primitive** — `spawnInheritedJobProcess()` creates one kill-on-close Job, temporarily marks the current stdio handles inheritable, creates the restricted child suspended, assigns it to the Job, and then resumes its initial thread. Target code cannot run before Job assignment; controlled assignment or resume failures terminate the suspended child or close the assigned Job before releasing every owned handle.
-- **Ordinary Job runner primitive** — `CurrentTokenProcessSpawnOptions` requires a resolved `applicationName`, the complete target environment, and three runner CRT descriptors dedicated to target stdin, stdout, and stderr. `spawnCurrentTokenJobProcess()` maps those descriptors to OS handles through Node's exported `uv_get_osfhandle()`, rejects invalid results, temporarily marks the handles inheritable, and passes them through `STARTF_USESTDHANDLES`. It sends a sorted UTF-16LE environment block with `CREATE_UNICODE_ENVIRONMENT`, creates the target suspended through `CreateProcessW`, assigns it to an unnamed kill-on-close Job, and resumes it only after assignment. The original command-line argv entry remains unchanged, and the runner can close its carrier descriptors without touching Node's own standard streams.
-- **Ordinary settlement operations** — `pollProcessExit()` publishes direct exit separately, while `isJobEmpty()` reads `QueryInformationJobObject(JobObjectBasicAccountingInformation)` until `ActiveProcesses` reaches zero. Checked Job termination and handle closure keep the runner as the only native owner.
-- **Explicit settlement ownership** — `waitForProcessExit()` waits and closes a sandbox process handle; ordinary runner process polling, Job accounting, and checked Job termination/closure remain separate operations. `drainPipe()` reuses one native count slot while draining, frees it, and closes the pipe read handle. Each caller owns its result composition and returned handles.
+- **唯一可复用 ABI owner** — `abi.ts` 拥有两条 process 路径消费的 Win32 常量与 x64 布局值。`ffi.ts` 懒加载 `kernel32.dll` 与 `advapi32.dll`，核验 `STARTUPINFOW` 和 `PROCESS_INFORMATION`，提供带类型的操作与错误格式化，并让沙箱策略通过同一组已加载库绑定剩余 API。
+- **restricted-token 创建** — `RestrictedProcessSpawnOptions` 要求沙箱的 primary token，并使用 `CreateProcessAsUserW`。pipe 与 inherited-stdio 路径共用命令行引号处理、cwd、restricted-token null 环境策略、返回值检查与句柄清理。
+- **管道进程原语** — `spawnPipedProcess()` 创建匿名 stdin/stdout/stderr 管道，立即关闭 stdin，并返回两个读取端；调用方负责等待进程与排空管道。任一局部失败都会关闭该操作已经拥有的句柄，并在各自 Win32 生命周期结束后释放每个 Koffi 输出槽与结构体分配。
+- **继承 stdio 的 Job 原语** — `spawnInheritedJobProcess()` 创建一个 kill-on-close Job，临时把当前 stdio 句柄设为可继承，以 suspended 状态创建 restricted child，把它分配给 Job，再恢复初始线程。目标代码不会在 Job 分配前运行；受控的分配或恢复失败会终止 suspended child，或在释放全部已拥有句柄前关闭已分配的 Job。
+- **ordinary Job runner 原语** — `CurrentTokenProcessSpawnOptions` 要求已解析的 `applicationName`、完整 target 环境，以及三个专用于 target stdin、stdout 与 stderr 的 runner CRT 描述符。`spawnCurrentTokenJobProcess()` 通过 Node 导出的 `uv_get_osfhandle()` 把这些描述符映射为 OS 句柄，拒绝无效结果，临时把句柄设为可继承，并通过 `STARTF_USESTDHANDLES` 传入。它使用 `CREATE_UNICODE_ENVIRONMENT` 传入排序后的 UTF-16LE 环境块，再以 suspended 状态通过 `CreateProcessW` 创建 target、把它分配给 unnamed kill-on-close Job，并只在分配后恢复。原始命令行 argv 项保持不变，runner 也可以关闭自己的 carrier 描述符，而不触碰 Node 自身的标准流。
+- **ordinary 结算操作** — `pollProcessExit()` 单独发布 direct exit，`isJobEmpty()` 则读取 `QueryInformationJobObject(JobObjectBasicAccountingInformation)`，直到 `ActiveProcesses` 归零。带检查的 Job 终止与句柄关闭使 runner 保持唯一 native owner。
+- **显式结算归属** — `waitForProcessExit()` 等待并关闭沙箱 process 句柄；ordinary runner 的 process polling、Job accounting 与 checked Job termination/closure 是独立操作。`drainPipe()` 在排空期间复用一个 native count slot，释放该分配并关闭管道读取句柄。每个调用方拥有自己的 result 组合与返回句柄。
 
-Process creation sets `STARTF_USESHOWWINDOW` with `SW_HIDE` before target code runs. It preserves console inheritance and does not add `CREATE_NO_WINDOW` or `CREATE_NEW_CONSOLE`, which can fail DLL initialization under the restricted token. Existing parent console windows are not hidden.
+进程创建在目标代码运行前设置 `STARTF_USESHOWWINDOW` 和 `SW_HIDE`。它保留控制台继承，不添加可能导致受限令牌下 DLL 初始化失败的 `CREATE_NO_WINDOW` 或 `CREATE_NEW_CONSOLE`。已有的父进程控制台窗口不会被隐藏。
 
-The Windows ACL sandbox adds SID, DACL, grant, workspace, and public child policy above these primitives.
+Windows ACL 沙箱在这些原语上增加 SID、DACL、grant、workspace 与公共 child 策略。
 
-- **Inherited control descriptor** — Job creation accepts an optional fd-7 pipe. `STARTUPINFO.cbReserved2/lpReserved2` carries an eight-slot CRT descriptor table with standard handles, closed slots 3–6, and the control pipe at slot 7. The table is allocated until CreateProcess returns; temporary handle inheritance is reset on success and failure. Initializing the slot before Node starts avoids overwriting descriptors Node has already allocated.
+- **继承控制描述符**——Job 创建接受可选的 fd-7 管道。`STARTUPINFO.cbReserved2/lpReserved2` 携带八槽 CRT 描述符表，其中包含标准句柄、关闭的槽 3–6，以及槽 7 的控制管道。该表保留到 CreateProcess 返回；临时句柄继承在成功和失败时均恢复。在 Node 启动前初始化该槽可避免覆盖 Node 已分配的描述符。
 
 <a id="header-verification"></a>
-## Header verification
+## 头文件验证
 
-The process, stdio, and Job constants plus selected structure sizes and offsets are checked against the MinGW Windows headers by [`verify/abi-probe.cpp`](verify/abi-probe.cpp):
+process、stdio 与 Job 的常量以及选定结构体的大小和偏移由 [`verify/abi-probe.cpp`](verify/abi-probe.cpp) 对照 MinGW Windows 头文件检查：
 
 ```sh
 g++ -std=c++20 -municode -O2 -o abi-probe.exe verify/abi-probe.cpp && ./abi-probe.exe
 ```
 
-The Koffi `STARTUPINFOW` and `PROCESS_INFORMATION` definitions also assert their 64-bit sizes at module load. The probe additionally fixes pointer and handle widths, the Unicode-environment flag, and the basic Job accounting record size and `ActiveProcesses` offset used to determine quiescence; it remains the evidence for the other recorded offsets and constants.
+Koffi 的 `STARTUPINFOW` 与 `PROCESS_INFORMATION` 定义还会在模块加载时断言各自的 64 位大小。该探针还固定指针与句柄宽度、Unicode 环境标志，以及用于判断完全停稳的基础 Job accounting record 大小与 `ActiveProcesses` 偏移；其余已记录偏移和常量也由该探针提供证据。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Process primitives
+### 进程原语
 
-#### What the model sees
+#### 模型看到什么
 
-Nothing directly. The package exposes `Win32ProcessBindings`, `CurrentTokenProcessBindings`, and process primitives to the sandbox and ordinary runner, which own all model-visible tools, output, and diagnostics; this package contributes no prompt text or tool schema.
+没有直接内容。本包向沙箱与 ordinary runner 提供 `Win32ProcessBindings`、`CurrentTokenProcessBindings` 与进程原语；两者拥有全部模型可见工具、输出与诊断，本包不贡献提示词或工具 schema。
 
-#### Token effect
+#### Token 影响
 
-None directly. Consumers decide whether process output enters a tool result or later model request.
+没有直接影响。消费方决定进程输出是否进入工具结果或后续模型请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-The package contributes no stable request prefix, so it does not invalidate model KV caches.
+本包不贡献稳定请求前缀，因此不会使模型 KV Cache 失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Windows-only native loading** — importing the generic types is portable, but resolving the binding table loads Windows DLLs and fails on other hosts. Cross-platform tests inject a binding table instead of loading native APIs.
-- **No public process service** — the package intentionally does not wrap its primitives in Cordis or Node streams. A consumer must own its policy, async scheduling, output limits, cancellation, and final handle closure.
-- **Restricted-token null environment** — the `CreateProcessAsUserW` sandbox primitives pass a null environment block and establish changes through `SetEnvironmentVariableW` first because an explicit block through Koffi fails with `ERROR_INVALID_PARAMETER`. The ordinary `CreateProcessW` runner instead requires a complete target environment and passes a sorted, double-NUL-terminated UTF-16LE block, including `=X:` drive entries, without mutating its own environment.
-- **No standalone process API** — the package exposes the operations current sandbox and ordinary-runner consumers need, but it does not own Node streams, public handles, output policy, cancellation, or durable state.
-- **Create-to-assignment interruption** — the target starts suspended and cannot execute before Job assignment, but an external termination of the runner in the narrow interval between process creation and assignment can leave the suspended target behind. The package does not claim atomic Job attachment.
-- **Header evidence is architecture-specific** — the committed ABI probe and layout constants cover the repository's current 64-bit Windows targets. A new pointer width or incompatible Windows ABI requires updating the probe before support is claimed.
+- **仅在 Windows 原生加载** — 导入通用类型可跨平台进行，但解析绑定表会加载 Windows DLL，并在其他宿主失败。跨平台测试注入绑定表，不加载原生 API。
+- **没有公共进程服务** — 本包刻意不把原语包装成 Cordis 或 Node 流。消费方必须拥有自己的策略、异步调度、输出上限、取消与最终句柄关闭。
+- **restricted-token null 环境** — `CreateProcessAsUserW` 沙箱原语传入 null 环境块，并先通过 `SetEnvironmentVariableW` 建立改动，因为经 Koffi 传入显式环境块会以 `ERROR_INVALID_PARAMETER` 失败。ordinary `CreateProcessW` runner 则要求完整 target 环境，并传入排序、双 NUL 结尾的 UTF-16LE 块，其中包括 `=X:` 驱动器条目，而不修改自身环境。
+- **没有 standalone process API** — 本包只暴露当前沙箱与 ordinary-runner 消费方所需的操作，不拥有 Node 流、公共句柄、输出策略、取消或 durable state。
+- **创建到分配之间的中断** — 目标以 suspended 状态启动，不能在 Job 分配前执行，但 runner 若在进程创建到分配之间的极窄区间被外力终止，可能留下 suspended target。本包不声明原子 Job 附加保证。
+- **header 证据限定架构** — 已提交的 ABI probe 与布局常量覆盖仓库当前 64 位 Windows 目标。支持新的指针宽度或不兼容 Windows ABI 前，必须先更新 probe。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

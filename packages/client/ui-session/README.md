@@ -1,47 +1,47 @@
 ---
-description: "React and Slot adapters for Session Controller lists, interaction state, and per-session context."
+description: "面向 Session Controller 列表、交互状态与逐会话上下文的 React 与 Slot 适配器。"
 kind: "package-reference"
 ---
 # @deepseek-ai/dsh-client-ui-session
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use this package to expose Session catalog, retain information, and unified UI status through standard Slot hooks. It materializes per-`SessionBinding` hooks and props, while `SessionProvider` can inherit an outer binding or bind an explicit `SessionReference`. It owns process-local pending-interaction and completion-reminder policy without owning Controller transport, history, or references.
+使用本包可通过标准 Slot 钩子公开 Session catalog、retain 信息与统一 UI 状态。它按 `SessionBinding` 物化钩子和 prop，而 `SessionProvider` 可以继承外围 binding 或绑定显式 `SessionReference`。它拥有进程本地的 pending-interaction 与完成提醒策略，但不拥有 Controller transport、历史或 reference。
 
-Running status comes from Host list baselines or status events. Subagent catalog rows and retained subagent fallback rows do not establish running status; main view references still acknowledge completions.
+运行状态来自 Host 列表基线或状态事件。Subagent 目录行和已保留子会话的 fallback 行不会建立运行状态；主视图引用仍会确认完成提醒。
 
-## Table of Contents
+## 目录
 
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package adapts browser-side Session state and registers nothing model-facing.
+无，因为本包适配浏览器侧 Session 状态，不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; Session selectors and Slot scopes do not assemble model requests.
+无；Session selector 与 Slot scope 不会组装模型请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Pending interactions are process-local projections** — the owning Remote waterfall must replay an outstanding request after a browser reconnect.
+- **Pending interaction 是进程本地投影**——浏览器重连后，所属 Remote waterfall（瀑布式事件）必须重放仍未完成的请求。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

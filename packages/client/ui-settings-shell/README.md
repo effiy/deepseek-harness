@@ -1,77 +1,77 @@
 ---
-description: "The shell executor's settings page on the dsh web client's Plugins page: the command timeout and the per-stream output cap of the shell namespace."
+description: "dsh Web 客户端插件页上的终端执行器设置页：shell 命名空间的命令超时与单流输出上限。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-shell
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Open **Plugins** in the sidebar and select **Shell** in the Official group to set how long one command may run and how much of each output stream stays in memory. The page stages what is typed and writes it only on save, marks the values the user overrode, and offers to reset each back to the deployment's default. The page exists while the Host serves the `shell` namespace, so a deployment without a local shell executor shows no trace of it.
+在侧栏打开**插件**，在官方分组里选择**终端**，即可设置单条命令允许运行多久、每条输出流在内存里保留多少。页面暂存输入、只在保存时写入，标明用户覆盖过的值，并允许把每个值重置回部署默认值。页面只在 Host 服务 `shell` 命名空间期间存在，没有本地终端执行器的部署看不到它。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-The **Shell** card in the Official group opens the page. **Command timeout (ms)** ends a command that runs longer; **Output cap per stream (bytes)** spills output beyond it to a temporary file. Both render the effective value — the user's override over the composed default — and a field the user overrode carries an **Overridden** badge with **Reset to default** beside it. Nothing is written until **Save**; leaving the page drops the drafts, an empty field saves as a reset, and text that is not a number blocks the save and says so under the field.
+官方分组里的**终端**卡片打开这一页。**命令超时（毫秒）**终止运行更久的命令；**单流输出上限（字节）**把超出的输出转存到临时文件。两个字段都显示生效值，即用户覆盖值叠在组合默认值之上；用户覆盖过的字段带**已覆盖**标签，旁边是**恢复默认**。点击**保存**之前不会写入任何内容；离开页面即丢弃草稿，清空字段并保存等于重置，填了不是数字的文本则保存被阻止，并在字段下说明原因。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The Host half is an empty `apply`, present only so the package holds a Loader row the client module system serves the browser half for. The browser half binds the composed shell executor entry (`bash-sandbox` off Windows, `pwsh-sandbox` on it) through `ctx.configForms.get`, keeps the staged form in `ShellCardController` over the shared `SettingsFormModel` of `ui-primitives`, and registers `ShellCard` into the Plugins page's `plugins.item` slot through `ctx.configForms.whileServed`, which registers while the Host serves either entry and withdraws when it stops. The page's copy lives in this package's `settings.shell` dictionary; the `SettingsForm` frame takes its copy as props.
+宿主半侧是一个空的 `apply`，只为让本包占一条 Loader 行，客户端模块系统据此送出浏览器半侧。浏览器半侧通过 `ctx.configForms.get` 绑定当前平台组装的 shell 执行器条目（非 Windows 为 `bash-sandbox`，Windows 为 `pwsh-sandbox`），用 `ui-primitives` 的共享 `SettingsFormModel` 在 `ShellCardController` 里维护暂存表单，并通过 `ctx.configForms.whileServed` 把 `ShellCard` 注册进插件页的 `plugins.item` slot：Host 服务任一执行器条目时注册，停止服务时注销。页面文案在本包的 `settings.shell` 字典里；`SettingsForm` 框架的文案以 props 传入。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [ui-plugin-manager](../ui-plugin-manager/README.md) — the Plugins page and the `plugins.item` slot the page registers into.
-- [ui-settings](../ui-settings/README.md) — the settings scope and the served-namespace watch the page rides.
-- [ui-primitives](../ui-primitives/README.md) — the settings form model and fields the page renders.
-- [bash-local](../../shell/bash-local/README.md) — the executor that registers the `shell` namespace.
+- [ui-plugin-manager](../ui-plugin-manager/README.zh.md)——插件页以及本页注册进去的 `plugins.item` slot。
+- [ui-settings](../ui-settings/README.zh.md)——本页依赖的设置 scope 与"命名空间被服务期间"的监视。
+- [ui-primitives](../ui-primitives/README.zh.md)——本页渲染的设置表单模型与字段。
+- [bash-local](../../shell/bash-local/README.zh.md)——注册 `shell` 命名空间的执行器。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the package is a browser-side settings surface that registers no model surface.
+无，本包是浏览器侧的设置界面，不注册任何模型面。
 
-#### KV Cache effect
+#### KV 缓存影响
 
-None; this package neither assembles nor sends a provider request.
+无；本包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The page follows the composed executor** — the POSIX and PowerShell executor families share the `shell` namespace because a host composes exactly one of them, so the served schema differs by platform (PowerShell adds `pwshPath`) while the page edits the same two fields on both.
+- **页面跟随组合进来的执行器**——POSIX 与 PowerShell 两个执行器家族共用 `shell` 命名空间，因为一台主机只组合其中一个，所以服务出来的 schema 因平台而异（PowerShell 多一个 `pwshPath`），而页面在两个平台上编辑的都是同样两个字段。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

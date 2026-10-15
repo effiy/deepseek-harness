@@ -1,51 +1,51 @@
 ---
-description: "The lsp group map: language-server code navigation through the LSP seam, its stdio provider, and the model-facing lsp tool, for users and maintainers navigating the group."
+description: "lsp 组地图：通过 LSP seam、其 stdio 提供方与面向模型的 lsp 工具实现的语言服务器代码导航，供浏览本组的用户与维护者阅读。"
 kind: "package-group"
 ---
 
-# lsp/ — Language-server code navigation
+# lsp/：语言服务器代码导航
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The lsp group lets agents navigate code through configured language servers: go to definitions, find references and implementations, and read hover documentation. Use `lsp-stdio` to connect local stdio language-server commands and extension mappings, and `tool-lsp` to make those operations available to the model. The shared `lsp` package keeps provider choice and normalized results consistent, so changing servers does not change model requests. Deployments must supply and configure their language servers; this group ships none.
+lsp 组让 agent（智能体）通过配置好的语言服务器导航代码：转到定义、查找引用与实现，以及阅读悬停文档。使用 `lsp-stdio` 连接本地 stdio 语言服务器命令和扩展名映射，使用 `tool-lsp` 向模型提供这些操作。共享的 `lsp` 包使提供方选择和规范化结果保持一致，因此更换服务器不会改变模型请求。部署必须自行提供并配置语言服务器；本组不随附任何语言服务器。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Role | ctx key |
+| 包 | 职责 | ctx key |
 |---|---|---|
-| [`lsp/`](lsp/README.md) | Defines the code-navigation service: provider selection by file extension, four normalized read-only operations, and structured errors | `ctx.lsp` |
-| [`lsp-stdio/`](lsp-stdio/README.md) | Drives configured stdio language-server commands as providers over `ctx.fs` and `ctx.subprocess` | registers on `ctx.lsp` |
-| [`tool-lsp/`](tool-lsp/README.md) | Exposes precise code navigation to the model through the `lsp` tool | registers on `ctx.tools` |
+| [`lsp/`](lsp/README.zh.md) | 定义代码导航服务：按文件扩展名选择提供方、四种规范化的只读操作与结构化错误 | `ctx.lsp` |
+| [`lsp-stdio/`](lsp-stdio/README.zh.md) | 通过 `ctx.fs` 与 `ctx.subprocess` 驱动配置好的 stdio 语言服务器命令，注册为提供方 | 注册到 `ctx.lsp` |
+| [`tool-lsp/`](tool-lsp/README.zh.md) | 通过 `lsp` 工具向模型暴露精确的代码导航 | 注册到 `ctx.tools` |
 
-Providers register capabilities, not tools: `tool-lsp` is the only owner of the model-facing name, schema, prompt guidance, and presentation, so swapping a provider never changes how the model asks for navigation.
+提供方注册的是能力而非工具：`tool-lsp` 是面向模型的名称、schema、提示词指引与呈现的唯一 owner，因此更换提供方绝不会改变模型请求导航的方式。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [LSP navigation subsystem](../../docs/subsystems/lsp.md) — operations, coordinates, requests and results, and `LspError` codes.
-- [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-tool-lsp) — the `lsp` schema the model receives.
+- [LSP 导航子系统](../../docs/subsystems/lsp.zh.md)——操作、坐标、请求与结果，以及 `LspError` 错误码。
+- [生成的工具目录](../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-lsp)——模型接收的 `lsp` schema。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

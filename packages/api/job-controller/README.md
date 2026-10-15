@@ -1,67 +1,67 @@
 ---
-description: "Host and Client job control: the roster one session can see and one job's retained output, mirrored to the browser without touching the model's consuming cursor, and a kill on a human's behalf."
+description: "Host 与 Client 的 job 控制：把一个会话看得到的名册与一个 job 的保留输出镜像到浏览器，不触碰模型的消耗型游标，并代人类停止一个 job。"
 kind: "package-reference"
 ---
 # Job Controller
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`@deepseek-ai/dsh-api-job-controller` owns the Host `ctx.jobController` service and the generated Client `ctx.remote.job` namespace. Its two Remote streams are projections of `ctx.jobs`: `job.list` mirrors the jobs one session can see as whole-set frames, and `job.follow` delivers one job's retained output from an absolute byte offset; its one command, `job.kill`, stops a job on a human's behalf. The Client half installs `ctx.jobs`, the reference-counted service whose rosters and accumulated views the session-header job list renders and whose `kill` its stop control calls. Neither stream touches the model's consuming cursor or its completion notices, and a human kill is not the model's own.
+`@deepseek-ai/dsh-api-job-controller` 拥有 Host 的 `ctx.jobController` 服务与生成的 Client `ctx.remote.job` namespace。它的两条 Remote 流都是 `ctx.jobs` 的投影：`job.list` 以整集帧镜像一个会话看得到的 job；`job.follow` 从绝对字节偏移发送一个 job 的保留输出；它唯一的命令 `job.kill` 代人类停止一个 job。Client 半侧安装 `ctx.jobs`——按引用计数的服务，会话头部任务列表渲染其名册与累积视图，其停止控件调用它的 `kill`。两条流都不触碰模型的消耗型游标与完成通知，人类 kill 也不是模型自己的杀停。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-The Host controller requires the live Agent registry and the job registry (`dsh-jobs-local` in the shipped compositions) and fails to load without them. `job.list({ sessionId })` yields the session's visible set — its own jobs plus every unowned job — once on open and again after each coalesced burst of lifecycle commits (registration, progress, stopping, settlement, removal); output appends never refresh the roster, since a settled projection already carries the final byte count. `job.follow({ sessionId?, jobId, from? })` passes `sessionId` to registry `get` and `readAt` — an unowned job needs no session — and yields one `opened` anchor carrying the job projection, coalesced `output` frames, then one terminal `status` once the job has settled and its ring is drained, after which the stream closes normally; a removal announced mid-stream (the owner's teardown) closes it with the removed job's terminal projection. Both reads are non-consuming: the model's `job_output` cursor and notice state never observe them.
+Host 控制器要求活体 Agent 注册表与 job 注册表（已发布组合里是 `dsh-jobs-local`），缺少任一则不加载。`job.list({ sessionId })` 产出该会话可见的集合——自己的 job 加上所有无主 job——打开时一次，之后每一轮聚合过的生命周期提交（注册、进度、停止中、结算、移除）后再一次；输出追加从不刷新名册，因为结算后的投影已经带着最终字节数。`job.follow({ sessionId?, jobId, from? })` 把 `sessionId` 传给注册表的 `get` 与 `readAt`——无主 job 不需要 session——先产出一个携带 job 投影的 `opened` 锚帧，再是聚合的 `output` 帧，job 结算且环排干后产出一个终态 `status`，随后流正常关闭；流中若通告了移除（拥有者 teardown），则以被移除 job 的终态投影收尾。两种读取都是非消耗的：模型侧 `job_output` 游标与完成播报状态永远观察不到它们。
 
-`job.kill({ sessionId, jobId })` cancels one job the session can see with the reason `cancelled by the user`, which the registry merges into the killed job's detail. It is not a kill the model requested — `dsh-tool-jobs` withholds a notice only for the model's own `job_kill` and for settlements a live wait collected — so the owning agent's completion notice stays due, reason included, and a shell tool still waiting on that job reads the reason as `[stopped: cancelled by the user]` in its own result. It answers `{ outcome: 'requested' }` or `{ outcome: 'already-finished' }` and rejects an id the session cannot see as `job/not-found`; the registry's owner fence is the only access rule, so a child session's own jobs are killable from its list like any other.
+`job.kill({ sessionId, jobId })` 以 `cancelled by the user` 为原因取消一个该会话看得到的 job，注册表把该原因合并进被杀 job 的 detail。它不是模型请求的杀停——`dsh-tool-jobs` 只对模型自己的 `job_kill` 与存活等待收走的结算不发通知——因此拥有者 agent 的完成通知照常送达，并带上原因；仍在等待该 job 的 shell 工具则在自己的结果里以 `[stopped: cancelled by the user]` 读到原因。它回答 `{ outcome: 'requested' }` 或 `{ outcome: 'already-finished' }`，对该会话看不到的 id 以 `job/not-found` 拒绝；注册表的所有者围栏是唯一的访问规则，因此子会话自己的 job 也能像其他 job 一样从它的列表里被杀停。
 
-The Client entry installs `ctx.jobs` (`IJobs`), backed by the package-internal `ClientJobsModel`. `kill(sessionId, jobId)` forwards to `job.kill` and returns the Remote result for the caller's admission verdict. `watchRows(sessionId)` keeps one roster stream open per watched session however many viewers hold it and drops the rows after the last release; a reconnect's first frame is already the whole truth. `observe(sessionId, jobId)` opens one Gateway stream per job however many viewers expand it, keeps a bounded render tail per job with `gapBefore` marking eviction or resume gaps, closes the view on the terminal frame or records a stream failure on it, and drops the view after the last viewer releases. The plugin resolves the Gateway stream factory and the `job` namespace while its own context is current, because stream (re)opens run on caller stacks whose dynamic context has not declared `remote.job`.
+Client 入口安装 `ctx.jobs`（`IJobs`），由包内部的 `ClientJobsModel` 支撑。`kill(sessionId, jobId)` 转发到 `job.kill` 并把 Remote 结果交给调用方判定准入。`watchRows(sessionId)` 不论多少查看器持有都只为每个被关注的会话开一条名册流，最后一个释放后丢弃行；重连后的首帧已经是完整事实。`observe(sessionId, jobId)` 不论多少查看器展开同一 job 都只开一条 Gateway 流，按 job 保留有界的渲染尾部并用 `gapBefore` 标记淘汰或续读缺口，在终态帧上关闭视图或把流失败记到视图上，最后一个查看器释放后丢弃视图。插件在自己的上下文仍是当前上下文时解析 Gateway 流工厂与 `job` namespace，因为流的（重）开启跑在未声明 `remote.job` 的调用栈上。
 
-### Config
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---:|---|
-| `observeFlushMs` | `100` | Coalescing window after a registry commit before the next rows or output read, in milliseconds |
-| `observeMaxFrameBytes` | `65,536` | Soft byte budget per observation output frame; one larger chunk ships whole |
+| `observeFlushMs` | `100` | 注册表提交到下一次名册或输出读取之间的聚合窗口，毫秒 |
+| `observeMaxFrameBytes` | `65,536` | 每个观测输出帧的软字节预算；更大的单块整块发送 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-api-job-controller) is the exhaustive source for accepted fields and their JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-api-job-controller)是所有受支持字段及其 JSDoc 的完整来源。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as job observation is browser and Host control state; it registers no prompt, tool, or session event. The model's own view of the same work stays with [`dsh-tool-jobs`](../../jobs/tool-jobs/README.md).
+无。job 观测是浏览器与 Host 的控制状态；它不注册任何提示词、工具或会话事件。模型对同一工作的视图仍在 [`dsh-tool-jobs`](../../jobs/tool-jobs/README.zh.md)。
 
-#### KV Cache effect
+#### KV 缓存影响
 
-No direct effect; observation reads never touch model requests.
+无直接影响；观测读取从不触碰模型请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The ring is a best-effort live preview, not a terminal transcript: producers' pull sources are copied per poll round, so two streams' writes inside one poll window land stdout first, and the client concatenates chunks regardless of `channel`.
-- Both streams are process-local: a Host restart loses every ring and roster; a resumed observation then anchors on an empty registry, and a re-opened roster starts empty.
-- Per-session fencing is enforced by the caller argument of each registry read; the Remote layer itself serves any connected browser.
+- 环是尽力而为的实时预览，不是终端转录：生产者的拉取源按轮询轮次复制，同一轮询窗口内两条流的写入先 stdout 落地，客户端拼接 chunk 时也不区分 `channel`。
+- 两条流都是进程本地的：Host 重启丢失全部环与名册，续读的观测随后锚定在空注册表上，重开的名册从空开始。
+- 按 session 的访问限制由注册表每次读取时的调用方参数强制；Remote 层本身服务任何已连接浏览器。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

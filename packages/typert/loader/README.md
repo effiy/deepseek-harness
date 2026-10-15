@@ -1,125 +1,125 @@
 ---
-description: "Loader integration for generated Typert artifacts: how mounted packages automatically contribute their host-face reflection and schemas to the runtime registry."
+description: "生成的 Typert 产物所用的 Loader 集成：已挂载的包如何自动把宿主侧反射与 schema 贡献给运行时注册表。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-typert-loader
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-With `dsh-typert-loader` mounted, every package that mounts in a Loader composition automatically contributes its generated Typert reflection and schema factories to the runtime registry — and withdraws them when the package or the plugin unmounts. Packages without the generated export are skipped, so adding the plugin to any composition is safe. An explicit `packages` list covers plugins nested behind another Loader entry, whose fibers carry no resolvable package specifier. It is a Node-only plugin and needs the config-tree resolution anchor to resolve packages.
+挂载 `dsh-typert-loader` 后，Loader 组合中每个挂载的包都会自动把其生成的 Typert 反射与 schema factory 贡献给运行时注册表——并在包或本插件卸载时自动撤销。没有该导出的包会被跳过，因此在任何 Loader 组合中挂载它都是安全的。显式 `packages` 用于覆盖嵌套在另一 Loader 配置项之下的插件，这些插件的 fiber 不携带可解析的包说明符。它是仅支持 Node 的插件，需要配置树解析锚点才能解析包。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this plugin in a Host Loader composition that loads packages publishing generated Typert artifacts. The registry itself comes from `dsh-typert-registry`; this plugin only discovers and registers.
+在加载发布生成 Typert 产物的包的 Host Loader 组合中挂载本插件。注册表本身来自 `dsh-typert-registry`；本插件只负责发现与注册。
 
-### Minimal configuration
+### 最小配置
 
-Load the registry and the loader; the loader defaults to discovering every Loader entry:
+加载注册表与 loader；loader 默认发现每一个 Loader 配置项：
 
 ```yaml
 - name: '@deepseek-ai/dsh-typert-registry'
 - name: '@deepseek-ai/dsh-typert-loader'
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `packages` | `[]` | Additional package artifacts to register for plugins nested behind another Loader entry; each must resolve from the config tree and export `./typert` |
+| `packages` | `[]` | 为嵌套在另一 Loader 配置项下的插件额外注册的包产物；每个包都必须能从配置树解析，并导出 `./typert` |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-typert-loader) is the exhaustive source for every accepted field.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-typert-loader)是所有受支持字段的完整真源。
 
-### What gets registered
+### 注册什么
 
-Each qualifying Loader entry contributes its generated host-face reflection and schema factories to the runtime registry. Registration follows the entry lifecycle: it is withdrawn when the entry or the plugin unmounts, and an import that settles after either owner is gone is discarded.
+每个符合条件的 Loader 配置项都会把其生成的宿主侧反射与 schema factory 贡献给运行时注册表。注册跟随配置项生命周期：配置项或本插件卸载时撤销；在配置项或本插件任一方卸载后才结束的导入操作会被丢弃。
 
-### Observable behavior and failures
+### 可观察行为与失败
 
-Packages without the export are skipped silently. Resolution verdicts and imported manifests are cached for the process lifetime, so adding a `./typert` export requires a restart. A malformed artifact among already-mounted entries fails activation loudly; a later failure is logged per package without preventing unrelated packages from registering. An explicit `packages` entry that cannot be resolved from the config tree, or that lacks the export, fails loudly and names the package.
+没有该导出的包会被静默跳过。解析结论与已导入的 manifest（元数据清单）会在整个进程生命周期内缓存，因此新增 `./typert` 导出后必须重启。已挂载配置项对应的产物格式错误时，激活会明确报错；之后才发生的失败按包记录日志，不会阻止无关包完成注册。无法从配置树解析、或缺少该导出的显式 `packages` 条目会明确报错并指名该包。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains how the loader scans, validates, and registers; the observable behavior is covered in [Use this package](#use-this-package).
+本节解释 loader 如何扫描、校验与注册；可观察行为已在[使用本包](#use-this-package)中说明。
 
-### Design concept
+### 设计理念
 
-The plugin is an incremental scanner mirroring the client-modules node half: every Cordis `internal/plugin` emission marks the fiber's entry name dirty, and a microtask flush reconciles each dirty name against the live Loader entries; the activation pass seeds the same dirty set with all current entries.
+本插件是一个增量扫描器，与 client-modules 的 Node 侧实现对称：每次 Cordis `internal/plugin` 事件都会把该 fiber 的配置项名称标记为脏，微任务 flush 会针对实时 Loader 配置项逐一调和每个脏名称；激活阶段用所有当前配置项填充同一脏集合。
 
-### Manifest validation
+### Manifest 校验
 
-`validateTypertManifest()` is the module/file boundary: the manifest crosses from a build artifact into the typed registry, so every field is checked. The manifest must name the package that exports it, carry face `host`, hold schema factories, and keep well-formed service, event, object, member, type, and documentation records; invocation descriptors must use strict codecs with factories. Every failure names the package and the defect.
+`validateTypertManifest()` 是模块／文件边界：manifest 从构建产物进入类型化注册表，因此每个字段都会被检查。manifest 必须指名导出它的包、携带 `host` face、持有 schema factory，并保持服务、事件、对象、成员、类型与文档记录格式正确；调用描述符必须使用带 factory 的严格编解码器。每次失败都会指名包与缺陷。
 
-### Caching and ownership
+### 缓存与归属
 
-Verdicts (resolvable specifier, export presence) and imported manifests are cached per package name and never expire. Registrations are keyed by entry name and withdrawn through the exact `ctx.typert.register()` disposer; in-flight tasks are tracked per entry so a late import cannot register a contribution after its owner is gone.
+结论（可解析说明符、是否导出）与已导入的 manifest 按包名缓存且永不过期。注册按配置项名称键控，并通过 `ctx.typert.register()` 返回的同一资源释放函数撤销；进行中的任务按配置项跟踪，因此迟到的导入不可能在其所有者消失后注册贡献。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config`, scanner, manifest validation, registration wiring |
+| [`src/index.ts`](src/index.ts) | 插件入口：`Config`、扫描器、manifest 校验、注册装配逻辑 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough; they move from the loader to what it registers and what produces it.
+当包级约定不够用时阅读以下页面；这些页面从 loader 开始，依次介绍它注册的内容及其生成方。
 
-- [Typert registry](../registry/README.md) — the service this plugin feeds.
-- [Typert generator](../generator/README.md) — what produces the artifacts the loader imports.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-typert-loader) — the `packages` field declaration and JSDoc.
-- [Typert group map](../README.md) — the full type-reflection pipeline.
+- [Typert 注册表](../registry/README.zh.md)——本插件所供给的服务。
+- [Typert 生成器](../generator/README.zh.md)——产生 loader 所导入产物的包。
+- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-typert-loader)——`packages` 字段声明及其 JSDoc。
+- [Typert 组地图](../README.zh.md)——完整的类型反射流水线。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as loader integration only registers generated artifacts; consumers own any model-visible projection.
+无，因为 loader 集成只注册生成的产物；任何模型可见投影均由消费方负责。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct effect; registration changes reach a request only through a consumer that reads the registry.
+无直接影响；注册变更只有通过读取注册表的消费方才会影响请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the loader does not discover or register; they are current package constraints, not a task backlog.
+这些限制说明 loader 不会发现或注册什么；它们是当前包约束，不是任务积压。
 
-- **Host face only** — discovery imports only the host `./typert` artifact; client runtimes need a separate composition owner before equivalent discovery is added.
-- **Explicit entries for nested plugins** — Loader entries are discovered automatically, but plugins nested behind another entry, or not loaded by the Loader at all, need an explicit `packages` entry or direct `ctx.typert.register()` ownership.
-- **Cached verdicts never expire** — a package that gains a `./typert` export mid-process needs a restart before the loader registers it.
+- **仅宿主侧**——发现机制只会导入宿主侧 `./typert` 产物；在为客户端运行时添加等价的发现机制之前，需要先有独立的组合所有者。
+- **嵌套插件需要显式条目**——Loader 配置项会被自动发现，但嵌套在另一配置项之下、或完全不经 Loader 加载的插件，需要显式加入 `packages`，或由其所有者直接调用 `ctx.typert.register()`。
+- **缓存结论永不过期**——进程中途新增 `./typert` 导出的包需要重启后 loader 才会注册它。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

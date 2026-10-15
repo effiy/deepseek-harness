@@ -1,52 +1,52 @@
 ---
-description: "The schedule package group: Host-owned scheduled reminders and task management."
+description: "schedule 包组：Host 拥有的定时提醒与任务管理。"
 kind: "package-group"
 ---
 
-# schedule/ — Host-owned reminders
+# schedule/ — Host 拥有的提醒
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Create one-shot, fixed-rate, daily, weekly, or cron reminders for a conversation and keep them across Host restarts. Inspect active and inactive tasks without opening their original Sessions. Use Schedule for reminder creation and delivery, and the Automation tasks page for cross-Session inspection and confirmed deletion. Due reminders arrive as ordinary follow-up messages in the original conversation, not email, SMS, or push notifications.
+为对话创建一次性、固定速率、每日、每周或 cron 提醒，并在 Host 重启后保留它们。无需打开原 Session，即可查看活动和已结束任务。使用 Schedule 创建和投递提醒，使用自动化任务页面跨 Session 查看任务并确认删除。到期提醒作为普通 follow-up 消息进入原对话，而不是电子邮件、短信或推送通知。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-Choose this package for persistent reminder management.
+选择此包进行持久提醒管理。
 
-| Package | Role |
+| 包 | 职责 |
 |---|---|
-| [`schedule/`](schedule/README.md) | Host-owned reminder persistence, scheduling, inspection, and explicit deletion |
-| [`tool-schedule/`](tool-schedule/README.md) | Preset-scoped `schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` tools over the Host `ctx.schedule` service |
+| [`schedule/`](schedule/README.zh.md) | Host 拥有的提醒持久化、调度、查询与显式删除 |
+| [`tool-schedule/`](tool-schedule/README.zh.md) | 基于宿主 `ctx.schedule` 服务的 preset 级 `schedule_create`、`schedule_list`、`schedule_update` 和 `schedule_delete` 工具 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [Schedule subsystem](../../docs/subsystems/schedule.md) — task records, latest receipts, timing, and delivery contracts.
-- [Generated tool catalog](../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) — the `schedule_create`/`schedule_list`/`schedule_update`/`schedule_delete` schemas a mounting preset contributes.
-- [Schedule user guide](../../docs/user/guide/schedule.md) — create reminders and inspect active or inactive tasks.
-- [Web task page and reminder catalog](../client/ui-schedule/README.md) — browser inspection of tasks and confirmed deletion.
+- [Schedule 子系统](../../docs/subsystems/schedule.zh.md)——任务记录、最近一次回执、时间与投递约定。
+- [生成的工具目录](../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-schedule)——挂载 preset 所贡献的 `schedule_create`／`schedule_list`／`schedule_update`／`schedule_delete` schema。
+- [Schedule 用户指南](../../docs/user/guide/schedule.zh.md)——创建提醒并查看活动或已结束任务。
+- [Web 任务页面与提醒目录](../client/ui-schedule/README.zh.md)——在浏览器中查询任务并确认删除。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

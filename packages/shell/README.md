@@ -1,51 +1,51 @@
 ---
-description: "The bash capability family for deployments and maintainers choosing and composing a shell executor, sandboxing, and the model-facing bash and pwsh tools."
+description: "面向部署方与维护者的 bash 能力家族说明，用于选择并组合 shell 执行器、沙箱化与面向模型的 bash 与 pwsh 工具。"
 kind: "package-group"
 ---
 
-# shell/ — bash capability family
+# shell/ — bash 能力家族
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The shell group provides command execution to agents: run a foreground command and read its bounded output, or start a background process and poll it, on POSIX with Bash and on Windows with PowerShell. Exactly one executor implementation is mounted per composition; the sandboxing executors confine every command through the sandbox capability, and the model-facing `bash` and `pwsh` tools sit on top of whichever executor is mounted. Choose a Bash executor for POSIX, a PowerShell executor for Windows, and pick the sandboxing variant when commands need file-level confinement.
+shell 组为 agent（智能体）提供命令执行能力：运行前台命令并读取其有界输出，或启动后台进程并轮询它——在 POSIX 上用 Bash，在 Windows 上用 PowerShell。每个组合恰好挂载一个执行器实现；沙箱执行器会通过沙箱能力限制每条命令，面向模型的 `bash` 与 `pwsh` 工具则位于所挂载执行器之上。POSIX 选择 Bash 执行器，Windows 选择 PowerShell 执行器；命令需要文件级隔离时选择沙箱变体。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Role | ctx key |
+| 包 | 职责 | ctx key |
 |---|---|---|
-| [`shell`](shell/README.md) | Defines the executor contract: foreground runs, background handles, and request resolution | `ctx.shell` |
-| [`bash-local`](bash-local/README.md) | Runs Bash commands as fresh `bash -c` processes on POSIX | registers `ctx.shell` |
-| [`bash-sandbox`](bash-sandbox/README.md) | Runs Bash commands confined through the sandbox capability, reporting denials as facts | registers `ctx.shell` |
-| [`pwsh-local`](pwsh-local/README.md) | Runs PowerShell commands as fresh `pwsh -Command` processes on Windows | registers `ctx.shell` |
-| [`pwsh-sandbox`](pwsh-sandbox/README.md) | Runs PowerShell commands confined through the sandbox capability | registers `ctx.shell` |
-| [`shell-env`](shell-env/README.md) | Supplies the managed `DSH_*` environment every shell command receives | `ctx.shellEnv` |
-| [`tool-bash`](tool-bash/README.md) | Exposes Bash execution and background jobs to the model as the `bash` tool | registers on `ctx.tools` |
-| [`tool-bash-persistent`](tool-bash-persistent/README.md) | Runs model shell calls in one owner-isolated persistent Bash session | registers on `ctx.tools` |
-| [`tool-pwsh`](tool-pwsh/README.md) | Exposes PowerShell execution to the model as the `pwsh` tool | registers on `ctx.tools` |
-| [`tool-pwsh-persistent`](tool-pwsh-persistent/README.md) | Runs model shell calls in one owner-isolated persistent PowerShell session | registers on `ctx.tools` |
+| [`shell`](shell/README.zh.md) | 定义执行器约定：前台运行、后台句柄与请求解析 | `ctx.shell` |
+| [`bash-local`](bash-local/README.zh.md) | 在 POSIX 上以全新 `bash -c` 进程运行 Bash 命令 | 注册 `ctx.shell` |
+| [`bash-sandbox`](bash-sandbox/README.zh.md) | 通过沙箱能力限制 Bash 命令运行，并把拒绝报告为事实 | 注册 `ctx.shell` |
+| [`pwsh-local`](pwsh-local/README.zh.md) | 在 Windows 上以全新 `pwsh -Command` 进程运行 PowerShell 命令 | 注册 `ctx.shell` |
+| [`pwsh-sandbox`](pwsh-sandbox/README.zh.md) | 通过沙箱能力限制 PowerShell 命令运行 | 注册 `ctx.shell` |
+| [`shell-env`](shell-env/README.zh.md) | 提供每条 shell 命令都会收到的受管 `DSH_*` 环境 | `ctx.shellEnv` |
+| [`tool-bash`](tool-bash/README.zh.md) | 以 `bash` 工具向模型公开 Bash 执行与后台任务 | 注册到 `ctx.tools` |
+| [`tool-bash-persistent`](tool-bash-persistent/README.zh.md) | 在单个限定所有者范围的持久 Bash 会话中运行模型的 shell 调用 | 注册到 `ctx.tools` |
+| [`tool-pwsh`](tool-pwsh/README.zh.md) | 以 `pwsh` 工具向模型公开 PowerShell 执行 | 注册到 `ctx.tools` |
+| [`tool-pwsh-persistent`](tool-pwsh-persistent/README.zh.md) | 在单个限定所有者范围的持久 PowerShell 会话中运行模型的 shell 调用 | 注册到 `ctx.tools` |
 
-A profile layer selects exactly one executor implementation (the win32 layer swaps the POSIX rows for the pwsh ones; mounting two fails loudly at load time on the duplicate service registration) and the model-facing tools it needs. A sandboxed composition also selects a `ctx.sandbox` provider and `ctx.sandboxPolicy`; the [base bundle](../bundle/base/cordis.patch.yml) owns the shipped wiring.
+profile 层恰好选择一个执行器实现（win32 层会把 POSIX 行换成 pwsh 行；同时挂载两个会因服务重复注册而在加载期失败）以及所需的面向模型工具。沙箱化组合还会选择一个 `ctx.sandbox` 提供方与 `ctx.sandboxPolicy`；[base 组合包](../bundle/base/cordis.patch.yml)负责随产品交付的接线配置。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [Bash executor subsystem](../../docs/subsystems/shell.md) — the shared request/spec vocabulary, results, background processes, and the complete service contract.
-- [Sandbox subsystem](../../docs/subsystems/sandbox.md) — the confinement capability the sandboxing executors consume.
+- [Bash 执行器子系统](../../docs/subsystems/shell.zh.md) —— 共享的请求/spec 词汇、结果、后台进程与完整的服务约定。
+- [沙箱子系统](../../docs/subsystems/sandbox.zh.md) —— 沙箱执行器所消费的隔离能力。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
-None.
+无。

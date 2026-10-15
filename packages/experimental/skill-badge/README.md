@@ -1,39 +1,39 @@
 ---
-description: "The bundled 'powered by dsh' badge skill for users and maintainers enabling, using, or debugging the optional badge provider."
+description: "随包附带的「powered by dsh」徽章 skill（技能），供启用、使用或排查该可选徽章提供方的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-skill-badge
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Agents can load the official "powered by dsh" badge skill from this bundled provider and follow its instructions for adding attribution badges to documents, PRs, and other content produced with DeepSeek Harness. The provider has no configuration; deployments install it and insert its plugin row explicitly. The skill ships both Markdown snippets and a packaged PNG for systems that cannot reliably import remote images.
+agent（智能体）可以通过该内置提供方加载官方「powered by dsh」徽章 skill，并遵循其指令，给文档、PR（Pull Request）以及其他用 DeepSeek Harness 生成的内容添加署名徽章。该提供方没有配置；部署方需要显式安装并插入插件行。该 skill 同时提供 Markdown 片段和随包分发的 PNG，供无法可靠导入远程图片的系统使用。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Enable the plugin to make the `dsh-badge` skill available in the session skill catalog; the model can then load it like any other skill and follow its instructions for adding a "powered by dsh" badge.
+启用插件即可让 `dsh-badge` skill 出现在会话 skill 目录中；随后模型可以像加载任何其他 skill 一样加载它，并遵循其指令添加「powered by dsh」徽章。
 
-### When to choose it
+### 何时选择
 
-Choose this provider when content produced with DeepSeek Harness should carry official attribution badges, and the deployment wants the badge skill available to agents without storing it in a local skill directory. Skip it when the badge is irrelevant to the deployment. The default composition omits the plugin; installation and an explicit active row are required.
+当用 DeepSeek Harness 生成的内容应携带官方署名徽章、且部署方希望该徽章 skill 对 agent 可用而无需存入本地 skill 目录时，选择此提供方。当徽章与部署无关时，请跳过。默认组合省略此插件；使用它需要安装包并显式插入活动行。
 
-### Enable the plugin
+### 启用插件
 
-Install `@deepseek-ai/dsh-skill-badge` into the profile and insert its plugin row. The default composition does not declare it.
+将 `@deepseek-ai/dsh-skill-badge` 安装到 profile，并插入插件行。默认组合不声明该行。
 
 ```yaml
 - insert:
@@ -41,78 +41,78 @@ Install `@deepseek-ai/dsh-skill-badge` into the profile and insert its plugin ro
       name: '@deepseek-ai/dsh-skill-badge'
 ```
 
-After enabling, `dsh-badge` appears in the available skills of the session catalog. The skill covers remote Markdown badges (Shields.io-based) and a packaged PNG badge asset for targets that cannot fetch remote images reliably.
+启用后，`dsh-badge` 会出现在会话目录的可用 skill 中。该 skill 覆盖远程 Markdown 徽章（基于 Shields.io）和随包分发的 PNG 徽章资源，后者用于无法可靠获取远程图片的目标环境。
 
-### What the badge skill provides
+### 徽章 skill 提供什么
 
-- **Markdown snippets.** Instructions for embedding the official badge markup in documents, PRs, and merge requests.
-- **Packaged PNG asset.** A `dsh-badge.png` resource (726×120 source, rendered at 121×20) that works where remote images cannot be imported.
+- **Markdown 片段。** 在文档、PR 与 merge request 中嵌入官方徽章标记的指令。
+- **随包分发的 PNG 资源。** `dsh-badge.png`（726×120 源图，按 121×20 渲染），在无法导入远程图片的环境中可用。
 
-### Observable success and failures
+### 可观察的成功与失败
 
-An explicitly inserted active row makes `dsh-badge` appear in the catalog and loadable by name. Without an active row, this provider contributes no catalog entry. Because the provider is immutable, discovery always succeeds with exactly one skill and never reports partial results.
+显式插入的活动行会使 `dsh-badge` 出现在目录中并可凭名称加载。没有活动行时，此提供方不贡献目录条目。由于提供方不可变，发现始终成功且恰好返回一个 skill，绝不会报告部分结果。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains how the bundled provider is wired; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释内置提供方如何接线；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design concept
+### 设计理念
 
-The provider is an immutable, synchronously registered skill source: it registers one fixed candidate at the bundled skill rank (600) under the provider name `dsh-badge`, exposes its packaged `assets/` directory as the skill's directory resource base, and reads the skill body from the packaged `assets/dsh-badge.md` file on every load.
+该提供方是一个不可变、同步注册的 skill 来源：它以 `dsh-badge` 作为提供方名称、按内置 skill rank（600）注册一个固定候选项，把随包分发的 `assets/` 目录作为该 skill 的目录资源基底公开，并在每次加载时从随包分发的 `assets/dsh-badge.md` 文件读取 skill 正文。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry and the immutable provider: one candidate, resource base, body load |
-| [`assets/`](assets/) | Packaged skill body (`dsh-badge.md`) and PNG asset (`dsh-badge.png`) |
+| [`src/index.ts`](src/index.ts) | 插件入口与不可变提供方：一个候选项、资源基底、正文加载 |
+| [`assets/`](assets/) | 随包分发的 skill 正文（`dsh-badge.md`）与 PNG 资源（`dsh-badge.png`） |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the registry this provider registers on to how the skill reaches the model.
+当包级约定不够用时，请阅读以下页面。这些页面先介绍该提供方注册到的注册表，再说明 skill 如何到达模型。
 
-- [Skill subsystem reference](../../../docs/subsystems/skills.md) — the registry and provider contract this provider implements.
-- [skill package](../../skill/skill/README.md) — the registry the provider registers on, and the shared rendering of loaded skills.
-- [tool-skill package](../../skill/tool-skill/README.md) — how the badge skill reaches the session catalog and the model.
+- [skill 子系统参考](../../../docs/subsystems/skills.zh.md)——该提供方实现的注册表与提供方约定。
+- [skill 包](../../skill/skill/README.zh.md)——该提供方注册到的注册表，以及已加载 skill 的共享渲染。
+- [tool-skill 包](../../skill/tool-skill/README.zh.md)——徽章 skill 如何到达会话目录与模型。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through `dsh-tool-skill`, which renders the provider's catalog entry and the selected skill body to the model.
+通过 `dsh-tool-skill` 间接影响模型；该包会把该提供方的目录条目和所选 skill 的正文渲染给模型。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-An omitted plugin adds no request content. When its inserted row is active, its catalog entry and any loaded body change the provider KV prefix at their insertion points.
+省略的插件不增加请求内容。插入的行处于活动状态时，其目录条目和任何已加载正文都会在各自插入点改变提供方的 KV 前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the bundled provider does not do. They are current package constraints, not a task backlog.
+这些限制说明内置提供方不做什么。它们是当前包约束，不是任务积压。
 
-- **One fixed skill, no runtime customization** — the provider contributes exactly the `dsh-badge` skill; deployments that need another badge variant author their own skill instead.
-- **Remote Markdown relies on Shields.io** — the remote badge markup embeds a Shields.io image; use the packaged PNG when the target cannot fetch remote images reliably.
+- **固定一个 skill，无运行时自定义**——提供方恰好贡献 `dsh-badge` 这一个 skill；需要其他徽章变体的部署请自行编写 skill。
+- **远程 Markdown 依赖 Shields.io**——远程徽章标记内嵌 Shields.io 图片；目标环境无法可靠获取远程图片时，请使用随包分发的 PNG。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

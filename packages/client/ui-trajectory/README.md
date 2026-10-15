@@ -1,116 +1,116 @@
 ---
-description: "Trajectory view for the dsh web client: a turn-aware event ledger with an interactive timing overview, registered into the conversation view ring."
+description: "dsh Web 客户端的 Trajectory 视图：按轮次组织的事件记录表加交互式时间概览，注册进对话视图环。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-trajectory
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The Trajectory tab lets you inspect agent activity as a turn-aware ledger and interactive timing overview. It groups User, Assistant, Tool, nested Subtool, and compaction records, marks turn and step boundaries, and opens a record inspector for token usage, duration, input, output, timing, images, and attachment summaries. Long histories open at the current tail, load older pages on demand, and render only visible rows. During streaming, the view follows the tail until you scroll upward, and in-flight records show a start marker without inventing elapsed time.
+Trajectory 标签页让你以按轮次组织的事件记录表和交互式时间概览检查 agent（智能体）活动。它对用户、助手、工具、嵌套子工具和压缩（compaction）记录分组，标示轮次与步骤边界，并为所选记录打开检查器，显示 token 用量、耗时、输入、输出、计时、图片和附件摘要。较长历史打开时定位于当前尾部，按需加载更早页面，并且只渲染可见行。流式输出期间，视图会跟随尾部，直到你向上滚动；进行中的记录只显示开始标记，不会虚构耗时。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Open the Trajectory tab in the conversation's view ring to inspect agent activity as an event ledger and timeline. The ledger covers records with an explicit loading row until the initial tail is positioned; while an older prefix remains unloaded, a first-row control loads one earlier page on click and shows the shared ongoing loader while that page is pending.
+在对话视图环中打开 Trajectory 标签页，把 agent 活动作为事件记录表与时间线查看。初始尾部完成定位前，记录表会用明确的加载行遮住真实记录；更早的前缀仍未加载时，首行控件会在点击时加载一页更早的历史，并在该页加载期间显示共享 ongoing loading。
 
-### Inspecting records
+### 检查记录
 
-Calls are identified by their recorded tool name. For `run_code`, the row shows the program description and the inspector opens numbered, highlighted source. The Code tab provides wrapping, a `{}` toggle for the original JSON arguments, and exact source copying, including trailing newlines. Copying the original arguments retains their recorded JSON whitespace. Each newly opened code view takes the last wrapping choice; changing it leaves other open views as they are. Output preserves the recorded text, using a tree for complete JSON objects or arrays. Highlighting uses only an unambiguous TypeScript or Python hint in the recorded tool schema; missing or conflicting hints leave plain source.
+调用按已记录的工具名识别。对于 `run_code`，记录行展示程序说明，检查器显示带行号和语法高亮的源码。“代码”页提供换行、查看原始 JSON 参数的 `{}` 切换按钮，以及保留末尾换行的源码原样复制。复制原始参数时保留记录中 JSON 的空白。每个新打开的代码视图采用上次选择的换行状态；切换时，其他已打开视图保持原状。输出保留记录中的文本，完整 JSON 对象或数组使用树形展示。高亮只采用已记录工具 Schema 中明确且无冲突的 TypeScript 或 Python 提示；提示缺失或冲突时显示纯文本源码。
 
-Selection, timeline navigation, folding, and search cover the React-visible window. Request numbers and cumulative usage cover the complete resident snapshot. Selecting a record opens a local inspector for token usage, duration, Input, Output, Timing, and durable images. Image URLs use the Conversation-owned per-session cache, so Chat and Trajectory share one authorized read per attachment. A user record shows both nonzero image and ordinary-file counts beside its text, including attachment-only records. A standalone compaction request appears chronologically in its own `Between turns` section, while a numbered compaction remains inside its owning turn.
+选择、时间线导航、折叠与搜索只覆盖 React 可见窗口。请求编号与累计用量覆盖完整的驻留快照。选择记录会打开局部检查器，查看 token 用量、耗时、输入、输出、计时与持久保留的图片。图片 URL 使用 Conversation 拥有的逐会话缓存，因此 Chat 与 Trajectory 对每个附件共享一次已授权读取。用户记录会在文本旁同时显示非零的图片与普通文件数量，仅含附件的记录也显示这些数量。独立运行的压缩请求会按时间顺序显示在自己的 `Between turns` 区段中，而带编号的压缩仍位于其所属轮次内。
 
-Summary and Preview share one ordered attachment list after the message text, preserving repeated references. Each row shows a contained image thumbnail or file-type icon, the recorded filename (a localized numbered label for unnamed images), and recorded size, type, and image dimensions where available. Zero-byte files retain their size, and truncated filenames expose the full name in a tooltip. Images open the existing lightbox. Raw keeps content-block order and unrendered text, with images and files in initially collapsed disclosures containing their complete recorded fields.
+概述与预览共用正文之后的有序附件列表，保留重复引用。每行展示完整缩放的图片缩略图或文件类型图标、已记录的文件名（未命名图片使用本地化的编号名称），以及可用的已记录大小、类型和图片尺寸。零字节文件保留大小显示，截断的文件名通过提示显示完整名称。图片打开现有灯箱。原始内容保留内容块顺序和未渲染文本，图片与文件使用默认折叠的展开项，包含完整的已记录字段。
 
-Requests remain pending while awaiting output, streaming, or retrying. A request without assistant output has no result link; interrupted output remains inspectable and both the request and assistant record show failure, including when the Step start is outside the loaded history. Retry counts and the last attempt error remain available after recovery; they do not change the current request status. A completed model response does not imply that its tools or turn have finished.
+请求在等待输出、流式生成或重试期间保持等待状态。尚无助手输出的请求不提供结果链接；中断的输出仍可检查，请求和助手记录都显示失败，即使步骤起点位于已加载历史之外。恢复后仍可查看重试次数与上次尝试错误；这些历史信息不改变请求当前的状态。模型回复完成并不表示其工具或轮次已经结束。
 
-Thinking in the inspector uses compact Markdown at the inspector's fixed 13px size and 20px line height, independent of the content-size setting. Headings add bold weight without increasing size or line height. Assistant output keeps its regular Markdown typography.
+检查器中的思考内容使用紧凑 Markdown，沿用检查器固定的 13px 字号和 20px 行高，不受内容字号设置影响。标题只加粗，不放大字号或行高。助手输出保留常规 Markdown 排版。
 
-### The timing overview
+### 时间概览
 
-Streaming replies retain their known start time and TTFT. After settlement, token timestamps provide generation duration; throughput also requires recorded usage. Historical replies retain the same recorded timing. TTFT measures from the Step start to its first token, including output from an earlier retry attempt; an unloaded Step start or a stream without tokens leaves the corresponding metric unavailable.
+流式回复保留已知的开始时间与 TTFT。回复结束后，token 时间戳用于计算生成耗时；吞吐量还需要已记录的用量。历史回复保留相同的已记录计时。TTFT 从步骤开始计量到首个 token，包括更早重试尝试中的输出；步骤起点尚未加载或流中没有 token 时，对应指标保持不可用。
 
-A fixed Overview above the ledger projects real record start/duration timing from left to right; Assistant spans divide recorded TTFT from decoding, and a 500 ms hover reveals exact clock and duration details. Dragging an interval focuses the ledger on every record active at any point in that inclusive range; wheel gestures zoom the time domain; a right-button click clears the selected interval, and a right-button drag pans an already zoomed viewport. The initial view and streaming updates stay at the tail; scrolling upward suspends following so new records do not interrupt inspection of earlier rows.
+固定在记录表上方的 Overview 区域从左到右投影记录的真实开始时间与耗时；助手时间条区分记录到的 TTFT 与解码时间，悬停 500 ms 后可查看精确时刻与耗时详情。拖选区间会把记录表聚焦到该闭区间内任何时刻处于活动的记录；滚轮手势用于缩放时间域；右键单击会清除所选区间，在已放大的视口上按住右键拖动则会平移。初始视图与流式更新都停留在尾部；向上滚动会暂停跟随，因此新记录不会打断对旧记录的检查。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The view is a pure projection: Trajectory-owned Definitions assemble business records from the shared Session window — including durable cancellation-finalized prefixes, chunk-only interruption fallbacks, and interrupted Tool records — so Trajectory neither reads nor changes the Chat conversation snapshot. Its steering classifier retains only next-step Inbox IDs through persistent splice state and shares each current claimed batch across later Contexts.
+视图是纯投影：Trajectory 自有的定义从共享会话窗口组装业务记录——包括因取消而定稿并持久保留的前缀、仅有分片时采用的中断回退记录，以及被中断的工具记录——因此 Trajectory 既不读取也不改变 Chat 会话快照。其 steering（中途引导）分类器通过持续保留的拼接状态只保留下一步的 Inbox ID，并让后续上下文共享当前已认领的每个批次。
 
-Native and nested PTC Tool results retain their raw structured error details and presentation metadata. Failed records show the error code in the ledger and the error name and code in the inspector.
+原生与嵌套 PTC 工具结果保留原始结构化错误详情和展示元数据。失败记录在记录表中显示错误代码，在检查器中显示错误名称和代码。
 
-Tool records begin at durable tool/call events and retain complete argument text with a lazy `args` view, reused by paired results. Chat's transient preparing stage does not create Trajectory tool rows or alter historical tool timing.
+工具记录从持久 tool/call 事件开始，保留完整参数文本和由配对结果复用的懒计算 `args` 视图。Chat 的瞬态 preparing 阶段不创建 Trajectory 工具行，也不改变历史工具计时。
 
-A complete appended prompt without a loaded request header appears as a standalone system row; only its known text is available, with no inferred request options or tool catalog. Prepending its request history replaces that standalone presentation without duplicating the prompt. In-history system prompt changes compare against the most recent request state, including earlier prompt updates without a new request header. Each request retains the prompt and change that applied at its own position. Surface replacements, including compaction, restore the last nonempty surviving system prompt even without a new system event; an unloaded prompt remains unavailable until its page arrives.
+完整的追加提示词在请求头未加载时显示为独立系统行；仅提供已知文本，不推断请求选项或工具目录。补入其请求历史后，该独立展示被替代而不重复提示词。历史中的系统提示词变更与最近的请求状态比较，包括没有新请求头的先前提示词更新。每个请求保留其所在位置生效的提示词与变更。包括压缩在内的 surface 替换会恢复最后一个非空的存活系统提示词，即使没有新的系统事件；未加载的提示词在对应分页到达前仍不可用。
 
-### Virtual rows
+### 虚拟行
 
-Long ledgers initially derive React data from 50 target Nodes ending at the mount-time tail. Later Nodes extend that anchored window without evicting its prefix, and the existing load control reveals earlier resident Nodes before requesting another Session page. Virtualization mounts only the visible row window plus a small overscan; request-only separators share the next measurable virtual item, while semantic row keys and ARIA indexes survive prepends. The virtualizer owns bottom following for structural appends; non-virtual ledgers use a direct tail-position write. Content-only stream frames preserve virtual row keys and heights, reuse measurements, and do not issue repeated tail-scroll writes. Completed replies retain assembled blocks, timing, and usage in Trajectory target State, while the shared Session window keeps the raw Events.
+长记录表最初只从挂载时尾部结束的 50 个 target Node 派生 React 数据。后续 Node 会扩展这个固定起点的窗口而不会逐出其前缀；现有加载控件会先显露更早的驻留 Node，再请求下一个会话页面。虚拟化只挂载可见行窗口加少量缓冲；仅含请求的分隔行并入下一个具备可测高度的虚拟项，语义行键与 ARIA 索引在向前补页后保持不变。虚拟化器负责结构性追加后的底部跟随；非虚拟记录表会直接写入末尾位置。仅含内容更新的流式帧会保持虚拟行的键与高度、复用测量结果，并且不会重复写入末尾滚动位置。已完成的回复会在 Trajectory target State 中保留组装后的块、计时与用量，共享会话窗口则保留原始事件。
 
-### Layout
+### 布局
 
-Trajectory asks the conversation shell to float the composer over the full-height ledger, while its responsive vertical scrollers reserve the composer's live height so final rows remain reachable. Scrollable Summary regions keep their scrollbar thumbs transparent until hovered or focused, without changing the reserved scroll geometry. The package provides no service and declares no Context merge.
+Trajectory 要求会话壳把 composer 作为浮层置于全高记录表上方；其响应式纵向滚动容器会预留 composer 的实时高度，确保仍可滚动到最后几行。可滚动的 Summary 区域在悬停或聚焦前保持滚动条滑块透明，同时不改变预留的滚动几何空间。本包不提供服务，也不声明上下文合并。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-These pages cover the conversation host and the session data this view projects.
+以下页面覆盖对话宿主与本视图所投影的会话数据。
 
-- [ui-conversation](../ui-conversation/README.md) — the chat surface hosting the `conversation.view` ring.
-- [session-projection](../../session/session-projection/README.md) — the projection registry serving client-facing read models of session state.
-- [session](../../core/session/README.md) — the session seam whose window holds the raw events.
-- [compaction](../../compaction/compaction/README.md) — the compaction seam whose requests appear in the ledger.
+- [ui-conversation](../ui-conversation/README.zh.md)——承载 `conversation.view` 环的聊天界面。
+- [session-projection](../../session/session-projection/README.zh.md)——为面向客户端的会话状态读取模型提供服务的投影注册表。
+- [session](../../core/session/README.zh.md)——其窗口持有原始事件的会话 seam。
+- [compaction](../../compaction/compaction/README.zh.md)——其请求出现在记录表中的压缩 seam。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+无。该包是浏览器端 UI 插件层，不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；该包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Tool-change presentation** — Tool-only developer messages name a single added or removed tool inline without expansion. Multiple changes show added/removed counts and expand to comma-separated tool lists, one line per change kind. Mixed content uses the generic context presentation.
+- **工具变更展示** — 仅包含工具变更的 developer 消息在单个工具新增或移除时直接显示工具名，不提供展开操作。多个变更显示新增、移除数量，展开后按变更类型分别以逗号分隔显示一行工具列表。混合内容使用通用上下文展示。
 
 
-These limits define what the view can show while work is in flight; they are current package constraints.
+这些限制定义工作仍在进行时视图能显示什么；它们是当前包约束。
 
-- **In-flight Time stays blank** — `partial` and `runningCalls` rows show their running state without a fabricated duration, so the Overview renders a start marker rather than inventing a live span. Record and timeline selection are local to Trajectory, with no anchor deep links.
+- **进行中时 Time 保持空白**：`partial` 与 `runningCalls` 行会显示运行状态，但不会虚构耗时，因此 Overview 区域只渲染开始标记，而不会杜撰实时跨度。记录选择与时间线选择位于 Trajectory 内部，不提供锚点深链接。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,171 +1,171 @@
 ---
-description: "Enable profile plugins and install, remove or select bundles from the Web sidebar or an agent."
+description: "通过 Web 侧边栏或 agent 启停 profile 插件，并安装、删除或选择组合包。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-plugin-manager
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-Application-owned profiles supply their bundled package-manager invocation through launcher facts. It takes precedence over `pnpmCommand` for package operations and registry inspection; its environment applies only to those subprocesses.
+应用拥有的 profile 通过启动器信息提供内置包管理器调用方式。它在包操作和 registry 检查中优先于 `pnpmCommand`；其环境仅应用于这些子进程。
 
-## Summary
+## 概述
 
-Manage the current profile's plugins without editing configuration by hand. Enable or disable individual plugin entries, select installed bundles, and install or remove external bundles. With HMR enabled in YAML, configuration changes apply immediately; without HMR, the running composition remains until restart. Changes affect every session using the profile.
+管理当前 profile 的插件，无需手动编辑配置。启停单个插件条目、选择已安装的组合包，以及安装或删除外部组合包。在 YAML 中启用 HMR 时，配置变化立即生效；未启用 HMR 时，运行中的组合保留到重启。改动影响使用该 profile 的全部会话。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Failure behavior](#failure-behavior)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [失败行为](#failure-behavior)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Base-backed profiles provide the manager. In Web, the sidebar's **Plugins** page ([ui-plugin-manager](../../client/ui-plugin-manager/README.md)) manages the profile's bundles and their uniquely addressable rows; the Settings Plugin list stays read-only. Agent-preset rows remain read-only. The `plugin_manager` tool exposes the same operations and is enabled in Creator mode. Other presets keep it disabled by default. Every tool action requires `danger-full-access` or approval for that call. Under lower sandbox modes, `ask` requests approval; `never`, rejection, cancellation, or an unavailable approval channel prevents execution. An approval leaves the session permission mode unchanged. Profile changes persist across sessions, and installed Host code executes in-process outside the workspace sandbox. Dependency build-script approval remains separate.
+基于 base 的 profile 提供管理服务。在 Web 中，侧边栏的**插件**页（[ui-plugin-manager](../../client/ui-plugin-manager/README.zh.md)）管理 profile 的组合包及其能唯一定位的行；设置页的插件列表保持只读。Agent 预设条目保持只读。`plugin_manager` 工具提供相同操作，在 Creator 模式中启用。其他预设仍默认禁用。 每个工具操作都要求 `danger-full-access` 或本次调用的批准。在较低沙箱模式下，`ask` 会请求审批；`never`、拒绝、取消或审批渠道不可用时均不执行。批准不改变会话的权限模式。profile 变更跨会话持久化，已安装的 Host 代码在宿主进程内运行，不受工作区沙箱限制。依赖构建脚本仍需单独批准。
 
-For a deployment without agent presets, enable the tool in the profile patch. Preset-backed sessions use their preset’s `tool-plugin-manager` entry.
+未使用 Agent 预设的部署在 profile patch 中启用工具；使用预设的会话由其预设中的 `tool-plugin-manager` 条目控制。
 
 ```yaml
 - id: tool-plugin-manager
   disabled: false
 ```
 
-A plugin toggle updates only `disabled` in the last matching override in the profile's `cordis.patch.yml`, or appends an override when none matches. Matching uses the entry id and any module-name assertion. A bundle toggle changes `package.json`'s ordered `dsh.profile.bundles` list. Disabling retains the dependency; enabling appends the bundle at the end, which can change configuration precedence. Installation enables a new bundle by default. Home and invocation patches retain their higher priority.
+插件开关只更新 profile 的 `cordis.patch.yml` 中最后一条匹配覆盖项的 `disabled`；没有匹配项时追加。匹配依据是条目 id，以及覆盖项声明的模块名称。组合包开关修改 `package.json` 的有序 `dsh.profile.bundles` 列表。关闭保留依赖；开启追加到列表末尾，可能改变配置优先级。安装新组合包默认启用。home 和单次启动 patch 保留更高优先级。
 
-A selected bundle that cannot load remains in `listBundles` with an `error`; `enabled` records the saved selection, not successful loading. The plugin page shows the error and allows deselection. A broken bundle cannot be enabled. Management bundles remain protected if their files become unreadable.
+已选择但无法加载的组合包仍会出现在 `listBundles` 中，并携带 `error`；`enabled` 表示保存的选择，不代表加载成功。插件页面显示错误并允许取消选择。损坏的组合包无法启用。管理组合包的文件变得不可读后仍受保护。
 
-`listBundles` includes optional display `meta` for each bundle and its declared plugin rows, including disabled bundles. The Client selects a language from these values. The separate `description` field is the bundle's raw `package.json.description`; a metadata diagnostic does not block management. `source` gives a profile dependency as a spec `pnpm add` accepts: a git address or URL as recorded without the user information of an http(s) URL (a query string stays as recorded), a `file:` or `link:` path made absolute against the profile or the home directory for `~`, and a registry range, tag, or alias after the package name, as is any spec of a package installed under another name; a bundle the installation supplies has none, even when the profile also depends on it, because the installation's copy is the one that loads. The `plugin_manager` tool omits UI display metadata from list results.
+`listBundles` 为各组合包及其声明的插件行提供可选的展示 `meta`，包括已禁用的组合包。Client 从这些值中选择语言。单独的 `description` 字段是该组合包原始的 `package.json.description`；元信息诊断不会阻止管理操作。`source` 以 `pnpm add` 接受的 spec 给出 profile 依赖：git 地址或 URL 按记录给出，但去掉 http(s) URL 的 user information（查询字符串保持原样）；`file:` 或 `link:` 路径按 profile 目录解析为绝对路径，`~` 展开为主目录；注册表版本范围、标签或别名接在包名的 `@` 之后，以别名安装的包的 spec 也是如此。安装提供的组合包没有该字段，即使 profile 也依赖它，因为实际加载的是安装中的副本。`plugin_manager` 工具的列表结果不包含 UI 展示元信息。
 
-`listBundles` marks shipped optional bundles and on-demand catalog entries as `official`, independently of package installation. `availability` identifies a readable installation-provided or profile package, or `missing`; on-demand catalog entries exclude undeclared transitive copies. `installed` only records whether the profile declares the dependency. An absent on-demand entry carries embedded localized metadata and a host-derived `installTarget` containing the running DSH version and install spec, without registry access. Profile-declared packages with unreadable files retain their declaration and expose the normal error.
+`listBundles` 将随附可选组合包和按需目录项标为 `official`，与包的安装状态独立。`availability` 表示可读取的安装随附包、profile 包，或 `missing`；按需目录项不计入未声明的传递依赖副本。`installed` 仅表示 profile 是否声明该依赖。尚未安装的按需条目携带内嵌的本地化元信息，以及 Host 生成、包含当前 DSH 版本与安装 spec 的 `installTarget`，无需访问注册表。profile 已声明但文件不可读的包保留依赖声明，并展示原有错误。
 
-`inspect(spec, options)` reads what a spec names before anything installs: a registry name is asked of the registry through `pnpm view`, run in the profile directory so the same proxy and authentication settings apply as to the install; an absolute path has its `package.json` read; a git address or tarball answers only its form and the `host` it is fetched from. The answer carries the name, version, description, whether the package declares a bundle, and the `registry` that answered, or a `problem`: `invalid-spec`, `already-installed`, `not-found`, `not-a-package`, `not-a-bundle`, `network`, or `unknown`, with the `registries` asked. A caller's `signal` or `inspectTimeoutMs` ends the lookup.
+`inspect(spec, options)` 在任何东西安装之前读出 spec 指向什么：注册表包名通过 `pnpm view` 询问注册表，在 profile 目录中运行，因而与安装使用同样的代理与认证设置；绝对路径读取其 `package.json`；git 地址或 tarball 只答复自己的形式和它被拉取的 `host`。答复携带名称、版本、描述、该包是否声明组合包，以及作答的 `registry`，否则给出 `problem`：`invalid-spec`、`already-installed`、`not-found`、`not-a-package`、`not-a-bundle`、`network` 或 `unknown`，并附上问过的 `registries`。调用方的 `signal` 或 `inspectTimeoutMs` 会结束查询。
 
-Published installations offer `package@<running DSH version>`. Source Web and development Desktop offer `link:<absolute workspace package directory>` from the running CLI installation, including its development symlink. Package names resolve through workspace manifests; current working directory and prerelease suffixes do not select a checkout. Missing packages, bundle patches, or built entry points produce a diagnostic without registry fallback. Prepare the checkout with `pnpm install` and `pnpm run build`. Linked packages use that checkout’s dependencies and peers; rebuilding and restarting remain necessary after code changes. A registry copy or another checkout’s link can need replacement even when its version matches.
+已发布的安装提供 `package@<当前 DSH 版本>`。源码 Web 与开发 Desktop 提供 `link:<工作区包的绝对目录>`，目录来自当前 CLI 的安装位置，包括其开发符号链接。包名通过工作区清单解析；当前工作目录和预发布版本后缀不用于选择 checkout。包、bundle patch 或已构建入口缺失时报告诊断，不回退到注册表。使用 `pnpm install` 和 `pnpm run build` 准备 checkout。链接包使用该 checkout 的依赖与 peer；代码改变后仍需重新构建并重启。即使版本相同，注册表副本或其他 checkout 的链接也可能需要替换。
 
-Official on-demand installs and explicit updates call the same `installBundle` operation as other bundles. Registry targets use `saveExact: true`; development targets retain the ordinary `link:` dependency. Updates pass the current `enabled` selection; replacing an existing dependency reports `restart-required`. Turning Off only deselects the layer, and Remove uses the existing removal checks. Installation failure restores the profile manifest and lockfile; activation failure after installation can retain the saved dependency and selection. The existing peer-compatibility check still applies, without an additional Official-only version admission rule.
+官方按需安装与显式更新调用和其他组合包相同的 `installBundle` 操作。注册表目标使用 `saveExact: true`；开发目标保留普通 `link:` 依赖。更新传入当前 `enabled` 选择状态；替换已有依赖会报告 `restart-required`。关闭仅取消选择配置层，移除使用原有移除检查。安装失败恢复 profile 清单和锁文件；安装成功后激活失败可能保留已保存的依赖和选择。原有 peer 兼容性检查继续生效，不增加仅针对官方条目的版本准入规则。
 
-`installBundle` checks GitHub repositories with `git ls-remote` before starting pnpm, using the profile directory and the installer's Git and proxy configuration. `githubConnectionTimeoutMs` defaults to 5000 ms and limits only this check, not package download or builds. The check disables credential helpers and prompts; only network failures and timeouts stop installation, reporting `failedAt: 'spec-host'` with the existing failure kind and diagnostic log. Authentication, repository lookup and other failures are left to pnpm, including its HTTPS-to-SSH fallback. Cancellation and manager disposal stop the check and its descendants. Registry packages, paths, tarballs and other Git hosts skip this check. A reachable repository can still fail during download or bundle validation.
+`installBundle` 在启动 pnpm 前通过 `git ls-remote` 检查 GitHub 仓库，使用 profile 目录及安装器的 Git 与代理配置。`githubConnectionTimeoutMs` 默认为 5000 毫秒，只限制这次检查，不限制包下载或构建。检查禁用凭据助手和认证提示；只有网络失败与超时会停止安装，通过现有失败类型与诊断日志返回，并标记 `failedAt: 'spec-host'`。认证、仓库查找及其他失败继续交给 pnpm，包括其 HTTPS 到 SSH 的回退。取消安装或销毁管理器会停止检查及其子进程。注册表包、本地路径、压缩包和其他 Git 主机跳过此检查。仓库可达后，下载或组合包验证仍可能失败。
 
-Registries are asked in turn. The plan starts at `options.registry`, else the configured `registry` (`null` is the one pnpm's own configuration names), and continues through `fallbackRegistries` while a registry is unreachable, times out, or answers that it has no such package or version, which a mirror not yet synced does. A registry outside the configured set is asked alone, so a private registry never falls through to a public one; pnpm's own registry counts as part of the set only while what it names, read through `pnpm config get registry` before each plan, is npm's own registry or one of the fallbacks, and is otherwise asked alone as a private one. A registry pnpm's own configuration already names is asked once. The lookup runs `pnpm view` with `--registry` and without pnpm's own retries, so a dead registry is reported within `inspectTimeoutMs` and the next one is asked; pnpm prints its refusal as JSON on stdout, which is read like stderr. The install keeps pnpm's retry settings. `registries()` answers the configured set and what pnpm names, for a picker. The [registry Agent Note](../../../.agents/notes/implemented/architecture/2026-09-18-plugin-install-registries.md) owns the rationale.
+注册表按顺序询问。计划从 `options.registry` 开始，否则从配置的 `registry`（`null` 即 pnpm 自身配置指定的那个）开始，并在一个注册表不可达、超时或答复没有这个包或版本（尚未同步的镜像会如此）时继续问 `fallbackRegistries`。配置集合之外的注册表只问它自己，因而私有源永远不会落到公共源；pnpm 自身的注册表只在它指向的地址（每次做计划前经 `pnpm config get registry` 读出）是 npm 官方源或某个备选源时才算集合成员，否则视为私有源只问它自己。pnpm 自身配置已经指向的注册表只问一次。查询以 `--registry` 运行 `pnpm view` 且不带 pnpm 自身的重试，所以死掉的注册表会在 `inspectTimeoutMs` 内报告并转问下一个；pnpm 把拒绝以 JSON 打印在 stdout，读法与 stderr 相同。安装保留 pnpm 的重试设置。`registries()` 把配置集合和 pnpm 指向的地址答复给选择器。[注册表 Agent Note](../../../.agents/notes/implemented/architecture/2026-09-18-plugin-install-registries.zh.md) 拥有理由。
 
-The browser-safe `@deepseek-ai/dsh-plugin-manager/registry` entry exports `OFFICIAL_NPM_REGISTRY` and `NPMMIRROR_REGISTRY` for consumers that identify those public registries.
+可在浏览器使用的 `@deepseek-ai/dsh-plugin-manager/registry` 入口导出 `OFFICIAL_NPM_REGISTRY` 和 `NPMMIRROR_REGISTRY`，供消费方识别这两个公共注册表。
 
-`installBundle` accepts a caller-generated `requestId`, under which `plugin-manager/install-log` streams each pnpm run's output and `plugin-manager/install-state` announces `installing`, `cancelling`, and `applying`; `installing` is announced once per registry asked, with the `attempt`'s registry, position, and the plan's length. The install asks the same plan as the lookup, from `options.registry`, running `pnpm add` with `--registry` and restoring the profile files between attempts; it moves on for the failures another registry can change and stops at any other, and at a failure whose error line names the host a git or tarball spec is fetched from, which no registry stands in for; `failedAt` says which of the two the last failed run could not reach. `cancelInstall(requestId)` stops the run and answers `cancelled` only after the Git check or pnpm exited and the files are back, `too-late` once the bundle is being applied, and `not-running` for any other id; the install call then reports `application: 'cancelled'`. A run that fails, is cancelled, or adds a package without a bundle patch restores `package.json` and `pnpm-lock.yaml` as they were; `packageResult.kind` classifies the last run from its exit and output, `registries` names every registry asked, `bundle` names the package a finished run added, and `version` its manifest version, which can differ from the version `inspect` read, for example when pnpm's `minimumReleaseAge` holds back a recent release. `listBundles` carries each bundle's one-liner (the package `description`), the rows its patch declares with their live entries, and the built-in rows it overrides; it lists the profile's own bundles, the bundles the installation supplies, and a selected name without a bundle patch as a `not-bundle` problem, while an unselected plain dependency is left out. A bundle the launcher's `OPTIONAL_BUNDLES` names is `optional`: shipped switched off for the person to turn on, never removable, and selected by no shipped template ([rationale](../../../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.md)). Every completed operation emits `plugin-manager/changed`; a patch generation applied outside the manager, by HMR's watcher after a CLI or hand edit, announces nothing, so the page learns of it on its next read.
+`installBundle` 接受调用方生成的 `requestId`，`plugin-manager/install-log` 在其下流式转发每次 pnpm 运行的输出，`plugin-manager/install-state` 通告 `installing`、`cancelling` 与 `applying`；每问一个注册表通告一次 `installing`，`attempt` 带上这次的注册表、序号和计划长度。安装沿用查询的计划，从 `options.registry` 开始，以 `--registry` 运行 `pnpm add`，两次尝试之间恢复 profile 文件；换一个注册表能改变的失败才转问下一个，其他失败即停，错误行点名 git 或 tarball spec 自身拉取主机的失败也停，因为没有注册表能替代那台主机；`failedAt` 说明最后一次失败的运行连不上的是二者中的哪一个。`cancelInstall(requestId)` 停止运行，只在 Git 检查或 pnpm 退出且文件恢复后答复 `cancelled`，组合包已在应用时答复 `too-late`，其他 id 答复 `not-running`；安装调用随后报告 `application: 'cancelled'`。失败、被取消或装入了没有组合包 patch 的包的运行，会把 `package.json` 与 `pnpm-lock.yaml` 恢复原样；`packageResult.kind` 按退出方式与输出对最后一次运行分类，`registries` 列出问过的每个注册表，`bundle` 给出完成的运行新增的包，`version` 给出它的清单版本，它可能与 `inspect` 读到的版本不同，例如 pnpm 的 `minimumReleaseAge` 暂缓了最近的发布。`listBundles` 携带每个组合包的一句话简介（包的 `description`）、其 patch 声明的行及其存活条目，以及它覆盖的内置行；它列出 profile 自己的组合包、安装提供的组合包，以及被选中却没有组合包 patch 的名字（作为 `not-bundle` 问题），未选中的普通依赖不列出。启动器的 `OPTIONAL_BUNDLES` 点名的组合包是 `optional`：随安装提供、默认关闭、由用户开启，永不可卸载，也不被任何随附模板选中（[理由](../../../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.zh.md)）。每个完成的操作都会发出 `plugin-manager/changed`；在管理器之外应用的一代 patch（HMR 监视到 CLI 或手工编辑后）不发通知，页面要到下一次读取才知道。
 
-`waitForInstall(requestId)` lets a client recover a lost response by waiting for the active installation, including its non-cancellable application phase. It returns the same outcome as the original call, or `null` if the request is not active. Completed results are not retained; `null` establishes neither success nor cancellation.
+`waitForInstall(requestId)` 让客户端在响应丢失后等待活动安装的结果，包括不可取消的应用阶段。它返回与原调用相同的结果，请求不在活动中时返回 `null`。已完成的结果不保留；`null` 不表示成功或已取消。
 
-When pnpm 11 blocks dependency scripts, the failed installation reports every pending package name in the profile under `pendingBuilds`, including names left by earlier attempts and names the run reported as ignored. pnpm writes those entries into `pnpm-workspace.yaml` only when it can prompt, so the manager records the reported names itself; a failed run restores `package.json` and `pnpm-lock.yaml` but deliberately not `pnpm-workspace.yaml`. The Web plugin page offers **Allow these scripts and retry**; the tool can grant permission on the user's behalf through `approvedBuilds` on `install_bundle`, after the user approves those scripts in the conversation. The service validates pending names; it does not verify conversation approval. Approval persists by package name in this profile, permits commands with the host user's permissions, and survives another installation failure. Only currently undecided names can be approved; existing denials and wildcard rules cannot be overridden through this action. Approval rejects YAML anchors or aliases inside `allowBuilds`. Retry preserves the original activation choice.
+pnpm 11 拦下依赖脚本时，失败的安装在 `pendingBuilds` 里报告 profile 中所有待决定的包名，包括先前尝试留下的，以及本次运行报告为已忽略的。pnpm 只在能够交互提示时才把这些条目写入 `pnpm-workspace.yaml`，因此由管理器自行记录本次运行报告的包名；失败的运行会恢复 `package.json` 与 `pnpm-lock.yaml`，但有意不恢复 `pnpm-workspace.yaml`。Web 插件页提供**允许这些脚本并重试**；工具可以在用户于对话中批准这些脚本后，通过 `install_bundle` 的 `approvedBuilds` 代为授权。服务只校验待决定的名字，不核实对话中的批准。授权按包名保存在当前 profile，允许以宿主用户的权限执行命令，并在再次安装失败后保留。只能批准当前未决定的名字；已有的拒绝与通配规则不能通过此操作覆盖。`allowBuilds` 里出现 YAML 锚点或别名时拒绝授权。重试保留原来的启用选择。
 
 <a id="version-compatibility-and-exemptions"></a>
-### Version compatibility and exemptions
+### 版本兼容性与豁免
 
-An install command that names packages (`add`, or `install` with specs) is checked before pnpm runs: a local path is read from its own `package.json`, and a registry spec is resolved through pnpm's registry lookup for the version its range selects and the peers that version declares. An incompatible DSH peer rejects the operation before pnpm runs, so nothing is downloaded and no build script runs; a build approval the caller supplied with the request is recorded before this check and remains. A git or tarball spec needs the fetch itself, so it is judged after installation: the operation then restores the profile manifest and lockfile, reinstalls the restored lockfile (or, when the profile had none, reinstalls from the restored manifest without creating one), and reports whether that recovery succeeded; already permitted build-script effects may remain. A dependency the run did not change never blocks an unrelated operation: it stays installed, the run reports a warning naming it, and profile startup denies it. Installation requests with `enabled: false` are checked the same way. Startup checks run independently; see [App boot](../app-boot/README.md#profiles) for range semantics. Version exemptions do not authorize dependency scripts.
+点名软件包的安装命令（`add`，或带 spec 的 `install`）会在 pnpm 运行前完成检查：本地路径直接读取其 `package.json`，registry spec 通过 pnpm 的 registry 查询得到该范围选中的版本及其声明的 peer。不兼容的 DSH peer 会在 pnpm 运行前使操作失败，因此不会下载任何内容、不会运行构建脚本；调用方随请求提交的构建批准在此检查之前记录，会保留下来。git 或 tarball spec 必须先抓取，因此在安装后才判定：此时操作会恢复 profile 清单与锁文件，并按恢复后的锁文件重新安装（profile 原本没有锁文件时，按恢复后的清单重新安装且不创建锁文件），同时报告该恢复是否成功；已获准构建脚本的副作用可能保留。本次运行未改动的依赖不会阻塞无关操作：它保持已安装状态，运行会输出点名它的警告，由 profile 启动拒绝加载。请求 `enabled: false` 的安装同样受检。启动检查独立执行；版本范围语义见 [App boot](../app-boot/README.zh.md#profiles)。版本豁免不授权依赖脚本。
 
-An exemption is an exact `package-name@version` mapped to a list of exact DSH runtime versions in the profile's own `compatibility.json`, beside `package.json` and `cordis.patch.yml`. Writing it changes no dependency, no bundle selection, and no patch layer. Neither plugin upgrades nor DSH upgrades inherit permission. Use `plugin_manager` with `list_version_exemptions` to obtain the runtime version and saved grants, then `set_version_exemption` with `target`, `runtimeVersion`, and `enabled`. Granting also requires `acceptRisk: true`, only after warning the user that incompatible plugins may cause crashes or data loss and receiving explicit permission for that pair. The service checks the acknowledgement and versions, not conversation history. Revocation can remove historical runtime grants.
+豁免保存在 profile 自己的 `compatibility.json` 中（与 `package.json`、`cordis.patch.yml` 并列），将精确的 `package-name@version` 映射到精确 DSH 运行时版本列表。写豁免不改变依赖、组合包选择或 patch 层。插件升级和 DSH 升级都不继承授权。使用 `plugin_manager` 的 `list_version_exemptions` 获取运行时版本与已有授权，再通过 `set_version_exemption` 提交 `target`、`runtimeVersion` 和 `enabled`。授权还要求 `acceptRisk: true`；只能在警告用户不兼容插件可能导致崩溃或数据丢失，并获得用户对此版本组合的明确许可后传入。服务校验确认参数和版本，不核实对话历史。撤销可以移除历史运行时版本的授权。
 
-A grant takes effect on the next composition. A live profile recomposes, so the granted plugin mounts in the running session and the result reports `applied`; a startup-only profile keeps its current entries until restart and reports `restart-required`.
+授权在下一次组合时生效。在线 profile 会重新组合，被授权的插件会在当前会话中挂载，结果报告 `applied`；仅启动型 profile 在重启前保留当前条目并报告 `restart-required`。
 
-The CLI exposes `dsh plugin --profile <profile> version-exemptions`, `allow-version <package@version> --dsh-version <runtime> --accept-risk`, and `revoke-version <package@version> --dsh-version <runtime>`. A grant prints a risk warning before saving. A compatibility refusal carries the `incompatible-version` code with each refused package's `name`, `version`, `runtimeVersion`, and unsatisfied `peers`; each surface renders that record itself. The Web page words it through its locale dictionary, and a CLI refusal prints the exact `allow-version` command. Use the tool or CLI to grant an exemption and retry the original operation.
+CLI 提供 `dsh plugin --profile <profile> version-exemptions`、`allow-version <package@version> --dsh-version <runtime> --accept-risk` 和 `revoke-version <package@version> --dsh-version <runtime>`。授权会在保存前打印风险警告。兼容性拒绝带有 `incompatible-version` 错误码，以及每个被拒绝软件包的 `name`、`version`、`runtimeVersion` 和未满足的 `peers`；各界面自行呈现这份记录。Web 页面通过 locale 词典生成文案，CLI 拒绝时打印精确的 `allow-version` 命令。通过工具或 CLI 添加豁免后，重试原操作。
 
-### Configuration
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `pnpmCommand` | `pnpm` | The pnpm executable name or path, resolved through `PATH` like the `dsh plugin` command. |
-| `inspectTimeoutMs` | `20000` | Bound on one registry lookup an inspection runs, in milliseconds. |
-| `githubConnectionTimeoutMs` | `5000` | Deadline for the GitHub repository check before installation, in milliseconds. |
-| `registry` | pnpm's own | The registry lookups and installations ask first, as an http(s) URL; absent, the one pnpm's own configuration names. |
-| `fallbackRegistries` | `['https://registry.npmmirror.com/']` | Registries asked in turn, as http(s) URLs, while the one before is unreachable or holds no copy of the package; pnpm's own registry joins the order only while it names npm's own registry or one of these. |
-| `outputBytes` | `16384` | Maximum pnpm diagnostic bytes returned per operation; the full output remains in the returned log path. |
-| `lockWaitMs` | `120000` | Maximum time in milliseconds to acquire the profile write lock. |
-| `idleTimeoutMs` | `600000` | Maximum time in milliseconds a service package run may capture no output before the manager terminates it; a run with inherited descriptors (`dsh plugin`) is never bound. |
+| `pnpmCommand` | `pnpm` | pnpm 可执行文件名或路径，与 `dsh plugin` 命令一样通过 `PATH` 解析。 |
+| `inspectTimeoutMs` | `20000` | 单次检查所做注册表查询的上限，单位毫秒。 |
+| `githubConnectionTimeoutMs` | `5000` | 安装前 GitHub 仓库连接检查的时限，单位毫秒。 |
+| `registry` | pnpm 自身配置 | 查询与安装首先询问的注册表，http(s) URL；缺省为 pnpm 自身配置指定的那个。 |
+| `fallbackRegistries` | `['https://registry.npmmirror.com/']` | 前一个注册表不可达或没有该包副本时依次询问的注册表，http(s) URL；pnpm 自身的注册表只在它指向 npm 官方源或这里的某一个时才进入顺序。 |
+| `outputBytes` | `16384` | 每次操作返回的 pnpm 诊断字节上限；完整输出保留在返回的日志路径中。 |
+| `lockWaitMs` | `120000` | 获取 profile 写锁的最长等待毫秒数。 |
+| `idleTimeoutMs` | `600000` | service 包操作允许持续无捕获输出的最长毫秒数，达到即被管理器终止；继承描述符运行的 `dsh plugin` 不受此上界约束。 |
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The service and `dsh plugin` share the package operations in [operations.ts](src/operations.ts). The launcher supplies the current profile; [DSH HMR](../hmr/README.md) serializes module reloads, file watching and management writes. Each configuration refresh re-reads bundle selection and patch layers, updates the original root Include, and awaits removed plugin resources as well as the remaining Loader tree. CLI and service operations share the profile manifest writer lock to prevent concurrent package and manifest writes. HMR does not acquire that lock. Pnpm runs outside the HMR queue; installation selects the bundle after pnpm succeeds, while removal deselects and unloads the bundle before pnpm runs.
+服务与 `dsh plugin` 共用 [operations.ts](src/operations.ts) 中的包管理操作。启动器提供当前 profile；[DSH HMR](../hmr/README.zh.md) 串行执行模块重载、文件监听和管理写入。每次配置刷新重新读取组合包选择与 patch 层，更新原有根 Include，并等待已移除插件释放资源及剩余 Loader 树稳定。CLI 与 service 操作共用 profile manifest 写锁，防止并发包操作和 manifest 写入。HMR 不获取该锁。pnpm 在 HMR 队列之外执行；安装在 pnpm 成功后选入组合包，删除则在执行 pnpm 前取消选入并完成卸载。
 
-Installing a new package, enabling a bundle, disabling it with HMR after its plugins stop, and a successful removal publish the profile's runtime resolution. Shared dependencies may pass to another bundle's declaration when their normalized directory, version, and scope stay unchanged. Without HMR, a deselected startup bundle still runs: while any such bundle is absent from the saved selection, subsequent package operations retain the entire current table and report `restart-required`. Other new installations and removals of non-running bundles can still publish without HMR; activation waits for restart. Overwriting an installed package publishes nothing and reports `restart-required` ([decision](../../../.agents/notes/implemented/architecture/2026-09-30-profile-package-refresh-and-manifest-invalidation.md)).
+安装新包、启用组合包、有 HMR 时停用组合包并等插件退出后、以及删除成功后，都会发布 profile 的 runtime resolution。共享依赖的规范化目录、版本和作用域不变时，可以改由另一个组合包声明。没有 HMR 时，已取消选入的启动组合包仍在运行：只要保存的选择列表中缺少任何这样的组合包，后续包操作就保留整张当前表，并报告 `restart-required`。其他新安装和未运行组合包的删除仍可在没有 HMR 时发布；激活等待重启。覆盖已安装的包不发布，并报告 `restart-required`（[决策](../../../.agents/notes/implemented/architecture/2026-09-30-profile-package-refresh-and-manifest-invalidation.zh.md)）。
 
-A service run whose captured output stays silent for `idleTimeoutMs` is terminated, reports `timedOut` alongside its exit status, is classified `timeout` whatever status the signal left behind, and is not retried on the next registry, which bounds how long one operation can hold the profile lock; the CLI inherits the terminal, captures no output, and stays unbounded for its operator to interrupt. A run completes when its process exits, and the pipes then drain under a bounded grace period, so a descendant that inherited them cannot hold the operation open. A terminated run stops its whole process tree and waits for it, because a lifecycle script outlives the pnpm process that started it (issue #4981). Each operation records the pnpm run it starts in `.plugin-manager/run.json` and removes the record when the run ends. A lock whose holder process exited is taken over by the next writer, but that process's pnpm tree can still be running, so an operation that finds a record waits up to five seconds for the recorded run to stop and otherwise fails with a diagnostic that names the process and the record, without running pnpm. Dependency-only changes do not trigger configuration reloads.
+service 运行若在 `idleTimeoutMs` 内没有任何捕获输出即被终止，与退出状态一并报告 `timedOut`，不论信号留下什么退出状态都归类为 `timeout`，且不再转问下一个注册表，因此单次操作占用 profile 锁的时长有上界；CLI 继承终端、不捕获输出，因此不受此上界约束，由操作者中断。运行以进程退出为完成点，随后只在一个有界的宽限窗口内排空管道，因此继承管道的孙进程无法让操作挂起。被终止的运行会停止整棵进程树并等待其消失，因为生命周期脚本的存活时间超过启动它的 pnpm 进程（issue #4981）。每个操作把它启动的 pnpm 运行记录在 `.plugin-manager/run.json` 中，并在运行结束时删除该记录。持有者进程已退出的锁会被下一个写入方接管，但该进程的 pnpm 进程树可能仍在运行，因此发现记录的操作最多等待五秒让记录中的运行停止，否则不运行 pnpm，并以指明该进程与记录文件的诊断失败。仅依赖字段变化不会触发配置重载。
 
-Results contain the last attempted stage, target, saved-state change, application status and error codes. Web dictionaries render management text; pnpm and Loader diagnostics remain unmodified. Unrelated pre-existing inactive entries return warnings; new or changed failures and inactive explicit enablement targets fail the operation. A failed or cancelled package run, or failed bundle validation, restores the manifest and lockfile snapshotted before pnpm ran ([rationale](../../../.agents/notes/implemented/architecture/2026-09-15-guided-plugin-installation.md)); later failures retain saved changes as described in [Failure behavior](#failure-behavior). Installations are tracked by request id until their call settles, so a cancellation names one run and joins its settlement without taking the profile lock. The CLI inherits authentication variables and terminal descriptors; service operations use a scrubbed environment and captured output.
+结果包含最后尝试的阶段、目标、磁盘变化、应用状态和错误码。Web 词典呈现管理文案；pnpm 与 Loader 的诊断保持原样。无关的已有故障作为警告返回；新出现、配置变化后的故障，以及显式启用目标未激活，都会使操作失败。包管理运行失败或被取消，或组合包校验失败时，会恢复 pnpm 运行前快照的 manifest 与 lockfile（[理由](../../../.agents/notes/implemented/architecture/2026-09-15-guided-plugin-installation.zh.md)）；后续失败按[失败行为](#failure-behavior)所述保留已保存的改动。安装按 request id 跟踪到调用结束，因此取消只针对一次运行，并且不取 profile 锁就能等待它结束。CLI 继承认证环境和终端描述符；service 使用清理后的环境并捕获输出。管理器直接读取文件和 Loader 状态，不维护第二份目标状态注册表，因此不发布单独的运行时不变式伴生入口。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [App boot](../app-boot/README.md) — profile layers and startup policy.
-- [Plugin inventory](../../host/plugin-inventory/README.md) — current Loader and preset observations.
-- [Plugin manager page](../../client/ui-plugin-manager/README.md) — the Web sidebar page over this service.
-- [Plugin settings](../../client/ui-settings-plugin-inventory/README.md) — the read-only Web inventory.
+- [App boot](../app-boot/README.zh.md)——profile 配置层与启动策略。
+- [Plugin inventory](../../host/plugin-inventory/README.zh.md)——当前 Loader 和预设状态。
+- [插件管理页](../../client/ui-plugin-manager/README.zh.md)——基于本服务的 Web 侧边栏页面。
+- [Plugin settings](../../client/ui-settings-plugin-inventory/README.zh.md)——只读的 Web 清单。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Management tool
+### 管理工具
 
-#### What the model sees
+#### 模型看到什么
 
-The [`plugin_manager` tool](../../../docs/tool-catalog.md#deepseek-aidsh-plugin-manager) lists plugin entries and bundles and performs profile-wide changes. Its results include saved-state changes, application status and package diagnostics. Management operations do not inject messages into Agents.
+[`plugin_manager` 工具](../../../docs/tool-catalog.zh.md#deepseek-aidsh-plugin-manager) 列出插件条目和组合包，并执行影响整个 profile 的改动。结果包含保存状态变化、应用状态和包管理诊断。管理操作不会向 Agent 注入消息。
 
-#### Token effect
+#### Token 影响
 
-The tool declaration is present when its consumer is mounted; each invocation adds its returned inventory or change result.
+装配工具消费者时提供工具声明；每次调用追加返回的清单或改动结果。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Tool results append to the transcript. Enabling or disabling other tools can change subsequent tool declarations and their cache reuse.
+工具结果追加到对话中。启停其他工具可能改变后续工具声明及其缓存复用。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Web approves the entire displayed pending group; it has no per-package selection.
-- Package replacements require restarting the process to load a fresh JavaScript module generation.
-- Startup-only profiles cannot remove packages used to start the current process; stop it and use `dsh plugin`.
-- The manager cannot disable its own management components, change another profile, or edit an agent preset's composition.
-- A failed removal may leave dependencies partially changed, and a failed or cancelled installation can leave downloaded files under `node_modules` or the pnpm store. Inactive dependencies with missing files remain removable. Diagnostic logs remain under the profile's `.plugin-manager/logs` directory.
-- Management results describe Host activation. Browser synchronization failures appear separately in the Settings plugin list.
-- Desktop package operations remain owned by the Desktop shell.
+- Web 一次批准显示出来的整组待决定包，没有逐包选择。
+- 替换已有包后需要重启进程，以加载新的 JavaScript 模块版本。
+- 仅启动时加载的 profile 不能删除当前进程启动时使用的包；停止进程后使用 `dsh plugin`。
+- 管理器不能关闭自身所需的管理组件、修改其他 profile 或编辑 agent 预设组合。
+- 失败的删除可能留下部分依赖改动，失败或被取消的安装可能在 `node_modules` 或 pnpm 缓存中留下已下载文件。文件缺失的未启用依赖仍可删除。诊断日志保留在 profile 的 `.plugin-manager/logs` 目录中。
+- 管理结果描述 Host 激活状态。浏览器同步失败会在设置的插件列表中单独显示。
+- Desktop 包管理操作仍由 Desktop shell 负责。
 
 <a id="failure-behavior"></a>
-### Failure behavior
+### 失败行为
 
-Failures preserve completed steps and report the actual remaining state. Profile dependencies without valid bundle metadata remain visible and removable, with enablement unavailable.
+失败保留已完成步骤，并报告实际残留状态。没有有效组合包声明的 profile 依赖仍可见、可删除，但不能启用。
 
-| Failed operation | Handling |
+| 失败操作 | 处理方式 |
 |---|---|
-| Install: pnpm or bundle validation fails | Restore `package.json` and `pnpm-lock.yaml` as snapshotted before pnpm ran; files pnpm downloaded may remain. Report installation failure. |
-| Enable: saving selection or loading fails | Keep the installed dependency and any saved selection. Report enablement failure; allow repair, disablement or removal. |
-| Resolution publication after a successful package operation fails | Keep completed disk changes and the previous runtime table. Report `application: 'failed'` with the publication diagnostic; pnpm's zero exit code does not mean publication succeeded. |
-| Remove: any step fails | Stop at the failed step. Preserve completed changes, retain remaining dependencies for retry, and report removal failure. Do not re-enable the bundle. |
+| 安装：pnpm 执行或组合包校验失败 | 恢复 pnpm 运行前快照的 `package.json` 与 `pnpm-lock.yaml`；pnpm 已下载的文件可能保留。报告安装失败。 |
+| 启用：保存选择项或加载失败 | 保留已安装的依赖和已保存的选择项。报告启用失败，允许修正、停用或卸载。 |
+| 包操作成功后解析表发布失败 | 保留已完成的磁盘改动和上一张运行时表。报告 `application: 'failed'` 及发布诊断；pnpm 的零退出码不代表发布成功。 |
+| 卸载：任一步失败 | 停在失败步骤，保留已完成的改动和待重试删除的依赖，报告卸载失败。不重新启用组合包。 |
 
-Installation finishes after pnpm and bundle validation succeed; subsequent publication or enablement failure does not undo installation. Removal proceeds in order: remove the bundle from `dsh.profile.bundles`, unload its runtime contributions, run `pnpm remove`, then publish runtime resolution unless a deselected startup bundle still runs without HMR. A failed step prevents subsequent steps; publication failure after removal does not restore deleted packages. A selected name that neither the profile's dependencies nor the installation holds, such as a retired bundle, is also removable; its removal stops after deselection and runs no pnpm.
+pnpm 执行和组合包校验成功即完成安装，后续发布或启用失败不撤销安装。卸载依次执行：从 `dsh.profile.bundles` 移除组合包、卸载运行时贡献、执行 `pnpm remove`，然后发布 runtime resolution，除非没有 HMR 且已取消选入的启动组合包仍在运行。任一步失败都不继续执行后续步骤；删除后的发布失败不会恢复已删除的包。 profile 依赖和安装都不持有的已选名称（例如已下线的组合包）同样可卸载；其卸载在取消选择后结束，不运行 pnpm。
 
-Restoration rewrites only the two snapshotted files; user-authored patch configuration, application data, diagnostic logs and files pnpm downloaded remain untouched, and the next package operation prunes packages no manifest references.
+恢复只重写这两份快照文件；用户编写的 patch 配置、应用数据、诊断日志以及 pnpm 已下载的文件保持原样，没有 manifest 引用的包由下一次包操作清理。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

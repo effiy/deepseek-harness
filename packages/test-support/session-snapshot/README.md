@@ -1,35 +1,35 @@
 ---
-description: "Session-log snapshot support for keyless profile tests: manifests, identity redaction, normalization, workspace checks, and protocol adapters."
+description: "面向无密钥 profile 测试的会话日志快照支持：manifest（元数据清单）、身份脱敏、规范化、workspace 检查与协议适配器。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-snapshot
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-session-snapshot` provides the shared support behind keyless recorded-session tests (`pnpm run test:snapshot`): closed manifests, typed identity redaction, normalization, workspace comparison, fixture guards, and protocol adapters for headless, SDK, ACP, and Web owners. The ACP adapter launches the tested profile as a real subprocess, drives a deterministic input script, and registers the complete record, replay, and refresh suite. Every scenario owns enough committed evidence to prove model-visible output and filesystem effects without trusting the agent's report. The package entry imports vitest and is therefore available only inside a vitest run.
+`dsh-session-snapshot` 提供无密钥已记录会话测试（`pnpm run test:snapshot`）背后的共享支持：封闭 manifest、类型化身份脱敏、规范化、workspace 比较、fixture（测试前置数据）保护，以及 headless、SDK、ACP（Agent Client Protocol）与 Web owner 使用的协议适配器。ACP 适配器以真实子进程启动被测 profile，驱动确定性输入脚本，并注册完整的录制、回放与刷新套件。每个场景都提交足够证据来证明模型可见输出与文件系统效果，不依赖 agent（智能体）自述。包入口会导入 vitest，因此只能在 vitest 运行中使用。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-This package turns a shipped profile scenario into a keyless snapshot suite: write a scenario table and a fixtures directory, call the matching adapter once, and the kit owns launching or composing the profile, driving the scenario, comparing normalized output, and guarding the committed fixtures.
+本包把随附 profile 场景变成无密钥快照套件：写一张场景表和一个 fixture 目录，调用一次匹配的适配器，工具包就负责启动或组合 profile、驱动场景、比较规范化输出并守护已提交的 fixture。
 
-### Writing a snapshot suite
+### 编写快照套件
 
-A consuming `*.snapshot.ts` is the scenario table plus one factory call. `AgentUnderTest` supplies absolute `binScript`, optional `libBinScript`, `configPath`, and `tsconfigPath` paths, because the subprocess cwd sits outside the repository:
+消费方 `*.snapshot.ts` 就是场景表加一次工厂调用。`AgentUnderTest` 提供绝对 `binScript`、可选 `libBinScript`、`configPath` 与 `tsconfigPath` 路径，因为子进程 cwd 位于仓库之外：
 
 ```ts
 import { dirname, join } from 'node:path'
@@ -68,109 +68,109 @@ defineAcpSnapshotSuite({
 })
 ```
 
-Each recorded-session directory carries a closed `snapshot.yml` manifest plus canonical parent and contiguous child roles. Parent filenames are `session[.vN].jsonl`; children are `session.<ordinal>[.vN].jsonl`; v0 omits `.v0`, positive versions use lowercase `.vN`, and every filename agrees with its header. A role may retain older generations, but the harness selects the numerically highest one. An owning manifest may declare `sessionFormat.version` plus one or more closed `coverage` names to keep that historical generation as an explicit migration fixture. Without that declaration, record and refresh write the current generation; replay independently accepts the retained V3 baseline or the current generation for each parent/child role under the [corpus policy](../../../snapshots/AGENTS.md). An explicit `sessionFormat.version` requires every selected role to match that version. The manifest also names the scenario, shipped profile, composition/header class, recording source, and only the replay, platform, permission, environment, workspace, or input facts the completed Session cannot reconstruct. Storage guards check tool results and portable paths in every selected parent and child role. Prompt/schema scrubbing, message identity, and prompt-before-request ordering apply to current generations; retained predecessors keep their historical representation. The adapter registers expected-output, Session-log, and optional `workspace.expected/` comparisons; guards reject orphan directories, missing roles, noncanonical names, absolute paths, malformed manifests, and platform-specific separators.
+每个已记录 Session 目录携带封闭的 `snapshot.yml` manifest，以及规范 parent 与连续 child 角色。parent 文件名是 `session[.vN].jsonl`；child 是 `session.<ordinal>[.vN].jsonl`；v0 省略 `.v0`，正版本使用小写 `.vN`，且每个文件名与其 header 一致。一个角色可以保留旧 generation，但 harness 会选择数值最高的一项。拥有 fixture 的 manifest 可以声明 `sessionFormat.version` 与一个或多个封闭 `coverage` 名称，把该历史 generation 保留为显式迁移 fixture。未声明时，record 与 refresh 写入当前 generation；replay 按[语料策略](../../../snapshots/AGENTS.md)对每个 parent/child 角色独立接受保留的 V3 基线或当前 generation。显式声明 `sessionFormat.version` 时，每个选定角色都必须匹配该版本。manifest 还会指名场景、随附 profile、组合／header 类别、录制来源，以及已完成 Session 无法重建的 replay、平台、权限、环境、workspace 或输入事实。存储保护检查每个选定 parent 与 child 角色的工具结果和可移植路径。提示词／schema 擦除、消息身份及提示词先于请求的顺序检查适用于当前 generation；保留的前代维持其历史表示。适配器注册预期输出、Session 日志与可选 `workspace.expected/` 比较；保护会拒绝遗留目录、缺失角色、非规范名称、绝对路径、格式错误的 manifest 与平台专用分隔符。
 
-`normalizeSessionSnapshot` retains the complete Session header and event payloads but omits top-level `seq`/`time` envelopes from committed fixtures after normalizing paths and scrubbing system-prompt text and tool schemas; it also normalizes embedded stream clocks and historical packed-row `seq0`/`time0` envelopes, and catalog child-creation clocks. Event order and source-event reference order are preserved. Record and refresh write top-level `sourceEventSeqs` as expanded arrays. Replay synthesizes the top-level envelopes in memory, while runtime persistence continues to write complete logs. Multi-session comparison validates expected and harvested logs through the strict build-static Session format catalog before identity redaction and normalization; source filenames cannot alter format validation. A retained historical replay input is not the native current-format writer-output oracle: structural migration preserves request meaning but can produce a different event layout. Normalization preserves unexpected request-header fields, including `system`, so regressions remain visible. Versionless protocol-adapter unit fixtures remain outside the released Session format corpus. Fixtures in the [current writer format](../../../docs/session-format-status.md) use one row per event; retained v0/v1 fixtures may use canonical packed rows. The [temporary repository migrator](../../../scripts/migrate-packed-session-fixtures.ts) (`pnpm run migrate:packed-session-fixtures`) rewrites older historical layouts, and its [removal proposal](../../../.agents/notes/proposed/process/2026-07-26-remove-packed-session-fixture-migrator.md) owns its deletion.
+`normalizeSessionSnapshot` 在规范化路径并擦除系统提示文本与工具 schema 后，会保留完整 Session header 与事件 payload，但从已提交 fixture 中省略顶层 `seq`/`time` envelope；它还会规范化嵌入式 stream clock 与历史 packed-row 的 `seq0`/`time0` envelope 与 catalog child 创建时钟。事件顺序与来源事件引用的顺序保持不变。录制与刷新会将顶层 `sourceEventSeqs` 以展开数组的形式写入 fixture。Replay 只在内存中合成顶层 envelope，而运行时持久化仍写入完整日志。多 Session 比较会先通过严格的构建期静态 Session 格式目录校验预期日志与收集日志，再进行身份脱敏与规范化；来源文件名不能改变格式校验。保留的历史 replay 输入不是原生当前格式 writer 输出的比较基准：结构迁移保留请求含义，但可以产生不同的事件布局。归一化保留意外的 request-header 字段（包括 `system`），使回归保持可见。无版本的协议适配器单元测试 fixture 不属于已发布 Session 格式语料。[当前写入器格式](../../../docs/session-format-status.zh.md)的 fixture 每个事件占一行；保留的 v0/v1 fixture 可以使用规范 packed row。[临时仓库迁移器](../../../scripts/migrate-packed-session-fixtures.ts)（`pnpm run migrate:packed-session-fixtures`）会改写更旧的历史布局，由其[移除提案](../../../.agents/notes/proposed/process/2026-07-26-remove-packed-session-fixture-migrator.zh.md)负责删除该迁移器。
 
-Spill scenarios save through the real local provider under a private temporary root. Their fixture adapter exposes fixed-length logical locators and maps only this run’s saved locators back to real files for retrieval, preserving preview budgets without writing into a shared logical path. Known snapshot spill paths normalize to stable locator tokens, including paths quoted inside JSON omission notices with JSON-escaped Windows separators. Refresh extraction preserves the matched serialized path spelling for literal replacement. Normalization changes only the locator: saved byte lengths and omission counts remain comparison evidence.
+spill 场景通过真实本地提供方保存到私有临时根目录。fixture 适配器提供固定长度的逻辑定位符，并仅将本次运行已保存的定位符映射回实际文件以供检索，在不写入共享逻辑路径的情况下保留预览预算。已知的快照 spill 路径会规范化为稳定的定位符 token，包括 JSON 省略通知中带引号、使用 JSON 转义 Windows 分隔符的路径。刷新提取会保留匹配路径的序列化写法，以便进行字面替换。规范化只改变定位符：保存字节数与省略计数仍作为比较证据。
 
-Retained historical scenarios keep their canonical Session files unchanged and selected for replay, with no newer canonical sibling in the pinned directory. Their exact normalized native writer output is recorded separately in `writer.expected.jsonl` for the parent and `writer.<ordinal>.expected.jsonl` for children; these are output oracles, not replay generations. Output oracles may retain an older supported generation: comparison restores them through the strict catalog, while harvested logs must use the checkout writer. Fresh-writer golden comparisons select `nativeWriterOutput` to tokenize only delivery markers qualified by each input’s original writer generation after strict restoration. Other delivery generations and captured-source fields remain numeric; source-versus-migrated-artifact comparisons preserve exact generations by default. Recording and refresh never store these comparison tokens. Retained SDK scenarios use `notifications.current.expected.jsonl` for current protocol output. Comparisons neither project current events back into a historical format nor strip structural differences. Independent migration tests verify the official transform rather than treating native writer layout as its expected event sequence.
+保留历史输入的场景保持规范 Session 文件不变，并继续选择它们进行回放；固定历史版本的目录中没有更新的规范同角色文件。其精确的规范化原生 writer 输出单独记录在父会话的 `writer.expected.jsonl` 和子会话的 `writer.<ordinal>.expected.jsonl` 中；这些是输出比较基准，而非 replay 代际。输出比较基准可以保留较旧的受支持代际：比较通过严格 catalog 恢复它们，而收集的日志必须使用当前检出版本的 writer。新 writer 输出的 golden 比较选择 `nativeWriterOutput`，仅在严格恢复后，将版本限定为各输入原始 writer 代际的 delivery 标记转换为 token。其他 delivery 代际与 captured-source 字段保持数值；源文件与已迁移产物的比较默认保留精确代际。record 与 refresh 从不存储这些比较 token。保留历史输入的 SDK 场景使用 `notifications.current.expected.jsonl` 记录当前协议输出。比较既不将当前事件反向投影为历史格式，也不剥除结构差异。独立迁移测试验证正式转换，而不把原生 writer 布局当作其预期事件序列。
 
-Headless/ACP and SDK adapters compare raw catalog child-creation times with harvested child headers before normalization. Refresh preserves the chosen child header time in every matching catalog entry, including inherited copies, so retained header clocks cannot diverge from freshly written catalog clocks. Committed historical inconsistencies remain unchanged migration-refusal evidence; normalizing their clocks does not establish successful migration.
+Headless/ACP 与 SDK 适配器在规范化之前，将原始目录中的子创建时间与采集到的子 header 比较。刷新会在每条匹配的目录记录中保留选定的子 header 时间，包括继承副本，防止保留的 header 时钟与新写入的目录时钟分歧。已提交的历史不一致数据保持不变，作为迁移拒绝证据；将其时钟规范化不能证明迁移成功。
 
-### Record, replay, and refresh
+### 录制、回放与刷新
 
-`pnpm run test:snapshot:record` calls the live LLM and writes the harvested current generation under its canonical versioned filename. Record and refresh never rename or delete a completed generation, including generations of a child role absent from a later run; reviewed source-tree curation removes a predecessor only after the same role has a verified current replacement. Scenarios with an explicit `sessionFormat` remain read-only in record mode. `pnpm run test:snapshot:refresh` stays keyless, runs the selected highest replay input, and writes stdout, owned prompt and tool-schema sidecars, and a fresh current-generation comparable Session output; retained historical scenarios write the separate writer-output oracles instead of a canonical current-format replay generation. Headless and SDK scenarios may add a local `runtime.cordis.yml` patch for execution fixtures. Each composition owner keeps its replay patch beside its live patch; top-level `snapshots/` owns Session-driven scenarios, while other expected outputs stay beside their owning package. [`dsh-llm-replay`](../llm-replay/README.md) serves the recorded streams selected through `DSH_SNAPSHOT_*` environment values.
+`pnpm run test:snapshot:record` 调用在线 LLM（大语言模型），并在规范具名版本文件下写入收集到的当前 generation。record 与 refresh 绝不重命名或删除已完成的 generation，即使后续运行不再产生某个 child 角色也一样；受审阅的源树整理只有在同角色存在已验证的当前替代文件后才移除前代。显式声明 `sessionFormat` 的场景在录制模式下保持只读。`pnpm run test:snapshot:refresh` 保持无密钥，运行选定的最高 replay 输入，并写入 stdout、各 pin 自有的提示词与工具 schema 伴随文件，以及新鲜当前 generation 的可比较 Session 输出；保留历史输入的场景写入单独的 writer 输出比较基准，而非规范当前格式 replay 代际。Headless 与 SDK 场景可通过本地 `runtime.cordis.yml` patch 添加执行 fixture。每个组合 owner 把 replay patch 放在 live patch 旁；顶层 `snapshots/` 拥有 Session 驱动场景，其他预期输出留在其 package owner 旁。[`dsh-llm-replay`](../llm-replay/README.zh.md) 提供通过 `DSH_SNAPSHOT_*` 环境值选择的已记录流。
 
-### Pinning request headers and system prompts
+### 固定请求 header 与系统提示
 
-A pin owns its generated `system-prompt.expected.md` or `tool-schemas.expected.json` sidecar by default; `systemPromptSource` and `toolSchemasSource` name another pin when the complete corresponding sequence is identical, so each distinct version is committed once. The system prompt is surface node 0, logged as a `system/message` event before the step's first `request/header`; every fixture stores its text block as `"text":"{{system}}"` and the prompt sidecar keeps the full text. The pin's `request/header` events store `"tools":"{{tools}}"` while retaining config and reason, and the structured schema sidecar keeps the full catalogs. Logs containing developer messages retain ordered tool names in each header instead of the token so historical addition references remain verifiable. A child Session whose own scope composes a different request declares it per fixture index with `pinsChildToolSchemas` and `pinsChildSystemPrompts`. A scenario that changes the request header mid-run declares `expectedHeaderChanges`; a scenario whose prompt changes mid-run — replacing node 0, or appending after the cached history on an `in-history` route — declares `expectedPromptChanges`, and each change adds a `<!-- system/message change N -->` section to the prompt sidecar. The manifest spells these `header.changes` and `header.promptChanges`.
+每个 pin 默认拥有其生成的 `system-prompt.expected.md` 或 `tool-schemas.expected.json` 伴随文件；当完整的对应序列相同时，`systemPromptSource` 与 `toolSchemasSource` 指定另一个 pin 作为来源，因此每个不同版本只提交一次。系统提示是 surface 节点 0，作为 `system/message` 事件记录在该步骤第一个 `request/header` 之前；每个 fixture 把其文本块存储为 `"text":"{{system}}"`，提示词伴随文件保留完整文本。该 pin 的 `request/header` 事件存储 `"tools":"{{tools}}"`，同时保留配置与原因，结构化 schema 伴随文件保留完整目录。包含 developer 消息的日志会在各 header 中保留有序工具名，而不使用 token，以便继续校验历史工具添加引用。自身作用域组合出不同请求的 child Session 按 fixture 索引以 `pinsChildToolSchemas` 与 `pinsChildSystemPrompts` 单独声明。运行中改变请求 header 的场景声明 `expectedHeaderChanges`；运行中提示词发生变化的场景——替换节点 0，或在 `in-history` 路由上追加到已缓存历史之后——声明 `expectedPromptChanges`，每次变化在提示词伴随文件中增加一个 `<!-- system/message change N -->` 小节。manifest 中对应字段为 `header.changes` 与 `header.promptChanges`。
 
-### Platform and composition variants
+### 平台与组合变体
 
-A scenario requiring a non-Windows host declares `posixOnly`, which skips its run test on Windows while the fixture guards keep covering its committed files everywhere; a scenario whose composition needs a usable `pwsh` declares `pwshOnly`. `workspaceParent` moves the generated child cwd outside the platform temp directory when temporary-directory grants are themselves under test; a scenario's committed `workspace/` is copied into that child first, then `prepareWorkspace` runs against the generated cwd before the agent starts. Default generated workspaces are stored in session fixtures as `{{cwd}}`, so platform temp roots and random basenames do not affect recordings. Headless manifests use `workspace.parent: outside-temp` when the Session workspace grant itself is under test. The adapter allocates beside the platform temp root when its parent is writable and outside system temporary grants, otherwise under home, and rejects any generated cwd already covered by automatic temporary write grants.
+需要非 Windows 主机的场景声明 `posixOnly`，在 Windows 上跳过运行测试，但 fixture 保护仍在所有平台覆盖其已提交文件；组合需要可用 `pwsh` 的场景声明 `pwshOnly`。当临时目录授权自身待测时，`workspaceParent` 将生成子级 cwd 移出平台临时区域；场景签入的 `workspace/` 会先复制到该子级，随后 `prepareWorkspace` 在 agent 启动前针对生成 cwd 运行。默认生成的 workspace 在会话 fixture 中存储为 `{{cwd}}`，使平台临时根目录与随机 basename 不影响录制。headless manifest 在测试 Session workspace 授权本身时使用 `workspace.parent: outside-temp`。适配器在父目录可写且位于系统临时授权之外时，于平台临时根目录旁分配目录，否则使用 home，并拒绝已被自动临时写授权覆盖的生成 cwd。
 
-### What can go wrong
+### 可能出什么问题
 
-- **A durable wait times out** — `waitForTurnStart`, `waitForTurnEnd`, `waitForSubagentTurnEnd`, `waitForGoalPhase`, `waitForInboxMessage`, `waitForTitleAfterTurnEnd`, and `waitForEventAfterTurnEnd` identify the session or child and deadline even when the first log harvest exceeds that deadline. Child waits also name the requested turn. All retain the underlying failure as the error cause. `waitForTurnStart` rejects malformed turn records immediately.
-- **A fixture guard rejects the committed files** — orphan scenario dirs, missing files, multiple pins for one header class, duplicate sidecar content, unscrubbed prompt text or tool schemas, a `request/header` with no preceding `system/message`, and malformed pinning headers all fail the suite before comparisons run.
-- **The session harvest needs raw JSONL mode** — snapshot configs set the JSONL backend's `compression: 'none'`; compressed JSONL has no snapshot-harvest path.
-- **Built mode needs current artifacts** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; source mode remains the zero-build path.
+- **持久记录等待超时**——即使首次日志收集就超过期限，`waitForTurnStart`、`waitForTurnEnd`、`waitForSubagentTurnEnd`、`waitForGoalPhase`、`waitForInboxMessage`、`waitForTitleAfterTurnEnd` 和 `waitForEventAfterTurnEnd` 也会指出会话或子会话及等待期限。子会话等待还会指出目标轮次。这些等待都通过错误的 cause 保留底层失败。`waitForTurnStart` 会立即拒绝格式错误的轮次记录。
+- **fixture 保护拒绝已提交文件**——遗留场景目录、缺失文件、一个 header 类别包含多个 pin、重复的伴随文件内容、未擦除的提示文本或工具 schema、没有前置 `system/message` 的 `request/header`，以及格式错误的 pin header 都会在比较运行前使套件失败。
+- **会话收集需要原始 JSONL mode**——快照配置使用 JSONL 后端的 `compression: 'none'`；压缩 JSONL 没有快照收集路径。
+- **构建 mode 需要当前产物**——选择 `DSH_EXAMPLE_MODE=lib` 前先运行 `pnpm run build`；源 mode 仍是零构建路径。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design of the kit; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释工具包的设计；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design
+### 设计
 
-The shared core owns manifests, generation-qualified role selection, workspace setup/comparison, typed identity mapping, normalizers, and fixture invariants. The ACP adapter adds four composable layers: launcher, scenario harness, normalizers, and suite factory. `launchAcpTestAgent` boots a source profile under tsx or a built `lib` profile under plain Node, connects the SDK client over a raw-byte stdout tee, collects Session updates and stderr, fails closed on unhandled permission requests, and owns shutdown. `runScenario` drives ACP JSON-RPC stdio and harvests the numerically highest persisted raw JSONL generation for every Session directory. The pure normalizers replace cwd paths and typed identities with stable tokens, zero times, expand physical source-event ranges, and scrub system-prompt text and tool-schema bulk. `defineAcpSnapshotSuite` registers comparisons, generation-qualified fixture write-back, and the live uniformity guard.
+共享核心拥有 manifest、generation 限定角色选择、workspace 设置／比较、类型化身份映射、normalizer 与 fixture 不变式。ACP 适配器增加四个可组合层：launcher、场景 harness、normalizer 与 suite factory。`launchAcpTestAgent` 在 tsx 下启动源码 profile，或在普通 Node 下启动已构建 `lib` profile，通过原始字节 stdout tee 连接 SDK client，收集 Session update 与 stderr，默认拒绝未处理的权限请求，并负责关闭。`runScenario` 驱动 ACP JSON-RPC stdio，并收集每个 Session 目录中数值最高的持久原始 JSONL generation。纯 normalizer 把 cwd 路径与类型化身份变为稳定 token，将时间归零、展开物理来源区间，并擦除系统提示词文本与工具 schema bulk。`defineAcpSnapshotSuite` 注册比较、generation 限定 fixture 回写与实时一致性保护。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/launcher.ts`](src/launcher.ts) | Subprocess/client launcher and shutdown ownership |
-| [`src/harness.ts`](src/harness.ts) | Scripted scenario driver and session-log harvest |
-| [`src/manifest.ts`](src/manifest.ts) | Closed `snapshot.yml` schema, collection, and ownership rules |
-| [`src/session-files.ts`](src/session-files.ts) | Canonical parent/child generation grammar, header agreement, and highest-role selection |
-| [`src/identity.ts`](src/identity.ts) | Typed first-seen identity tokenization across parent and child logs |
-| [`src/normalize.ts`](src/normalize.ts) | Pure normalizers and scrubbing helpers |
-| [`src/workspace.ts`](src/workspace.ts) | Scenario workspace setup and complete expected-state comparison |
-| [`src/suite.ts`](src/suite.ts) | Scenario-table suite factory, fixture guards, record/refresh write-back |
-| [`src/index.ts`](src/index.ts) | Package entry re-exporting the four layers |
+| [`src/launcher.ts`](src/launcher.ts) | 子进程/客户端启动器与关闭所有权 |
+| [`src/harness.ts`](src/harness.ts) | 脚本化场景驱动与会话日志收集 |
+| [`src/manifest.ts`](src/manifest.ts) | 封闭 `snapshot.yml` schema、收集与归属规则 |
+| [`src/session-files.ts`](src/session-files.ts) | 规范 parent/child generation grammar、header 一致性与最高角色选择 |
+| [`src/identity.ts`](src/identity.ts) | 跨父子日志的类型化首次出现身份 token 化 |
+| [`src/normalize.ts`](src/normalize.ts) | 纯规范化器与擦除辅助 |
+| [`src/workspace.ts`](src/workspace.ts) | 场景 workspace 设置与完整预期状态比较 |
+| [`src/suite.ts`](src/suite.ts) | 场景表套件工厂、fixture 保护、录制/刷新回写 |
+| [`src/index.ts`](src/index.ts) | 再导出四个层的包入口 |
 
-### Data flow
+### 数据流
 
-A scenario runs the agent under the launcher, feeds it the input script through the harness, and captures stdout plus the persisted logs. The normalizers canonicalize those captures — ids to first-seen sequence, generated cwd to `{{cwd}}`, `system/message` text to `{{system}}` and header tool schemas to `{{tools}}` — so recorded and fresh runs compare structurally. The factory then compares normalized stdout and re-persisted logs against committed fixtures, or writes them back in record/refresh mode, and its guards reject malformed or drifting fixtures before any comparison result is trusted.
+场景在启动器下运行 agent，通过 harness 向它喂入输入脚本，并捕获 stdout 与持久化日志。规范化器把捕获内容规范化——id 转为首次出现序列、生成 cwd 转为 `{{cwd}}`、`system/message` 文本转为 `{{system}}`、header 工具 schema 转为 `{{tools}}`——使已录制与本次运行可以结构化比较。随后工厂把规范化 stdout 与重新持久化日志同已提交 fixture 比较，或在录制/刷新模式下回写它们；其保护在任何比较结果被采信之前就拒绝畸形或漂移的 fixture。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the snapshot kit to the model fixture source, the launch mechanics, and the policy that requires the tier.
+当包级约定不够用时阅读以下页面。它们从快照工具包逐步进入模型 fixture 来源、启动机制与要求该层级存在的策略。
 
-- [llm-replay](../llm-replay/README.md) — the keyless model fixture source replay mode consumes.
-- [loader-smoke](../loader-smoke/README.md) — the mode-aware subprocess launch mechanics the launcher builds on.
-- [Testing policy](../../../docs/testing.md) — the keyless snapshot tier, when it is required, and the fixture ownership rules.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [llm-replay](../llm-replay/README.zh.md)——回放模式消费的无密钥模型 fixture 来源。
+- [loader-smoke](../loader-smoke/README.zh.md)——启动器所依赖的模式感知子进程启动机制。
+- [测试策略](../../../docs/testing.zh.md)——无密钥快照层、其适用时机与 fixture 归属规则。
+- [test-support 组地图](../README.zh.md)——兄弟 harness 与支持包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this test-only support records, normalizes, and compares profile sessions without changing the agent's assembled model request.
+无。该测试专用支持会记录、规范化并比较 profile 会话，不会改变 agent 组装的模型请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；本包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the kit needs special care. They are current package constraints, not a task backlog.
+这些限制说明何时需要对该工具包特别小心。它们是当前包约束，不是任务积压。
 
-- **Session harvest requires raw JSONL mode** — `runScenario` collects persisted `.jsonl` logs, so snapshot configs set the JSONL backend's `compression: 'none'`; compressed JSONL has no snapshot-harvest path.
-- **Built mode requires current artifacts** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; source mode remains the zero-build path.
-- **ACP remains for protocol behavior** — cancellation and permission round trips whose stimulus is the ACP client stay on that adapter; assembled one-shot and persistent-control behavior uses headless and SDK adapters.
+- **会话收集需要原始 JSONL mode**——`runScenario` 收集持久化 `.jsonl` 日志，因此快照配置使用 JSONL 后端的 `compression: 'none'`；压缩 JSONL 没有快照收集路径。
+- **构建 mode 需要当前产物**——选择 `DSH_EXAMPLE_MODE=lib` 前先运行 `pnpm run build`；源 mode 仍是零构建路径。
+- **ACP 继续覆盖协议行为**——刺激来自 ACP 客户端的取消与权限往返留在该适配器；组装式一次性行为与持久控制行为使用 headless 与 SDK 适配器。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

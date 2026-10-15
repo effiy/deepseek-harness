@@ -1,33 +1,33 @@
 ---
-description: "Whole-log turn outline for clients and maintainers composing or debugging the turnOutline projection unit behind full-session turn navigation."
+description: "面向组合或调试 turnOutline 投影单元的客户端与维护者的全量轮次大纲说明，支撑整会话轮次导航。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-turn-outline
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This package gives history clients a whole-session outline of every started turn, including bounded prompt and settled-response previews. Clients can navigate turns that are not yet loaded and page backward from the exact event sequence needed to load a selected turn. It fits assemblies that provide session projections; elsewhere, clients continue using loaded-window navigation. Previews exclude injected context and tool results, and a response appears only after its turn settles.
+本包为历史记录客户端提供涵盖完整会话的轮次大纲，其中包含每个已开始轮次的有界提示词预览与落定回复预览。客户端可以导航尚未加载的轮次，并从载入所选轮次所需的准确事件序号向后分页。它适用于提供会话投影的装配；在其他装配中，客户端继续使用仅覆盖已加载窗口的导航。预览排除注入的上下文与工具结果，并且回复仅在所属轮次落定后出现。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount the plugin beside the session store and the projection registry when clients should navigate every turn of a session without holding its complete event log. The unit registers only when the registry is present.
+当客户端需要在不持有完整事件日志的情况下导航会话的每一轮时，在会话存储与投影注册表旁挂载此插件。只有存在注册表时单元才会注册。
 
-### Composition
+### 组合
 
 ```yaml
 - name: '@deepseek-ai/dsh-session'
@@ -35,91 +35,91 @@ Mount the plugin beside the session store and the projection registry when clien
 - name: '@deepseek-ai/dsh-session-turn-outline'
 ```
 
-### What an entry means
+### 各字段含义
 
-| Field | Meaning |
+| 字段 | 含义 |
 |---|---|
-| `turn` | Host-assigned turn number from the `turn/start` payload |
-| `seq` | The turn's `turn/start` event seq — paging a window back through this seq loads the whole turn |
-| `prompt` | Preview of the turn's first human prompt (space-joined text blocks, collapsed whitespace, 50-character cap with a trailing ellipsis when clipped — one rail-card line); `''` until an eligible prompt lands |
-| `response` | Preview of the turn's final text-bearing assistant message (same normalization, 120-character cap — up to three rail-card lines); `''` until the turn ends with assistant text |
+| `turn` | `turn/start` 载荷里的宿主分配轮次号 |
+| `seq` | 该轮 `turn/start` 事件的 seq——窗口向后分页越过此 seq 即载入整轮 |
+| `prompt` | 该轮首条人类提示词的预览（文本块以空格连接、空白折叠、50 字符封顶且截断时补省略号——即导航卡片一行）；合格提示词落日志前为 `''` |
+| `response` | 该轮最后一条带文本的助手消息的预览（同样的归一化、120 字符封顶——即卡片至多三行）；轮次带着助手文本结束前为 `''` |
 
-The wire value is the complete entry array, strictly increasing by `turn` (whole-value rule): consumers replace, never merge. Prompts fill only from `user/message` events with the human `user` source, so injected context and tool results never leak into navigation; a turn whose prompt is images-only keeps `''` and consumers label it by number. The response buffers as a draft while its turn streams and commits at `turn/end`; the change feed's raw-view identity gate keeps draft-only changes quiet, so the outline pushes at most three times per turn — boundary, prompt, settled response. Preview budgets match the chat rail's loaded-turn previews, so a turn shows the same words before and after its events load.
+wire 值是按 `turn` 严格递增的完整条目数组（整值规则）：消费方整体替换，从不合并。提示词只从带人类 `user` 来源的 `user/message` 事件填充，注入的上下文与工具结果绝不进入导航；纯图片提示词的轮次保持 `''`，消费方按轮次号标注。回复在轮次流式期间缓冲为草稿、在 `turn/end` 落定；变更流的原始视图身份门让纯草稿变化保持安静，因此大纲每轮至多推送三次——开轮、提示词、落定回复。预览预算与聊天导航栏已加载轮次的预览一致，同一轮在事件载入前后显示相同的文字。
 
-### Failures and recovery
+### 失败与恢复
 
-The unit is inert without the projection registry: `inject` keeps the fiber pending and nothing registers, so other assemblies lack the `turnOutline` key. Unmounting the plugin removes the key, because registrations are effects on the mounting fiber. Persisted-cache rows are schema-validated on restore — including the strictly-increasing turn order — so a corrupt row is discarded instead of seeding a broken fold.
+没有投影注册表时单元是惰性的：`inject` 使 fiber 保持挂起，不注册任何内容，因此其他装配缺少 `turnOutline` 键。卸载插件会移除该键，因为注册是挂载 fiber 上的 effect。持久缓存行在恢复时经受 schema 校验——包括轮次严格递增的顺序——损坏的行被丢弃而不会喂坏折叠。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the fold behind the outline; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释大纲背后的折叠；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design concept
+### 设计理念
 
-The unit is a pure fold over committed session events. `turn/start` — not the prompt `user/message` — anchors each entry because its seq is the load-through target for a jump: the agent loop logs `turn/start` before the turn's prompt and steps, so a window paged back through that seq contains the whole turn. The prompt fills from the first human `user/message`, and only while the newest entry is still empty — later human messages in the same turn (steering) keep the first preview. The response cannot fill the same way (`turn/end` carries no text), so each text-bearing `assistant/message` overwrites a state draft and `turn/end` commits the survivor — the newest text, which is the loaded rail's `findLast` semantic.
+该单元是对已提交会话事件的纯折叠。锚定每个条目的是 `turn/start` 而非提示词 `user/message`，因为它的 seq 就是跳转的载入目标：agent loop（智能体循环）先记 `turn/start` 再记该轮的提示词与步骤，窗口向后分页越过该 seq 即包含整轮。提示词由首条人类 `user/message` 填充，且仅当最新条目仍为空时——同一轮内后续的人类消息（steering（中途引导））保留首个预览。回复无法同样填充（`turn/end` 不带文本），所以每条带文本的 `assistant/message` 覆写状态里的草稿，`turn/end` 提交幸存者——最新的文本，与已加载导航栏 `findLast` 的语义一致。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `inject`, unit registration on the mounting fiber |
-| [`src/projection.ts`](src/projection.ts) | The fold: entry append, preview fill, wire view |
-| [`src/types.ts`](src/types.ts) | One home of the `turnOutline` projection-key declaration and entry types |
+| [`src/index.ts`](src/index.ts) | 插件入口：`inject`、在挂载 fiber 上注册单元 |
+| [`src/projection.ts`](src/projection.ts) | 折叠：条目追加、预览填充、wire 视图 |
+| [`src/types.ts`](src/types.ts) | `turnOutline` 投影键声明与条目类型的唯一归属 |
 
-### Fold rules
+### 折叠规则
 
-- Uninteresting events return the same state reference, and draft-only changes keep the `turns` array's identity; the registry's two `Object.is` gates then hold the feed to at most three pushes per turn.
-- A `turn/start` that does not advance the turn number is skipped, keeping the outline sorted; a retried boundary's previews then land on the standing entry.
-- The wire view projects `state.turns`; the persisted-cache state schema wraps the wire schema with the draft field.
+- 不相关事件返回同一状态引用，纯草稿变化保持 `turns` 数组身份不变；注册表的两道 `Object.is` 门由此把变更流压到每轮至多三次推送。
+- 未推进轮次号的 `turn/start` 被跳过，保持大纲有序；重试边界的预览随后落在既有条目上。
+- wire 视图投影 `state.turns`；持久缓存的状态 schema 在 wire schema 外再包一个草稿字段。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the unit's contract is not enough. They move from the registry that drives units to adjacent session packages.
+当单元约定不够用时阅读以下页面。它们从驱动单元的注册表逐步进入相邻的会话包。
 
-- [Session projection subsystem](../../../docs/subsystems/session-projection.md) — the registry that drives units and serves snapshot and change-feed values.
-- [Session projection registry package](../session-projection/README.md) — the registry contract units register against.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [会话投影子系统](../../../docs/subsystems/session-projection.zh.md)——驱动单元并提供快照与变更流值的注册表。
+- [会话投影注册表包](../session-projection/README.zh.md)——单元注册所依据的注册表约定。
+- [会话包映射](../README.zh.md)——相邻的持久化、投影、标题与遥测包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the turnOutline unit folds already-logged turn boundaries into a client-facing read model and registers nothing model-facing.
+无，因为 turnOutline 单元把已写入日志的轮次边界折叠成面向客户端的读模型，不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; the package never assembles or sends provider requests.
+无；本包从不组装或发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the outline describes and when the unit is absent. They are current package constraints.
+这些限制说明大纲描述什么、单元何时缺失。它们是当前包约束。
 
-- **The wire value grows with the session** — every push carries the complete outline (whole-value rule), up to ~600 bytes per turn at full CJK budgets and typically far less; splitting previews into an on-demand read is deferred until sessions with many thousands of turns need it.
-- **The response previews only settled turns** — it commits at `turn/end`, so an open turn (or one whose end never logged) shows a prompt-only preview until the boundary lands.
-- **A turn without eligible text keeps `''`** — images-only and command-only turns are navigable but labeled by number, and a turn whose steps emit no text gets no response preview.
-- **Mounted only where the projection registry is composed** — other assemblies serve no `turnOutline` key, and their consumers fall back to loaded-window navigation.
+- **wire 值随会话增长**——每次推送携带完整大纲（整值规则），CJK 字符占满预算时每轮上限约 600 字节、通常远小于此；把预览拆成按需读取推迟到数千轮量级的会话真正需要时。
+- **回复只预览已落定的轮次**——它在 `turn/end` 提交，进行中的轮次（或从未记下结束边界的轮次）在边界落地前只有提示词预览。
+- **没有合格文本的轮次保持 `''`**——纯图片、纯命令的轮次可导航但按轮次号标注，步骤全程不产文本的轮次没有回复预览。
+- **仅在组合了投影注册表时挂载**——其他装配不提供 `turnOutline` 键，其消费方回退到仅按已加载窗口导航。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

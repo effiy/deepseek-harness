@@ -1,35 +1,35 @@
 ---
-description: "Frozen released-v0 Session header, event, and packed-row decoder with the identity conversion to v1."
+description: "冻结的已发布 v0 会话标头、事件与打包行解码器，以及到 v1 的恒等转换。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-format-v0-to-v1
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This package restores released v0 Session JSONL by decoding each physical row and producing the shared-layout v1 format. It preserves validated headers and events apart from changing version 0 to version 1, while applying only the finite legacy normalizations accepted by v0 persistence. Malformed or unsupported historical records fail migration before the current restorer runs, with the source retained for recovery. The migration accepts only the frozen first-party event inventory and does not publish or select later format migrations.
+本包逐个物理行解码已发布的 v0 会话 JSONL，并生成共享布局的 v1 格式，以还原历史会话。除把版本从 0 改为 1 外，它会保留经过校验的标头与事件，并仅应用 v0 持久化接受的有限旧格式规范化。畸形或不支持的历史记录会在当前还原器运行前使迁移失败，同时保留源文件以便恢复。该迁移只接受冻结的第一方事件清单，且不发布或选择后续格式迁移。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-### When to use it
+### 何时使用
 
-Persistence obtains this edge through `dsh-session-format-catalog`; feature compositions do not mount it. Import it directly only when assembling or testing the static released-format catalog.
+持久化通过 `dsh-session-format-catalog` 获取该迁移边；功能组合不会挂载它。只有在装配或测试静态已发布格式目录时，才直接导入本包。
 
-### Entry point
+### 入口
 
 ```text
 const decoder = releasedV0SessionFormatCodec.createDecoder(physicalHeader, 'recoverable')
@@ -40,74 +40,74 @@ stage.transformEvent(event, migrationContext)
 const targetInheritedEventCount = stage.finish(migrationContext)
 ```
 
-`releasedV0SessionFormatCodec` reads the exact v0 header and physical rows, including packed Assistant deltas and range-encoded source-event references. Its decoder emits either a scalar event or a codec-owned compact run through `emitEvent()` and `emitRun()`. `sessionFormatV0ToV1` creates one stateful stage per restore; the static catalog connects that decoder and stage so migration does not retain a physical-row array. `releasedV1SessionFormatCodec` exposes the same row-at-a-time decoder for the v1 physical layout without freezing the ordinary event vocabulary.
+`releasedV0SessionFormatCodec` 读取精确的 v0 header 与物理行，包括打包的 Assistant 增量和范围编码的来源序号。它的 decoder 通过 `emitEvent()` 与 `emitRun()` 发出单个事件或 codec 自有的紧凑 run。`sessionFormatV0ToV1` 为每次还原创建一个有状态 Stage；静态 catalog 连接该 decoder 与 Stage，使迁移无需保留物理行数组。`releasedV1SessionFormatCodec` 为 v1 物理布局暴露相同的逐行 decoder，同时不冻结普通事件词表。
 
-The alpha edge refuses every event type outside its frozen inventory, including an unknown event marked `ignorable: true`. It also refuses unexpected payload members. `tool/result.meta` and nested PTC `arguments` remain explicit opaque JSON fields and are preserved without Session-sequence interpretation. Unknown content-block `type`, message-source `kind`, assistant finish-reason `kind`, and `turn/end` reason `kind` arms remain owner-opaque JSON while their known arms receive structural validation.
+Alpha 迁移边会拒绝冻结清单之外的所有事件类型，包括带有 `ignorable: true` 标记的未知事件。它也会拒绝意外的 payload 成员。`tool/result.meta` 与嵌套 PTC `arguments` 是显式的不透明 JSON 字段；迁移会原样保留它们，不把其中的数字解释为会话序号。内容块中未知的 `type` 分支、消息来源中未知的 `kind` 分支、assistant 结束原因中未知的 `kind` 分支与 `turn/end` 原因中未知的 `kind` 分支保持 owner-opaque JSON，已知分支则接受结构校验。
 
-The bounded historical normalizers convert `steering/message` to `user/message`, rename `compact/*` events to `compaction/*`, remove `turn/start.trigger`, convert retired `turn/end` reasons, add current message wrappers and deterministic ids for legacy messages, retry chains, and compaction groups, and remove the obsolete `request/header.header.messagePrefix` duplicate. Retired `request/header-delta`, `mode/set`, and the `request/header` fallback reason refuse migration. No other event, reference, source, or payload fact may change.
+有限的历史规范化会把 `steering/message` 转换为 `user/message`、把 `compact/*` 事件重命名为 `compaction/*`、移除 `turn/start.trigger`、转换已停用的 `turn/end` reason、添加当前消息包装层，并为旧消息、retry chain 与压缩（compaction）组补充确定性 id，同时移除已停用且重复的 `request/header.header.messagePrefix`。已停用的 `request/header-delta`、`mode/set` 和 `request/header` fallback reason 会使迁移失败。除此之外，任何事件、引用、来源或 payload 事实都不得改变。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The physical codec validates each packed row atomically, emits it as a compact run, and never mutates parsed input. Recoverable decoding drops a complete faulty row and keeps the preceding prefix unless a later decoded `turn/end` proves that the faulty region was committed. The incremental normalizer retains only message, retry, and open-compaction identities; the catalog performs complete relationship validation on the final current artifact.
+物理 codec 会以行为原子单位校验每个打包行，以紧凑 run 发出它，且绝不修改已解析输入。可恢复解码会丢弃完整的故障行并保留此前前缀，除非后续成功解码的 `turn/end` 证明故障区域已经提交。增量 normalizer 只保留 message、retry 与未结束的压缩 identity；catalog 会在最终当前产物上执行完整关系校验。
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/codec.ts`](src/codec.ts) | Frozen v0/v1 physical headers, packed rows, and source-event ranges |
-| [`src/dispositions.ts`](src/dispositions.ts) | Released-v0 event and payload-member inventory |
-| [`src/payload-validation.ts`](src/payload-validation.ts) | Frozen nested payload semantics for every released-v0/v1 event type |
-| [`src/relationships.ts`](src/relationships.ts) | Frozen cross-event pairings: turns, steps, tool starts and results, retries, compaction, titles |
-| [`src/migration.ts`](src/migration.ts) | Identity edge and legacy normalization |
-| [`src/validation.ts`](src/validation.ts) | Exact source and target validation |
+| [`src/codec.ts`](src/codec.ts) | 冻结的 v0/v1 物理标头、打包行与来源序号范围 |
+| [`src/dispositions.ts`](src/dispositions.ts) | 已发布 v0 事件与 payload 成员清单 |
+| [`src/payload-validation.ts`](src/payload-validation.ts) | 每种已发布 v0/v1 事件类型的冻结嵌套 payload 语义 |
+| [`src/relationships.ts`](src/relationships.ts) | 冻结的跨事件配对：轮次、步骤、工具开始与结果、重试、压缩、标题 |
+| [`src/migration.ts`](src/migration.ts) | 恒等迁移边与旧格式规范化 |
+| [`src/validation.ts`](src/validation.ts) | 精确的源与目标校验 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [Migration machinery](../session-format/README.md) — pure chain and codec contracts.
-- [Static catalog](../session-format-catalog/README.md) — build-owned assembly.
-- [Session subsystem](../../../docs/subsystems/session.md) — current logical Session semantics.
+- [迁移机制](../session-format/README.zh.md)——纯迁移链与编解码约定。
+- [静态目录](../session-format-catalog/README.zh.md)——由构建负责的装配。
+- [会话子系统](../../../docs/subsystems/session.zh.md)——当前逻辑会话语义。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Historical restoration
+### 历史还原
 
-#### What the model sees
+#### 模型看到什么
 
-Nothing directly. After restoration, `deriveMessages()` sees canonical released-v0 events unchanged under v1; bounded historical forms produce the same model-visible content through their defined current wrappers.
+没有直接内容。还原后，`deriveMessages()` 会看到在 v1 下保持不变的规范已发布 v0 事件；有限历史结构会通过规定的当前包装层产生相同的模型可见内容。
 
-#### Token effect
+#### Token 影响
 
-Zero direct tokens.
+不直接产生 token。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct effect for canonical v0 history. Bounded normalizers preserve model-visible content while producing current wrappers and deterministic identities.
+对规范 v0 历史没有直接影响。有限 normalizer 会在生成当前包装层与确定性标识时保留模型可见内容。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Closed first-party inventory** — unknown external-plugin events refuse migration in this alpha policy.
-- **One adjacent edge** — this package does not perform publication or select later migrations.
+- **封闭的第一方清单**——按照当前 Alpha 策略，未知的外部插件事件会使迁移失败。
+- **单个相邻迁移边**——本包不执行发布，也不选择后续迁移。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

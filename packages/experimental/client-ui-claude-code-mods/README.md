@@ -1,78 +1,78 @@
 ---
-description: "Web band above the prompt for Claude Code mods: draws each session's mod tree from the bridge's Remote and sends button clicks back."
+description: "面向 Claude Code 模组的提示框上方 Web 横幅：从桥接的 Remote 绘制每个会话的模组树，并把按钮点击发回。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-client-ui-claude-code-mods
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This optional browser plugin draws the band a [Claude Code mod](../claude-code-mods/README.md) renders above the prompt. It mounts the bridge's `claudeCodeMods` Remote, watches each open session's band, and renders the serialized `Box`/`Text`/`Button` tree as a full-width entry above the composer card; clicking a button runs the mod's `onPress` on the Host and the band redraws. Without a mod that draws, nothing is shown.
+这个可选的浏览器插件绘制 [Claude Code 模组](../claude-code-mods/README.zh.md)在提示框上方渲染的横幅。它挂载桥接的 `claudeCodeMods` Remote，监视每个已打开会话的横幅，并把序列化的 `Box`/`Text`/`Button` 树渲染为输入卡片上方的整行条目；点击按钮会在宿主上运行模组的 `onPress`，横幅随之重绘。没有模组绘制时，什么也不显示。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Compose it beside the bridge and the mods; the [opt-in overlay](../claude-code-mods/cordis.source.patch.yml) does so for a source launch of the Web profile. The band appears only while a mod's `ui.render` hook returns a tree: Token Weather's forecast after the first turn, Blast Radius's Proceed and Cancel while a risky command is held, Replay Theater's hint after a turn with edits. Colors follow Claude Code's terminal palette on this theme's tokens; a hotkey is shown as a hint beside the label, and a press is a click. While a press is in flight every button is disabled; a press the Host refuses shows its message under the band.
+与桥接和模组一起组合；[可选叠加层](../claude-code-mods/cordis.source.patch.yml)为 Web 配置文件的源码启动完成了这一组合。横幅只在某个模组的 `ui.render` 钩子返回树时出现：首轮之后 Token Weather 的预报、风险命令被持有期间 Blast Radius 的 Proceed 与 Cancel、含编辑的一轮之后 Replay Theater 的提示。颜色按 Claude Code 的终端调色板映射到本主题的令牌；热键显示为标签旁的提示，按下即点击。按下处理期间所有按钮禁用；被宿主拒绝的按下会在横幅下方显示其消息。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>维护者细节 — 点击展开</summary>
 
-The browser entry imports the generated Remote contribution and hands it to `mountModsBand`, which mounts the contribution through `ctx.remote.$mount()` and registers one `conversation.input.dock` entry. The entry's `inject` keeps one `watchBand` stream per session behind a small observable store the slot renderer exposes as `useBand`; `press` calls `pressBand` with the generation the band was drawn in and applies the snapshot it returns. Disposal ends every stream and the Remote mount. [`Band.tsx`](src/client/Band.tsx) renders the serialized tree: `Box` as a flex container with `data-direction`, `data-border`, and padding and gap from the props, `Text` as a span carrying `data-color`, `data-bold`, `data-dim`, `data-italic`, `data-underline`, and `Button` as a button disabled without an action id or while a press runs.
+浏览器入口导入生成的 Remote 贡献并交给 `mountModsBand`，后者通过 `ctx.remote.$mount()` 挂载该贡献并注册一个 `conversation.input.dock` 条目。条目的 `inject` 为每个会话保持一条 `watchBand` 流，置于一个小型可观察存储之后，由槽位渲染器暴露为 `useBand`；`press` 以横幅绘制时的代数调用 `pressBand`，并应用其返回的快照。销毁时结束每条流与 Remote 挂载。[`Band.tsx`](src/client/Band.tsx) 渲染序列化的树：`Box` 为带 `data-direction`、`data-border` 以及来自属性的内边距与间距的 flex 容器，`Text` 为携带 `data-color`、`data-bold`、`data-dim`、`data-italic`、`data-underline` 的 span，`Button` 为没有动作 id 或按下进行中时禁用的按钮。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [The bridge](../claude-code-mods/README.md) — how the band is drawn and which mods draw first.
-- [Compatibility with Claude Code mods](../../../docs/subsystems/claude-code-mods.md) — the element and prop subset this band renders.
+- [桥接](../claude-code-mods/README.zh.md) — 横幅如何绘制，以及哪些模组先绘制。
+- [与 Claude Code 模组的兼容性](../../../docs/subsystems/claude-code-mods.zh.md) — 本横幅渲染的元素与属性子集。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the band is drawn from Host state and never enters a model request; a button's effect reaches the model only through the mod's own hooks.
+None, as 横幅由宿主状态绘制，从不进入模型请求；按钮的效果只经模组自身的钩子到达模型。
 
-#### KV Cache effect
+#### KV 缓存影响
 
-No direct effect.
+无直接影响。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- One band per session; no docked `Pane`, `TextInput`, hotkeys, focus, or scrolling. The Host renders for a band 120 columns wide and the band wraps; `width`, `height`, `overflow`, `wrap`, and `truncate` props are ignored.
-- The band reflects the Host's redraw triggers; a mod that changes state outside them is drawn at the next trigger.
+- 每会话一条横幅；没有停靠的 `Pane`、`TextInput`、热键、焦点或滚动。宿主按 120 列宽渲染，横幅会换行；`width`、`height`、`overflow`、`wrap`、`truncate` 属性被忽略。
+- 横幅反映宿主的重绘触发；在触发之外改变状态的模组会在下一次触发时绘出。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>维护者细节 — 点击展开</summary>
 
-None.
+无。
 
 </details>

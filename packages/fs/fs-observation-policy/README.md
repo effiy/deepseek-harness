@@ -1,35 +1,35 @@
 ---
-description: "The read-before-edit filesystem policy plugin for deployments and maintainers choosing or debugging guarded write and edit behavior."
+description: "编辑前读取的文件系统策略插件：面向选择或排查受防护写入/编辑行为的部署方与维护者。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-fs-observation-policy
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-fs-observation-policy` makes filesystem tools require an agent to read a file before overwriting or editing it. It also rejects a mutation when the file has changed since that read, and returns a clear instruction to re-read and retry. Reading a missing path authorizes guarded creation, while concurrent creation remains protected. Choose it for deployments that want read-before-write safety; resumed sessions must read targets again because observations are not persisted.
+`dsh-fs-observation-policy` 要求 agent（智能体）先读取文件，文件系统工具才可覆盖或编辑它。如果文件自读取后发生变化，它也会拒绝变更，并清楚提示重新读取后重试。读取缺失路径会授权带防护的创建，同时仍防止覆盖并发创建的文件。需要编辑前读取安全性的部署请选择它；由于观察记录不持久化，恢复的会话必须重新读取目标。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Load this plugin alongside a `ctx.fs` backend and the `dsh-tool-fs` tools when a deployment wants the model to read a file before it can overwrite or edit it. The plugin needs no configuration and injects no service; it only listens for the `fs/*` events the tools dispatch.
+当部署希望模型在覆盖或编辑文件之前先读取该文件时，把本插件与 `ctx.fs` 后端及 `dsh-tool-fs` 工具一起加载。插件无需配置，也不注入任何服务；它只监听工具分派的 `fs/*` 事件。
 
-### Minimal composition
+### 最小组合
 
-Load a backend, then this plugin, then the tools. The policy listener should be the first decider registered for the `fs/*`-intent slots.
+先加载后端，再加载本插件，最后加载工具。策略监听器应当是 `fs/*` 意图 slot 上第一个注册的决策器。
 
 ```yaml
 - name: '@deepseek-ai/dsh-fs-local'
@@ -37,103 +37,103 @@ Load a backend, then this plugin, then the tools. The policy listener should be 
 - name: '@deepseek-ai/dsh-tool-fs'
 ```
 
-### What changes for the model
+### 对模型而言的变化
 
-With the policy mounted, `write` creates new files but refuses to overwrite an existing file that the session has not read, `edit` requires a prior read of the target, and a file that changed since it was read fails with `FS_STALE_VERSION`. Absence is recorded too: reading a missing file marks it confirmed absent, so a later `write` may recreate it through the guarded-create flow. A session resumes with no observed state, so it must re-read files before guarded mutations succeed again.
+挂载策略后，`write` 可以创建新文件，但拒绝覆盖会话未读取过的现有文件；`edit` 要求先读取目标；自读取以来发生变化（包括缺失）的文件以 `FS_STALE_VERSION` 失败。缺失也会被记录：读取缺失文件会把它标记为确认缺失，因此随后的 `write` 可以通过防护创建流程重新创建它。会话恢复后不携带任何已观察状态，因此必须重新读取文件，防护变更才能再次成功。
 
-### Failures and recovery
+### 失败与恢复
 
-An edit without a prior observation fails with code `FS_NOT_OBSERVED` and policy reason `edit requires reading "<path>" first`; editing a target observed absent fails with `FS_NOT_FOUND`. The tools normalize unread policy and provider failures to `cannot modify "<path>": file has not been read — read the file, then retry` while preserving the code and original cause. Following the remedy on an externally deleted file records absence, so the next guarded write can recreate it without clobbering a concurrent creator.
+没有先前观测的编辑以代码 `FS_NOT_OBSERVED` 和策略原因 `edit requires reading "<path>" first` 失败；编辑被观测为缺失的目标以 `FS_NOT_FOUND` 失败。工具把策略和提供方的未读失败统一为 `cannot modify "<path>": file has not been read — read the file, then retry`，同时保留错误码和原始原因。在外部删除的文件上遵循该恢复指令会记录缺失，因此下一次防护写入可以重新创建它，而不会覆盖并发创建者。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the policy plugin and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释策略插件背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design concept
+### 设计理念
 
-The plugin is built on two ideas:
+插件建立在两个想法之上：
 
-- **Event gate, not method service.** The plugin influences the world only through the `fs/*` events, so it registers no `ctx.fsPolicy` service and has no public methods. Removing it cannot break `dsh-tool-fs` at a service-injection boundary — the tool falls through to the bare provider.
-- **Observed state is a prior-observation record.** A weak owner-to-target map holds three logical states — unseen, confirmed absent, or present at a version. The plugin performs no filesystem I/O of its own; it converts recorded state into the provider's optional guard, and the provider performs the atomic freshness check.
+- **事件门禁，而非方法服务。** 插件只通过 `fs/*` 事件影响外部世界，因此不注册 `ctx.fsPolicy` 服务，也没有公开方法。移除它不会在服务注入边界破坏 `dsh-tool-fs`——工具会直接落到裸提供方。
+- **已观察状态是先前观察记录。** 一张以所有者为弱键、记录各目标的映射表持有三种逻辑状态——未见、确认缺失、存在于某个版本。插件本身不执行任何文件系统 I/O；它把记录的状态转换为提供方的可选防护，由提供方执行原子新鲜度检查。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | The three `fs/*` listeners and the observed-state gate |
-| [`src/types.ts`](src/types.ts) | The opaque event actor shape from which the owner session is derived |
+| [`src/index.ts`](src/index.ts) | 三个 `fs/*` 监听器与已观察状态门禁 |
+| [`src/types.ts`](src/types.ts) | 不透明事件参与者形态，从中派生所有者会话 |
 
-### Decision flow
+### 决策流程
 
-`fs/write-intent` resolves unseen or confirmed absent to `{ kind: 'createIfAbsent' }` and observed present to `{ kind: 'replaceIfVersion', version: vObserved }`. `fs/edit-intent` rejects an unseen target with `FS_NOT_OBSERVED`, a confirmed-absent target with `FS_NOT_FOUND`, and otherwise supplies the observed version as the compare-and-swap basis. `fs/observed` records `{ kind: 'present', version }` or `{ kind: 'absent' }` for the owner and target — a synchronous, side-effect-only `WeakMap.set`, because successful mutations have already committed.
+`fs/write-intent` 把未见或确认缺失解析为 `{ kind: 'createIfAbsent' }`，把已观测存在解析为 `{ kind: 'replaceIfVersion', version: vObserved }`。`fs/edit-intent` 以 `FS_NOT_OBSERVED` 拒绝未见目标，以 `FS_NOT_FOUND` 拒绝确认缺失的目标，否则提供观察到的版本作为比较并交换的基础。`fs/observed` 为该所有者与目标记录 `{ kind: 'present', version }` 或 `{ kind: 'absent' }`——同步、只有副作用的 `WeakMap.set`，因为成功的变更已经提交。
 
-### Single-slot, first-wins
+### 单 slot、先到者胜
 
-Each intent slot holds exactly one decider: this plugin fully decides and never calls `next()`. The slot is first-wins by registration order — this plugin owning it is the default-deployment convention, not an event-enforced invariant. Layered permission, audit, or sandbox interception belongs on the `tools/execute` waterfall instead.
+每个意图 slot 只容纳一个决策器：本插件会完整决策，绝不调用 `next()`。slot 按注册顺序先到者胜——由本插件拥有 slot 只是默认部署约定，不是事件强制的不变式。分层权限、审计或沙箱拦截属于 `tools/execute` waterfall（瀑布式事件）。
 
-### Lifecycle
+### 生命周期
 
-Observed state is dropped on plugin disposal (HMR safety) and is never persisted across sessions — a resumed session starts with no observations.
+已观察状态在插件 dispose（资源释放）时丢弃，以确保 HMR（热模块替换）安全，且绝不跨会话持久化——恢复的会话从无观察状态开始。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the policy to the contract, tools, and backends it composes with.
+当包级约定不够用时阅读以下页面。它们从策略逐步进入它所组合的约定、工具与后端。
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — exhaustive provider contract, policy events, and error taxonomy.
-- [dsh-fs](../fs/README.md) — the `ctx.fs` contract and the `fs/*` event vocabulary.
-- [tool-fs](../tool-fs/README.md) — the model-facing tools that dispatch the `fs/*` events.
-- [fs-local](../fs-local/README.md) — the host-filesystem backend this policy guards.
-- [fs-sandbox](../fs-sandbox/README.md) — the sandbox-enforcing backend this policy composes with.
-- [Fsspec-style seam-split reference](../fs/README.md) — why the policy is an event plugin rather than a provider method.
+- [文件系统子系统](../../../docs/subsystems/filesystem.zh.md)——穷尽式提供方约定、策略事件与错误分类体系。
+- [dsh-fs](../fs/README.zh.md)——`ctx.fs` 约定与 `fs/*` 事件词汇。
+- [tool-fs](../tool-fs/README.zh.md)——分派 `fs/*` 事件的面向模型工具。
+- [fs-local](../fs-local/README.zh.md)——本策略所防护的宿主文件系统后端。
+- [fs-sandbox](../fs-sandbox/README.zh.md)——与本策略组合的沙箱强制后端。
+- [Fsspec 风格 seam 拆分 参考说明](../fs/README.zh.md)——策略为何是事件插件而非提供方方法。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Filesystem tool outcome
+### 文件系统工具结果
 
-#### What the model sees
+#### 模型看到的内容
 
-This plugin adds no prompt or schema. It rejects an edit without a prior observation with code `FS_NOT_OBSERVED` and policy reason `edit requires reading "<path>" first`; editing a target observed absent returns `FS_NOT_FOUND`. Guarded mutations whose positive observation is stale propagate the provider-owned `FS_STALE_VERSION` error. [`dsh-tool-fs`](../tool-fs/README.md) owns the model-facing error wrapper: it normalizes every `FS_NOT_OBSERVED` source to `cannot modify "<path>": file has not been read — read the file, then retry`, while `FS_STALE_VERSION` retains the provider reason and adds `— re-read the file, then retry`; both preserve the code and original cause. Following the stale remedy on an externally deleted target records absence: the next guarded write may recreate it with `createIfAbsent`, while the provider atomically preserves any concurrent creator.
+该插件不添加提示词或 schema。没有先前观测时，它会以代码 `FS_NOT_OBSERVED` 和策略原因 `edit requires reading "<path>" first` 拒绝编辑；编辑被观测为缺失的目标返回 `FS_NOT_FOUND`。正向观测陈旧时，带防护的变更会传播由提供方拥有的 `FS_STALE_VERSION` 错误。[`dsh-tool-fs`](../tool-fs/README.zh.md) 拥有模型侧错误包装：它把所有 `FS_NOT_OBSERVED` 来源规范化为 `cannot modify "<path>": file has not been read — read the file, then retry`，而 `FS_STALE_VERSION` 保留提供方原因并追加 `— re-read the file, then retry`；两者都保留错误码和原始原因。外部删除目标后，遵循陈旧恢复指令会记录缺失：下一次带防护的写入可以通过 `createIfAbsent` 重新创建该目标，而提供方会以原子方式保留任何并发创建者写入的文件。
 
-#### Token effect
+#### Token 影响
 
-Zero tokens on allowed operations beyond the ordinary tool result. A denial adds the small retained error result and avoids any success payload.
+允许的操作除了普通工具结果外不增加 token。拒绝会添加少量保留的错误结果，并避免产生成功 payload。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the policy is a poor fit or needs special operational care. They are current package constraints, not a general filesystem comparison or a task backlog.
+这些限制说明本策略何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是通用文件系统对比或任务积压。
 
-- **Observed state does not survive a session resume** — persistence of the record is deferred, so a resumed session must re-read files before guarded writes and edits.
-- **Actors without an agent session can never satisfy the policy** — their edits throw `FS_NOT_OBSERVED` and their writes always resolve `createIfAbsent`, so a non-agent caller cannot overwrite an existing file through the gate.
-- **Direct `ctx.fs` reads emit no `fs/observed`** — a file read outside the `read` tool stays unobserved, and a later guarded edit rejects with `FS_NOT_OBSERVED` until the tool reads it.
-- **Authorization is version freshness, not view completeness** — any windowed read authorizes a full-file overwrite of an unchanged file, deliberately weaker than a full-view rule ([seam-split reference](../fs/README.md)).
+- **已观察状态无法在会话恢复后保留**：该记录的持久化工作延期处理，因此恢复的会话必须重新读取文件，才能执行防护写入与编辑。
+- **没有 agent 会话的参与者绝无法满足策略**：它们的编辑会抛出 `FS_NOT_OBSERVED`，写入总会解析为 `createIfAbsent`，因此非 agent 调用方无法通过门禁覆盖现有文件。
+- **直接 `ctx.fs` 读取不会发出 `fs/observed`**：在 `read` 工具之外读取的文件仍未观察；后续防护编辑会以 `FS_NOT_OBSERVED` 拒绝，直到工具读取该文件。
+- **授权依据是版本新鲜度，而非视图完整性**：任何窗口读取都会授权对未变文件执行全文件覆盖，这有意弱于完整视图规则（见[seam 拆分 参考说明](../fs/README.zh.md)）。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

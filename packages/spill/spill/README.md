@@ -1,39 +1,39 @@
 ---
-description: "The spill storage service: save oversized tool text or captured session references and return a retrievable locator."
+description: "spill 存储服务：保存超大工具文本或已捕获的会话引用，并返回可用于取回内容的定位信息。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-spill
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-spill` lets plugins and tools save oversized text through the public `ctx.spillStore` API and receive an opaque locator, exact byte count, and retrieval guidance. Choose it when full results must remain retrievable without filling model context. Configure `dsh-spill-local` for local persistence, and add `dsh-spill-policy` when oversized tool results should become bounded previews. The API does not offer retention, replacement, retrieval, or search operations. A save rejects on storage failure, leaving the caller to keep the content inline or fail.
+`dsh-spill` 让插件和工具通过公开的 `ctx.spillStore` API 保存超大文本，并取得不透明定位信息、精确字节数与取回指引。当完整结果必须保持可取回、同时又不能填满模型上下文时选择它。配置 `dsh-spill-local` 可获得本地持久化；当超大工具结果应变为有界预览时，再添加 `dsh-spill-policy`。该 API 不提供保留、替换、取回或搜索操作。存储故障会使保存操作拒绝，由调用方决定保留内联内容还是让操作失败。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-A composition that saves spill artifacts mounts one backend — this package alone stores nothing. `dsh-spill-policy` decides when tool results spill; `dsh-session-reference` directly saves truncated reference transcripts without requiring that policy. Callers use `ctx.spillStore.saveText()` with an explicit owner; optional consumers discover the backend with `ctx.get("spillStore")`.
+保存 spill 产物的组合需要挂载一个后端——仅本包本身不存储任何内容。`dsh-spill-policy` 决定工具结果何时 spill；`dsh-session-reference` 直接保存截断后的会话引用 transcript（文本记录），不需要该策略。调用方使用 `ctx.spillStore.saveText()` 并明确指定归属；可选消费方通过 `ctx.get("spillStore")` 获取后端。
 
-### When to choose it
+### 何时选择
 
-Choose spill storage when a deployment needs to keep full text retrievable after the model sees a bounded preview, such as a fetched page body or a captured session-reference transcript. A backend whose locator and retrieval hint are usable in the deployment is a prerequisite; local filesystem access is not a service requirement.
+当部署需要在模型看到有界预览后仍能取回全文时，选择 spill 存储，例如抓取的页面正文或已捕获的会话引用 transcript。前提是后端的定位信息与取回指引在部署环境中可用；该服务不要求本地文件系统访问。
 
-### Smallest working composition
+### 最小可用组合
 
-Mount a backend and the policy together; with `maxInlineTokens` set, an oversized text/image tool result becomes a preview plus a locator automatically.
+把后端与策略一起挂载；设置 `maxInlineTokens` 后，过大的图文工具结果都会自动变成预览加定位信息。
 
 ```yaml
 - name: '@deepseek-ai/dsh-spill-local'
@@ -42,9 +42,9 @@ Mount a backend and the policy together; with `maxInlineTokens` set, an oversize
     maxInlineTokens: 12500
 ```
 
-### Saving text
+### 保存文本
 
-With a backend mounted, call `ctx.spillStore.saveText()` with the owning session, a source description, a suggested file name, and the full text:
+挂载后端后，用所属会话、来源描述、建议文件名与完整文本调用 `ctx.spillStore.saveText()`：
 
 ```text
 const ref = await ctx.spillStore.saveText({
@@ -55,100 +55,100 @@ const ref = await ctx.spillStore.saveText({
 })
 ```
 
-The returned `SpillRef` carries three fields: `locator`, an opaque model-facing handle the backend produces (a local file path for `dsh-spill-local`, possibly a URI or key for another backend); `bytes`, the exact UTF-8 byte count written; and `retrievalHint`, the guidance a consumer shows the model — for the local backend, read or grep the path. Consumers render the locator with the hint and never parse the locator itself.
+返回的 `SpillRef` 携带三个字段：`locator`，后端产生的面向模型的不透明句柄（对 `dsh-spill-local` 是本地文件路径，对其他后端可能是 URI 或键）；`bytes`，写入的精确 UTF-8 字节数；`retrievalHint`，消费方展示给模型的指引——对本地后端而言是读取或搜索该路径。消费方将定位信息与指引一同呈现，绝不自行解析定位信息。
 
-### Ownership and boundaries
+### 归属与边界
 
-Storage is grouped by the owning session: forked sessions inherit existing locators from the seeded log without copying or re-owning them, and new spills after a fork use the child session id. A session-reference artifact belongs to the target session receiving the context, not the referenced source session. `suggestedName` is only a hint — backends sanitize it to one safe segment and never trust it as a path. Consumers own preview and spill decisions; the backend owns storage and artifact expiry.
+存储按所属会话分组：fork 后的会话从种子日志继承既有定位信息，无需复制或更改归属，fork 后新产生的 spill 使用子会话 id。会话引用产物归接收上下文的目标会话所有，而不是被引用的源会话。`suggestedName` 只是提示——后端会把它清理成单个安全路径段，绝不把它当作可信路径。预览与 spill 决策由消费方负责；存储与产物过期由后端负责。
 
-### Failures and recovery
+### 故障与恢复
 
-`saveText` rejects only on a real storage failure — permissions, no space left, or a backend that is down. The caller decides how to degrade: the shipped policy treats a rejection as best-effort, logs a warning, and keeps the original inline result, so a spill failure never turns a successful tool call into an error or hides content. If no backend is mounted, there is nothing to save; load `dsh-spill-local` or another backend in the composition.
+`saveText` 只在真实存储故障时拒绝——权限不足、磁盘已满或后端不可用。由调用方决定如何降级：已交付的策略把拒绝当作尽力而为处理，记录警告并保留原始内联结果，因此 spill 失败绝不会把成功的工具调用变成错误或隐藏内容。如果没有挂载后端，就没有可保存的目标；请在组合中加载 `dsh-spill-local` 或其他后端。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the service; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释该服务背后的设计决策；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-The package is built on one separation and a deliberate minimum:
+本包建立在一个分离与刻意的极简之上：
 
-- **Contract, implementation, and policy stay separate.** This package defines what a backend does (`saveText`); `dsh-spill-local` implements it; `dsh-spill-policy` decides when. Each concern evolves and swaps independently.
-- **One method, nothing else.** The seam owns no retention policy, no result replacement, and no retrieval or search API — those have owning packages.
-- **Reject, never silently degrade at the seam.** The caller owns degradation; the seam reports real storage failures.
+- **约定、实现与策略保持分离。** 本包定义后端做什么（`saveText`）；`dsh-spill-local` 实现它；`dsh-spill-policy` 决定何时触发。各项关注点独立演进与替换。
+- **只有一个方法，别无其他。** 该 seam 不负责保留策略、结果替换或取回/搜索 API——那些都有各自的归属包。
+- **在 seam 处拒绝，绝不静默降级。** 降级由调用方负责；seam 报告真实存储故障。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: the abstract `SpillStore` service and its `saveText` contract |
-| [`src/types.ts`](src/types.ts) | Vocabulary: `SaveTextSpill`, `SpillRef`, branded `SpillLocator`, `SpillOwner`, `SpillSource` |
+| [`src/index.ts`](src/index.ts) | 插件入口：抽象 `SpillStore` 服务及其 `saveText` 约定 |
+| [`src/types.ts`](src/types.ts) | 词汇：`SaveTextSpill`、`SpillRef`、带品牌类型 `SpillLocator`、`SpillOwner`、`SpillSource` |
 
-### Data model
+### 数据模型
 
-`SaveTextSpill` separates storage ownership from its source description. `SpillSource` accepts either the tool source `{ kind: "tool", toolName, callId, label }` or `{ kind: "session-reference", sessionId, label }`, whose id names the captured source session. Session references never fabricate tool call ids. Neither the source descriptor nor the owner namespace grants read access. Consumers treat the returned locator as opaque and present it with its retrieval hint.
+`SaveTextSpill` 将存储归属与描述性来源信息分开。`SpillSource` 接受工具来源 `{ kind: "tool", toolName, callId, label }` 或 `{ kind: "session-reference", sessionId, label }`，后者的 id 标识被捕获的源会话。会话引用绝不伪造工具调用 id。来源信息与归属命名空间都不授予读取权限。消费方把返回的定位信息视为不透明值，并与取回指引一同展示。
 
-### Lifecycle
+### 生命周期
 
-A backend subclasses `SpillStore` and loads as a plugin, registering as `ctx.spillStore`; one implementation per context, and a second load fails. Disposal releases the service. The abstract class itself registers nothing — this package contributes the contract and vocabulary only.
+后端继承 `SpillStore` 并以插件方式加载，注册为 `ctx.spillStore`；每个上下文只有一个实现，第二次加载会失败。执行 dispose（资源释放）时会释放该服务。抽象类本身不注册任何内容——本包只提供约定与词汇。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the shared vocabulary to the shipped backend, the policy, and the design rationale.
+当包级约定不够用时阅读以下页面。它们从共享词汇逐步进入已交付后端、策略与设计依据。
 
-- [Spill subsystem](../../../docs/subsystems/spill.md) — the exhaustive vocabulary, ownership, and backend relationships.
-- [Spill package map](../README.md) — the three-package family and each role.
-- [dsh-spill-local](../spill-local/README.md) — the shipped local filesystem backend.
-- [dsh-spill-policy](../spill-policy/README.md) — the policy that decides when a final result is too large.
-- [dsh-output-retention](../../util/output-retention/README.md) — the preview mechanics behind the policy.
-- [Tool output spill decision](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md) — the capability boundary and design rationale.
+- [spill 子系统](../../../docs/subsystems/spill.zh.md)——穷尽式词汇、归属与后端关系。
+- [spill 包映射](../README.zh.md)——三包家族与各自职责。
+- [dsh-spill-local](../spill-local/README.zh.md)——已交付的本地文件系统后端。
+- [dsh-spill-policy](../spill-policy/README.zh.md)——决定最终结果何时过大的策略。
+- [dsh-output-retention](../../util/output-retention/README.zh.md)——策略背后的预览机制。
+- [工具输出 spill 决策](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)——能力边界与设计依据。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through spill consumers, which render the backend's locator and retrieval guidance to the model.
+spill 消费方将后端的定位信息与取回指引渲染给模型，从而间接影响模型体验。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+不会直接导致 KV Cache 失效；请求前缀变更由上述消费方负责。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the spill storage service is incomplete on its own. They are current package constraints.
+这些限制说明 spill 存储服务单独使用时在哪些方面不完整。它们是当前的包约束。
 
-- **No retrieval or deletion API** — consumers can only render the backend's locator and guidance; lifecycle and access semantics remain backend-specific.
-- **Storage is not access control** — the owner session namespaces writes but does not authorize reads of a locator; each backend and retrieval consumer must enforce its own boundary.
+- **没有取回或删除 API**——消费方只能渲染后端的定位信息与指引；生命周期与访问语义仍由后端自行决定。
+- **存储不等于访问控制**——所属会话区分写入命名空间，但不会授权通过定位信息读取内容；每个后端与取回消费方都必须自行强制执行访问边界。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: undecided directions and open questions. It is explicitly non-authoritative.
+本开发备注是维护者的工作上下文：尚未决定的探索方向与开放问题。它明确不具权威性。
 
-#### Future: executor spill-file integration
+#### 未来：执行器 spill 文件集成
 
-The seam has only `saveText`; a save-file or link/copy path for existing executor spill files (for example normalizing bash temp files) and tool-owned spill for subagent rollouts remain deferred, per the [tool output spill decision](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.md).
+该 seam 只有 `saveText`；为既有执行器 spill 文件提供保存文件或链接/复制路径（例如规范化 bash 临时文件），以及为 subagent 展开提供工具自有 spill，仍然延期，见[工具输出 spill 决策](../../../.agents/notes/implemented/architecture/2026-07-08-tool-output-spill-files.zh.md)。
 
-#### Future: non-local backends and cleanup
+#### 未来：非本地后端与清理
 
-Remote or database backends remain open. The local backend applies its [startup-cleanup policy](../spill-local/README.md#startup-cleanup); the service defines no per-session cleanup or locator-refresh API.
+远程或数据库后端仍是开放方向。本地后端执行其[启动清理策略](../spill-local/README.zh.md#startup-cleanup)；该服务未定义按会话清理或刷新定位信息的 API。
 
 </details>

@@ -1,34 +1,34 @@
 ---
-description: "The scoped-registration library for plugin authors and maintainers building registries or event surfaces that isolate contributions per agent or per group."
+description: "面向插件作者与维护者的作用域注册库，用于构建按 agent（智能体）或按分组隔离贡献的注册表或事件接口。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-scope
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-scope` lets plugin authors give each agent or group an isolated contribution set with a shared lifetime. Child scopes inherit ancestor contributions, with the nearest definition taking precedence, while ancestor scopes can observe descendant activity; neither relationship works in reverse. Disposing a scope removes everything owned by it. Use this dependency-free library when per-agent or per-group isolation must work without depending on the agent loop or presets.
+`dsh-scope` 让插件作者能够为每个 agent 或分组提供隔离的贡献集合与统一生命周期。子作用域继承祖先贡献，且较近的定义优先；祖先作用域可以观察后代活动，这两种关系均不反向成立。释放作用域会移除它拥有的一切。按 agent 或分组隔离必须脱离 agent loop（智能体循环）与 preset 工作时，请使用这个零依赖库。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Plugin authors use `dsh-scope` to give one agent (or one group) its own registration world. The registries in the core group build on it — a tool registered through `agent.ctx` is visible only to that agent — and the same primitive serves any custom registry or scope-filtered event.
+插件作者使用 `dsh-scope` 为单个 agent（或单个分组）提供独立的注册世界。core 分组中的注册表都构建在它之上——通过 `agent.ctx` 注册的工具只对该 agent 可见——同样的原语也服务于任何自定义注册表或带作用域的事件。
 
-### Mint a scope
+### 创建作用域
 
-`createScope(ctx, key)` creates a scope under `ctx`'s fiber: its `ctx` carries the scope tag, and everything registered through it is both scope-visible and scope-lifetime. `dispose()` unwinds every registration through the scope; `rawDispose` is the exact Cordis disposer for nesting the teardown in an ordered composite effect.
+`createScope(ctx, key)` 在 `ctx` 的 fiber 下创建作用域：其 `ctx` 携带作用域标签，通过它进行的每项注册既具备作用域可见性，也服从作用域生命周期。`dispose()` 撤销通过该作用域进行的每项注册；`rawDispose` 是确切 Cordis disposer，用于把 teardown 嵌套进有序组合 effect。
 
 ```text
 const scope = createScope(ctx, agent)
@@ -37,74 +37,74 @@ scope.ctx.on('agent/status', ({ agent, status }) => track(agent, status))
 await scope.dispose()   // unwinds every registration made through scope.ctx
 ```
 
-### Route scoped events
+### 路由带作用域的事件
 
-`scopeTarget(base, key)` builds the opaque carrier a scope-filtered event dispatches with. Untagged listeners stay global; a listener tagged with `key` receives events for that key and its descendants. The carrier carries routing state only — the real subject travels in the event arguments.
+`scopeTarget(base, key)` 构造带作用域事件分发所用的不透明载体。无标签监听器保持全局；标签为 `key` 的监听器接收该键及其后代的事件。载体只携带路由状态——真实主体由事件参数携带。
 
-### Build a scoped registry layer
+### 构建带作用域的注册表层
 
-Registry authors use `ScopedLayers`, `NamedEntries`, and `AnonymousEntries` to hold one eager global layer plus lazily created exact-scope layers: reads never create layers, `merge()` materializes insertion-ordered named shadows along the scope chain, and `effect()` derives visibility and ownership from the same context. A scoped layer is reclaimed only when its whole aggregate is empty.
+注册表作者使用 `ScopedLayers`、`NamedEntries` 与 `AnonymousEntries` 持有一个立即构造的全局层加惰性创建的精确作用域层：读取从不创建层，`merge()` 沿作用域链物化按插入序的具名遮蔽，`effect()` 从同一上下文推导可见性与所有权。只有当整个聚合为空时才回收作用域层。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains how the package realizes the behavior above; the observable contract is covered in [Use this package](#use-this-package).
+本节解释该包如何实现上述行为；可观察约定已在[使用本包](#use-this-package)中完整说明。
 
-### Design concept
+### 设计理念
 
-The registration context determines both visibility and ownership: a registration made through a scoped context is visible in that scope and disposed with it, preventing a contribution from being visible in one scope but torn down with another. The primitive routes trusted same-process plugins; it is not a sandbox or an authority boundary. Handing out a scoped context also hands out the minting plugin's service-resolution API (resolution walks the minting fiber's dependency chain), so a scope is minted from the plugin whose dependencies the scoped registrations need.
+注册上下文同时决定可见性与所有权：通过带作用域上下文进行的注册在该作用域内可见、并随其 dispose（资源释放），从而防止贡献在一个作用域中可见、却随另一个作用域拆除。该原语用于路由受信任的同进程插件；它不是沙箱或权限边界。交出带作用域的上下文，也会交出创建该上下文的插件的服务解析范围（解析沿创建者 fiber 的依赖链行进），因此作用域应由具备这些带作用域注册所需依赖的插件来创建。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `createScope`, `scopeOf`, `scopeTarget`, `bindScopeParent`/`scopeParentOf`/`scopeChainOf`, carrier marks |
-| [`src/store.ts`](src/store.ts) | `ScopedLayers`, `NamedEntries`, `AnonymousEntries`, `ScopeLayer` |
+| [`src/index.ts`](src/index.ts) | `createScope`、`scopeOf`、`scopeTarget`、`bindScopeParent`/`scopeParentOf`/`scopeChainOf`、载体标记 |
+| [`src/store.ts`](src/store.ts) | `ScopedLayers`、`NamedEntries`、`AnonymousEntries`、`ScopeLayer` |
 
-### The parent chain
+### 父链
 
-One relation powers both directions: registration views inherit DOWN the chain (a child scope sees its ancestors' layers), while event admission extends UP it (a listener tagged with an ancestor receives events dispatched to a descendant key). Binding is once — a key that already has a parent throws, and only the returned binding may re-link it — and every link rejects a cycle. `scopeChainOf` returns `[key, parent, …]` nearest-first.
+一个关系支撑两个方向：注册视图沿链**向下**继承（子作用域看得见祖先的各层），事件放行沿链**向上**扩展（标签为祖先的监听器收到分发到后代键的事件）。绑定仅此一次——已有父级的键直接抛错，只有返回的绑定句柄才能重新绑定——且每次链接都拒绝闭环。`scopeChainOf` 返回 `[key, parent, …]`，最近者在前。
 
-### Event filtering
+### 事件筛选
 
-`scopeTarget` composes the base's existing `Context.filter` with the scope predicate: an untagged listener is admitted; a tagged listener is admitted iff its tag is the dispatch key or an ancestor of it; `key === undefined` admits untagged listeners only. `{ global: true }` listeners bypass filtering. The `Scoped<T>` brand demands the carrier as the `this` type of a scope-filtered event, so dispatching with a bare subject is a compile error.
+`scopeTarget` 把基对象的现有 `Context.filter` 与作用域谓词组合起来：无标签监听器放行；有标签监听器仅当标签为分发键或其祖先时放行；`key === undefined` 只放行无标签监听器。带 `{ global: true }` 的监听器绕过筛选。`Scoped<T>` brand 要求带作用域事件以载体作为 `this` 类型，因此用裸主体分发会产生编译错误。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-The package-level contract is enough for most consumers; read these when you need the surrounding domain and the design rationale.
+包级约定对大多数消费方已经足够；需要周边领域与设计原理时再阅读以下页面。
 
-- [Scoped registration subsystem](../../../docs/subsystems/scope.md) — the identity, carrier, and layer types.
-- [Agent-scope runtime design reference](../agent-loop/README.md) — how the loop builds per-agent scopes.
-- [Core group map](../README.md) — how the core packages compose.
+- [作用域注册子系统](../../../docs/subsystems/scope.zh.md)——身份、载体与层类型。
+- [agent 作用域运行时设计 reference](../agent-loop/README.zh.md)——循环如何构建按 agent 的作用域。
+- [core 分组地图](../README.zh.md)——core 各包如何组合。
 
 -----
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define when the primitive needs special care. They are current package constraints, not a task backlog.
+这些限制说明该原语何时需要特别留意。它们是当前包约束，不是任务积压。
 
-- **Only scope-aware APIs isolate state** — registries must file by `scopeOf()` and events must dispatch through `scopeTarget()`; an arbitrary Cordis service remains context-global merely because it is called through a scoped context.
-- **A context carries one nearest scope key** — the hierarchy lives in the key-level parent relation, not in context tags; nested scope contexts still shadow to a single tag, and multi-membership policy sets remain unsupported.
-- **Service reachability comes from the scope minter** — handing out `Scope.ctx` also hands out the minting plugin's injected services, so a broader minter cannot later be narrowed by the holder.
+- **只有感知作用域的 API 才会隔离状态**：注册表必须按 `scopeOf()` 归档，事件必须通过 `scopeTarget()` 分发；仅仅通过带作用域的上下文调用任意 Cordis 服务，并不会改变该服务仍为上下文全局这一事实。
+- **一个上下文只携带一个最近的作用域键**：层级关系存在于键级父关系中而非上下文标签里；嵌套作用域上下文仍遮蔽为单一标签，多成员策略集仍不受支持。
+- **服务可达性来自作用域创建者**：交出 `Scope.ctx` 也会交出创建插件注入的服务范围，因此，若作用域创建者提供的服务范围较宽，持有者之后也无法将其收窄。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

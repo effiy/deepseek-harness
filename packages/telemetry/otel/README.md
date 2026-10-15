@@ -1,70 +1,70 @@
 ---
-description: "Create independent OTLP reporting channels through the shared Cordis OTel service."
+description: "通过共享 Cordis OTel 服务创建独立的 OTLP 上报通道。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-otel
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Mount one `otel` service to create ordinary-event and Session-log reporting channels. Each channel has its own exporter, resource, instrumentation scope, and queue. Mounting alone creates no transport or identity and sends nothing. Business consumers own authorization, redaction, field selection, and their channel's disposal.
+挂载一个 `otel` 服务即可创建普通事件和 Session 日志上报通道。每个通道拥有独立的 exporter、resource、instrumentation scope 和队列。仅挂载不会创建传输、身份或发送数据。业务调用方负责授权、脱敏、字段选择及通道销毁。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-The base bundle mounts `@deepseek-ai/dsh-otel`. Independent compositions must mount it before consumers that inject `otel`. Call `ctx.otel.createEventReporter(options)` for ordinary analytics or `ctx.otel.createSessionLogReporter(options)` for complete Session events. Options explicitly supply endpoint, scope, resource attributes, queue settings, and a diagnostic callback; the service has no deployment defaults or automatic collection policy of its own.
+base bundle 挂载 `@deepseek-ai/dsh-otel`。独立组合必须在注入 `otel` 的调用方之前挂载它。普通埋点调用 `ctx.otel.createEventReporter(options)`，完整 Session 事件调用 `ctx.otel.createSessionLogReporter(options)`。选项显式提供 endpoint、scope、resource attributes、队列设置和诊断回调；服务本身没有部署默认值或自动采集策略。
 
-The returned channel belongs to the consumer. Ordinary-event `shutdown(signal)` cancels requests and retry waits when the supplied signal aborts, and resolves after transport cleanup. Register shutdown with the consumer's Cordis fiber and bound the complete drain with its configured deadline. Injection makes service replacement unload dependent consumers. Do not retain a channel after its consumer unloads. The product and Session adapters implement this ownership for UI and feedback callers.
+返回的通道由调用方持有。普通事件 `shutdown(signal)` 在传入信号中止时取消请求和重试等待，并在传输清理完成后返回。将关闭注册到调用方的 Cordis fiber，并用配置的期限约束完整清空过程。注入机制使服务替换时卸载依赖方。调用方卸载后不得继续保留通道。产品和 Session 适配器为 UI 和反馈调用方实现这些职责。
 
-Ordinary channels use SDK count-based batching. Session channels preserve one complete event per record with `eventName: "session-log"`, `sessionId`, and a JSON string `content`, and enforce at most 4,000,000 uncompressed request bytes. Their byte limits, single-record rejection, serial transport settlement, and shutdown behavior are specified by the [Session adapter](../../session/session-telemetry-otel/README.md). A Session channel never shares a request or queue with ordinary events.
+普通通道使用 SDK 按条数聚合。Session 通道将每条完整事件保留为一个记录，包含 `eventName: "session-log"`、`sessionId` 和 JSON 字符串 `content`，并保证未压缩请求不超过 4,000,000 字节。字节限制、单条拒绝、串行传输结束和关闭行为见 [Session 适配器](../../session/session-telemetry-otel/README.zh.md)。Session 通道不会与普通事件共享请求或队列。
 
-Headers are explicit. The service does not add a channel header or inherit ambient authorization headers or TLS identity. Agent factories configure their returned agents, including keepAlive. Ordinary-event channels destroy their agent on shutdown; factories must provide a dedicated agent for each channel. Scope names and versions are supplied by each consumer, so transport sharing does not change event attribution.
+Header 显式提供。服务不会附加 channel header，也不继承环境中的授权 header 或 TLS 身份。Agent factory 配置返回的 agent，包括 keepAlive。普通事件通道在关闭时销毁自己的 agent；factory 必须为每个通道提供独立 agent。每个调用方提供 scope 名称和版本，因此共享传输不会改变事件归属。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
-`src/index.ts` registers the service; `event-log.ts` owns ordinary SDK batching; `session-log.ts` owns byte/count scheduling; `transport.ts` supplies the Session SDK JSON HTTP delegate and owns the shared exporter metrics recorder, which receives no meter provider and records nothing; `event-transport.ts` uses Got for cancellable ordinary-event HTTP requests and retry waits with SDK serialization and export accounting. No global OTel provider is installed; the accepted exporter options exclude the upstream `selfObsMeterProvider`, and the Session processor accepts only the batching fields it implements, so exporter and Session-processor self-observability metrics stay unrecorded. The Session processor measures each record once, groups conservative sizes, and waits for the SDK concurrency queue to clear after every callback before sending another request.
+`src/index.ts` 注册服务；`event-log.ts` 负责普通事件的 SDK 聚合；`session-log.ts` 负责字节和条数调度；`transport.ts` 提供 Session 的 SDK JSON HTTP delegate，并持有共享的 exporter 指标记录器（不接收 meter provider，不记录任何指标）；`event-transport.ts` 使用 Got 实现可取消的普通事件 HTTP 请求和重试等待，序列化与导出计数仍由 SDK 负责。不安装全局 OTel provider；接受的 exporter 选项排除上游的 `selfObsMeterProvider`，Session processor 也只接受它实现的聚合字段，因此 exporter 和 Session processor 的自观测指标都不会被记录。Session processor 对每条记录只计量一次，按保守大小组包，并在每次回调后等待 SDK 并发队列清理完成才发送下一请求。
 
-Composition tests exercise independent channels and service removal; adapter tests cover dependent-fiber cleanup and feedback authorization.
+组合测试覆盖独立通道和服务移除；适配器测试覆盖依赖 fiber 清理与反馈授权。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [OTel subsystem](../../../docs/subsystems/otel.md) — service ownership and API.
-- [Product adapter](../../host/product-telemetry-otel/README.md) — explicit analytics policy and configuration.
-- [Session adapter](../../session/session-telemetry-otel/README.md) — feedback authorization and configured upload limits.
+- [OTel 子系统](../../../docs/subsystems/otel.zh.md) — 服务职责与 API。
+- [产品适配器](../../host/product-telemetry-otel/README.zh.md) — 显式埋点策略与配置。
+- [Session 适配器](../../session/session-telemetry-otel/README.zh.md) — 反馈授权和上传限制配置。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the service delivers caller-selected records without changing model context.
+无，因为服务只投递调用方选择的记录，不改变模型上下文。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; reporting does not change model requests.
+无；上报不改变模型请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-Channels provide best-effort, memory-only delivery with the following limits.
+通道提供尽力而为的纯内存投递，具有以下限制。
 
-- The caller owns consent, redaction, resource identity, renderer-to-host RPC, and the outer shutdown deadline.
-- Queue overflow, oversized Session events, transport failure, and process exit can lose records. There is no durable outbox or warehouse acknowledgement.
-- Ordinary-event channels batch by count; their consumers must select event and batch sizes suitable for the collector.
+- 调用方负责同意、脱敏、resource 身份、renderer 到 host 的 RPC 及外层关闭期限。
+- 队列溢出、Session 事件超限、传输失败和进程退出可能丢失记录。不提供持久 outbox 或仓库确认。
+- 普通事件通道按条数聚合；调用方必须选择适合 collector 的事件和批次大小。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
-None.
+无。

@@ -1,31 +1,31 @@
 ---
-description: "Read the Session’s current directory or enter an existing directory with the same tool. Relative changes use the current directory. The returned absolute path can be passed to other tools."
+description: "使用同一工具读取 Session 的当前目录，或进入一个现有目录。相对路径变更基于当前目录解析。返回的绝对路径可传给其他工具。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-working-directory
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Read the Session’s current directory or enter an existing directory with the same tool. Relative changes use the current directory. The returned absolute path can be passed to other tools.
+使用同一工具读取 Session 的当前目录，或进入一个现有目录。相对路径变更基于当前目录解析。返回的绝对路径可传给其他工具。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用此包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用此包
 
-Mount alongside `tools` and `workingDirectory`. Call `working_directory({})` to read or `working_directory({ cd: "src" })` to change directory. The tool has no configuration fields.
+与 `tools` 和 `workingDirectory` 一起挂载。调用 `working_directory({})` 读取目录，或调用 `working_directory({ cd: "src" })` 改变目录。此工具没有配置字段。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-working-directory'
@@ -34,57 +34,57 @@ Mount alongside `tools` and `workingDirectory`. Call `working_directory({})` to 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节 — 点击展开</summary>
 
-The tool delegates validation, recovery, persistence, and context notices to the directory owner. Its canonical result contains `cwd`; native rendering returns that path. The generic tool card displays the arguments and result without a separate GUI renderer.
+此工具将验证、恢复、持久化和上下文通知委托给目录服务。规范结果包含 `cwd`；原生渲染返回该路径。通用工具卡展示参数和结果，无需独立 GUI 渲染器。
 
-No runtime invariant companion is published because the tool delegates all directory state and mutations to `workingDirectory`.
+不发布 `./invariant` 伴生模块，因为工具将全部目录状态和变更委托给 `workingDirectory`。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步阅读
 
-- [Working directories](../../../docs/subsystems/working-directory.md) — shared runtime behavior.
-- [Session group](../README.md) — durable Session services.
-- [Testing](../../../docs/testing.md) — composition and replay verification.
+- [工作目录](../../../docs/subsystems/working-directory.zh.md) — 共享运行时行为。
+- [Session 包组](../README.zh.md) — 持久化 Session 服务。
+- [测试](../../../docs/testing.zh.md) — 组合与回放验证。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Tool schema and result
+### 工具 schema 与结果
 
-#### What the model sees
+#### 模型可见内容
 
-The [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-working-directory) defines the optional `cd` argument and canonical `cwd` result. Directory notices are owned by `dsh-working-directory`.
+[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-working-directory) 定义可选的 `cd` 参数与规范 `cwd` 结果。目录通知由 `dsh-working-directory` 拥有。
 
-#### Token effect
+#### Token 影响
 
-The registered schema and returned path contribute tokens when the tool is available and invoked.
+工具可用及被调用时，注册的 schema 和返回路径贡献 token。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Changing tool availability changes its schema context. A tool call appends ordinary call and result history without replacing prior messages.
+改变工具可用性会改变其 schema 上下文。工具调用追加普通调用和结果历史，不替换已有消息。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Calling Session required** — the tool requires an Agent and changes neither existing processes nor write permissions.
+- **需要调用方 Session** — 此工具需要 Agent，不改变已有进程或写权限。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护工作上下文 — 点击展开</summary>
 
-None.
+无。
 
 </details>

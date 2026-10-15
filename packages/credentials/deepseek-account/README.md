@@ -1,77 +1,77 @@
 ---
-description: "Account consumers read stored login state, start or cancel a browser login, and sign out without editing API keys. Host model consumers resolve account credentials only for the provider-configured inference origin."
+description: "账号使用方可读取本地登录状态、发起或取消浏览器登录，并在保留 API Key 的情况下退出。Host 模型使用方仅能为提供者配置的推理来源解析账号凭证。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-deepseek-account
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-getPlatformSession returns a Host-only origin/token snapshot for native Platform embedding, or null when signed out. Its userId repeats the stable account ID from the most recent successful getProfile, and is null until one succeeds or when that profile holds no ID. The snapshot reuses that ID without issuing a profile request, so an unknown ID leaves userId null instead of delaying the caller; a profile read whose stable ID first becomes available or changes notifies watch subscribers, which lets identity consumers re-read the snapshot. Consumers key persistent browser preference storage by origin and userId and use temporary storage while userId is null. It is absent from account-controller RPC and Client state. Consumers destroy documents holding a snapshot when the account changes. The snapshot carries deployment request headers only; the embedding client composes the Platform client identity of its own UI.
+getPlatformSession 为原生 Platform 内嵌提供仅限 Host 的 origin/token 快照，退登时返回 null。其 userId 复制最近一次成功 getProfile 得到的稳定账号 ID；尚无一次成功读取或资料不含 ID 时为 null。快照复用该 ID，不自行发起资料请求，因此 ID 未知时只会让 userId 为 null，而不会延迟调用方；资料读取首次取得稳定 ID 或该 ID 变化时会通知 watch 订阅者，供标识使用方重新读取快照。使用方以 origin 和 userId 作为持久化浏览器偏好存储的键，userId 为 null 时改用临时存储。账号控制器 RPC 和 Client 状态不包含此方法及快照。账号变化时，使用方销毁持有旧快照的文档。快照只携带部署请求头；Platform 客户端身份由发起请求的内嵌客户端自行组装。
 
-`platformClientHeaders` builds the five Platform client headers for one call from its `AccountClientMetadata` and the composition's desktop platform: `x-client-bundle-id` is intentionally empty, `x-client-platform` is `web` unless the Desktop profile supplies `darwin` or `win32`, `x-client-version` is the calling build's version, `x-client-locale` reduces the active UI language to `zh_CN` or `en_US` through the exported `platformWireLocale`, and `x-client-timezone-offset` is whole seconds east of UTC. A consumer whose request body carries that same wire locale reuses `platformWireLocale` so the header and body cannot disagree.
+`platformClientHeaders` 依据单次调用的 `AccountClientMetadata` 与组合出的桌面平台生成五个 Platform 客户端请求头：`x-client-bundle-id` 有意保持为空字符串，`x-client-platform` 在没有 Desktop profile 提供 `darwin` 或 `win32` 时为 `web`，`x-client-version` 为调用方构建的版本，`x-client-locale` 通过导出的 `platformWireLocale` 将当前界面语言归约为 `zh_CN` 或 `en_US`，`x-client-timezone-offset` 为东为正的整秒偏移。请求正文需要同一个线上语言值时，消费方复用 `platformWireLocale`，使请求头与正文不会不一致。
 
-getUnnotifiedBonuses returns the granted bonuses Platform has not yet recorded as displayed, together with the account they belong to; ackBonusNotified records one bonus the user actually saw. The acknowledgement names that account, so a notification read under one account is never confirmed for another.
+getUnnotifiedBonuses 返回平台尚未记录为已展示的赠金及其所属账号；ackBonusNotified 记录用户实际看到的那一笔赠金。确认请求携带该账号，因此在一个账号下读取的通知绝不会被确认到另一个账号。
 
-`rejectToken` accepts a Host inference request’s rejected token and removes only the matching current login; a late rejection cannot clear a replacement credential.
+`rejectToken` 接收 Host 推理请求被拒绝的 token，仅删除与它匹配的当前登录凭据；延迟返回的拒绝不能清除替换后的凭据。
 
-`deepseek-account/session-expired` notifies current subscribers once after a rejected credential is removed. Account snapshots carry no expiry notice, so reconnecting does not repeat the toast.
+`deepseek-account/session-expired` 在移除被拒绝的凭据后，向当前订阅方通知一次。账号快照不携带失效提示，因此重新连接不会重复弹出 toast。
 
-## Summary
+## 概述
 
-Account consumers read stored login state, start or cancel a browser login, and sign out without editing API keys. Host model consumers resolve account credentials only for the provider-configured inference origin.
+账号使用方可读取本地登录状态、发起或取消浏览器登录，并在保留 API Key 的情况下退出。Host 模型使用方仅能为提供者配置的推理来源解析账号凭证。
 
-`SignInErrorCode` distinguishes `no-response` (fetch returned no Response) from HTTP and response-validation failures so clients can offer network troubleshooting.
+`SignInErrorCode` 将 `no-response`（fetch 未返回 Response）与 HTTP 和响应校验失败区分开，使客户端可以提示检查网络。
 
-`getDeviceIdentity()` returns existing device and account IDs plus the login OS version string, without credentials or device creation.
+`getDeviceIdentity()` 返回已有设备和账户 ID 以及登录使用的操作系统版本字符串，不返回凭据，也不创建设备标识。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [使用此包](#use-this-package)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用此包
 
-`AccountProfile.avatarUrl` is an optional profile image URL; null or absence means no avatar.
+本地成功退出登录后发出 `deepseek-account/signed-out`。Platform 提供方安装账号模块的取消监听器，根据运行中 Agent 的 `session.requestContext().provider` 判断账号任务，取消时保留收件箱。账号控制器的确认弹窗复用同一判断，不维护额外 Agent 状态。新轮次绑定首请求前，该判断仍读取上一轮的提供方。
 
-Successful local sign-out emits `deepseek-account/signed-out`. The platform provider installs the account-owned cancellation listener, which checks running Agents against `session.requestContext().provider` and cancels account tasks while retaining inboxes. The account controller uses the same predicate for its confirmation dialog. No additional Agent state is maintained. Before a new turn binds its first request, this predicate still sees the previous turn’s provider.
+`AccountProfile.avatarUrl` 是可选的账号头像 URL；为空或缺失时表示没有头像。
 
-The service defines account operations and reconnectable state snapshots. The platform provider owns the protocol and stored grant. Credentials are Host-only; the API controller exports state and commands without resolveToken.
+该服务定义账号操作和可重连的状态快照。平台提供者负责协议和授权记录。凭证仅限 Host；API 控制器只导出状态与操作，不导出 resolveToken。
 
-Account model failures with `ACCOUNT_SIGN_IN_REQUIRED` emit `deepseek-account/model-sign-in-required`; the Client receives this live event for sign-in guidance. Other request errors do not emit it.
+账号模型请求以 `ACCOUNT_SIGN_IN_REQUIRED` 失败时，发出 `deepseek-account/model-sign-in-required`，Client 接收该实时事件以提示登录。其他请求错误不触发此事件。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
-The service defines account operations without maintaining a second credential index. The provider owns persistence and login lifecycle checks.
+服务只定义账号操作，不维护第二份凭证索引。提供者负责持久化和登录生命周期检查。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 深入探索
 
-The [credentials subsystem](../../../docs/subsystems/credentials.md) owns storage APIs; the [architecture](../../../docs/architecture.md) explains application composition.
+[凭证子系统](../../../docs/subsystems/credentials.zh.md)定义存储接口；[架构](../../../docs/architecture.zh.md)说明应用组合。
 
-A ready AccountDetails.balance keeps recharge wallets in value and bonus wallets in bonusWallets; both arrays preserve decimal strings and currency. Query failure supplies neither amount.
+AccountDetails.balance 就绪时，value 保存充值钱包，bonusWallets 保存赠送钱包；两个数组均保留十进制金额字符串和币种。查询失败不提供金额。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as account credentials affect HTTP authentication and never enter model prompts, Session logs, or tool results.
+无，因为账号凭证只影响 HTTP 认证，不进入模型提示、Session 日志或工具结果。
 
 #### KV Cache effect
 
-No model request prefix changes.
+不改变模型请求前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Account tokens have no expiry or refresh flow. Sign-out removes the local grant before background provider revocation; remote logout failures never restore local login. Profile and balance query failures retain the stored grant. getProfile / getBalance reports profile and balance query outcomes independently.
+- 账号 token 没有过期或刷新流程。退出时先移除本地授权，再由提供者在后台撤销；远程退登失败不会恢复本地登录态。资料和余额查询失败保留已存储授权。getProfile / getBalance 分别报告资料和余额的查询结果。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
-The [desktop login decision](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md) records cancellation and storage ownership.
+[桌面登录决策](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.zh.md)记录取消和存储的职责。
 
-PlatformSession may carry Host-only requestHeaders from Host to Electron main: deployment headers only, because the embedded document's client identity is composed where its locale, timezone and version are known. Consumers must exclude those headers from renderer bootstrap and restrict them to the configured origin. userId is Host-only on the same terms and never enters renderer bootstrap. mergePlatformCookies preserves unrelated cookie pairs while replacing matching names.
+PlatformSession 可将仅限 Host 的 requestHeaders 从 Host 传至 Electron 主进程，其中只有部署请求头，因为内嵌文档的客户端身份在其语言、时区和版本可知处组装。消费者必须从渲染层 bootstrap 排除这些请求头，并将其限定于配置来源。userId 同样仅限 Host，绝不进入渲染层 bootstrap。mergePlatformCookies 替换同名 Cookie，同时保留其他 Cookie。

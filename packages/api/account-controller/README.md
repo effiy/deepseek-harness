@@ -1,59 +1,59 @@
 ---
-description: "Account screens use authenticated Remote commands and a snapshot stream. The controller exposes login state without returning tokens or PKCE secrets."
+description: "账号页面使用经过认证的 Remote 操作和快照流。控制器提供登录状态，不返回 token 或 PKCE 私密数据。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-api-account-controller
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Account screens use authenticated Remote commands and a snapshot stream. The controller exposes login state without returning tokens or PKCE secrets.
+账号页面使用经过认证的 Remote 操作和快照流。控制器提供登录状态，不返回 token 或 PKCE 私密数据。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [使用此包](#use-this-package)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用此包
 
-The account namespace exposes getState, getProfile / getBalance, getUnnotifiedBonuses, ackBonusNotified, startSignIn, cancelSignIn, signOut, and watch. watch emits an initial complete state and subsequent complete states; disconnecting stops observation, not the login attempt. Cancellation names the attempt ID so a stale screen cannot cancel a newer login. getUnnotifiedBonuses returns null and ackBonusNotified returns false while the account is absent or has changed; failures the caller should retry arrive as thrown Remote errors.
+account 命名空间提供 getState、getProfile / getBalance、getUnnotifiedBonuses、ackBonusNotified、startSignIn、cancelSignIn、signOut 和 watch。watch 先发送完整初始状态，随后发送完整状态变化；断开连接只停止观察，不取消登录。取消操作必须指定尝试 ID，防止旧页面取消新登录。账号缺失或已切换时 getUnnotifiedBonuses 返回 null、ackBonusNotified 返回 false；需要调用方重试的失败以抛出的 Remote 错误返回。
 
-Every operation that reaches Platform takes the calling UI's `AccountClientMetadata` — client version, active language, and UTC offset in seconds — so the Host reports the requesting UI rather than the last caller it saw. Cancellation and watch remain identity-free because they never reach Platform.
+到达 Platform 的每个操作都接收调用界面的 `AccountClientMetadata`——客户端版本、当前语言和以秒为单位的 UTC 偏移——因此 Host 报告的是发起请求的界面，而不是它上一次见到的调用方。取消和 watch 不接该参数，因为它们不会到达 Platform。
 
-`watchExpiry` delivers live credential-expiry notifications without an initial item or replay. Desktop uses this stream to hand off a one-shot toast when switching to Welcome.
+`watchExpiry` 仅发送实时凭据失效通知，不发送初始值，也不重放历史通知。桌面端通过该流，在切换到 Welcome 时交接一次性 toast。
 
-`hasRunningAccountTasks` checks running Agents through the account-owned predicate over their latest logged request context, including tools and retries. Idle Agents and API-key contexts are excluded. The account provider independently cancels matching tasks when credentials are removed.
+`hasRunningAccountTasks` 通过账号模块的判断函数，检查运行中 Agent 最近记录的请求上下文，包括工具和重试阶段。空闲 Agent 及 API key 上下文不计入。移除凭据时，账号提供方独立取消匹配任务。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
-The controller forwards operations to the account service and maintains no independent account state.
+控制器向账号服务转发操作，不维护独立的账号状态。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 深入探索
 
-The [credentials subsystem](../../../docs/subsystems/credentials.md) owns storage APIs; the [architecture](../../../docs/architecture.md) explains application composition.
+[凭证子系统](../../../docs/subsystems/credentials.zh.md)定义存储接口；[架构](../../../docs/architecture.zh.md)说明应用组合。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as account credentials affect HTTP authentication and never enter model prompts, Session logs, or tool results.
+无，因为账号凭证只影响 HTTP 认证，不进入模型提示、Session 日志或工具结果。
 
 #### KV Cache effect
 
-No model request prefix changes.
+不改变模型请求前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- A disconnected UI can recover account state through watch, but cannot resume an attempt after the Host exits. Credentials and request-token resolution are not Remote operations.
+- UI 断线后可通过 watch 恢复状态，但不能在 Host 退出后恢复登录尝试。凭证和请求 token 解析不对 Remote 暴露。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
-The [desktop login decision](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.md) records cancellation and storage ownership.
+[桌面登录决策](../../../.agents/notes/implemented/architecture/2026-09-14-deepseek-account-login.zh.md)记录取消和存储的职责。

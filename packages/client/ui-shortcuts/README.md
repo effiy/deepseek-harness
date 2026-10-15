@@ -1,87 +1,87 @@
 ---
-description: "Browse the commands available in the current window and find them by action, English alias, or key"
+description: "查看当前窗口可用的命令，按操作名称、英文别名或键位搜索"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-shortcuts
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Browse the commands available in the current window and find them by action, English alias, or key. Open the reference from General Settings or Mod+/. Record, clear, or restore application bindings; fixed input actions remain read-only.
+查看当前窗口可用的命令，按操作名称、英文别名或键位搜索。从通用设置或 Mod+/ 打开速查。录制、清除或恢复应用快捷键；固定输入操作保持只读。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用此包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用此包
 
-The Web app bundle mounts this package together with `shortcuts`. The reference shows only registered commands and existing fixed input actions. Desktop shows the effective device keys; commands without a Web default show No shortcut. The Settings entry and Mod+/ open the same single dialog, titled “Keyboard shortcuts” in English and “快捷键” in Chinese. Its 480×600 CSS-pixel card shrinks to fit smaller windows; the header and search remain above an internally scrolling list. The search field receives focus on open without changing its border color. Automatic entry and return focus in the reference, recorder, and reset confirmation omit outlines, including returns after Escape and application close shortcuts. Containers remain outline-free, and Tab and directional navigation retain their visible focus indicators. The Settings entry follows Coding Tools and is labeled “Edit shortcuts”, with an “Open from anywhere” shortcut tooltip, and uses a filled button with the same standard radius as adjacent settings controls and no dropdown icon and reads the same effective binding for its tooltip and `aria-keyshortcuts`; both are absent without a binding.
+Web 应用 bundle 将此包与 `shortcuts` 一同挂载。速查仅展示已注册命令和现有固定输入操作。桌面端展示设备对应的有效键位；没有 Web 默认键位的命令显示“暂无快捷键”。设置入口与 Mod+/打开同一个单实例弹窗，中文标题为“快捷键”，英文标题为“Keyboard shortcuts”。卡片尺寸为 480×600 CSS 像素，小窗口中缩小以保持可见；标题和搜索框位于内部滚动列表上方。打开时聚焦搜索框，边框颜色保持不变。速查窗、录键框及重置确认框内的自动进入和回焦均不绘制外轮廓线，包括通过 Esc 和应用关闭快捷键触发的回焦。容器仍不绘制焦点外框，Tab 和方向键导航保留可见焦点提示。设置入口位于代码工作工具之后，标为“编辑快捷键”，快捷键提示文案为“全局唤起查看”，使用与相邻设置控件一致的标准圆角填充按钮，不带下拉图标，并从同一有效绑定读取提示及 `aria-keyshortcuts`；没有绑定时不显示提示，也不设置该属性。
 
-`Mod+/` opens the reference when no modal is open or Settings is in front, and closes it when the reference is in front. While the reference is in front, the Settings command cannot open or close Settings. Held-key repeats are ignored. Recording, pending writes, and a nested confirmation prevent the reference shortcut from closing the dialog.
+没有模态弹窗或设置位于最前方时，`Mod+/` 打开速查；速查位于最前方时，该快捷键关闭速查。速查位于前方时，设置命令不能打开或关闭设置。长按产生的重复按键不执行操作。录键期间、写入尚未完成或嵌套确认框打开时，速查快捷键不会关闭弹窗。
 
-Core actions follow a fixed product order, independent of plugin registration, unloading, or remounting. Stopping the current response ends the Message input group and remains read-only. Extension commands outside that order follow the core actions in stable command ID order; other fixed actions retain their groups.
+核心操作采用固定产品顺序，不受插件注册、卸载或重新挂载影响。停止当前回复位于“消息输入”分组末尾，仍为只读项。未列入该顺序的扩展命令在核心操作之后按命令 ID 稳定排列；其余固定操作保留原有分组。
 
-Search matches an ordered subsequence within one label, English alias, or key combination, ignoring case. Each matching command appears once. Search relevance takes precedence; equal matches retain the display order. Application and fixed-action rows remain 42 CSS pixels high during normal display and recording; long command names are truncated. Application rows show command names and binding controls without availability subtitles or reason tooltips, including conflicting and invalid bindings. Commands that cannot execute remain silent. Both platforms show each editable row’s complete key combination in one settings-control grey block with secondary ink. Fixed actions use unboxed tertiary text, cannot enter recording, and do not highlight on hover. Group titles align with command labels.
+搜索在单个操作名称、英文别名或按键组合内按字符顺序模糊匹配，忽略大小写。每个命中命令只出现一次。搜索时优先按相关性排序，同分项保留展示顺序。正常显示和录制时，应用操作行和固定操作行均保持 42 CSS 像素高；过长的命令名称会被截断。应用命令行只显示名称和改键控件，不显示可用性副标题或原因悬浮提示，冲突和无效绑定也不例外。无法执行的命令静默结束。两个平台均将可编辑行的完整快捷键放在同一个设置控件灰色色块中，使用次级文字色。固定操作使用无背景的三级文字色，不能进入录键，悬停时不高亮。分组标题与命令名称左对齐。
 
-Hover an application row to highlight its rounded surface and reveal the edit icon; keyboard focus also reveals the icon. Clicking anywhere on the row starts its inline recorder. Unbound commands omit the inline Remove action. Windows and macOS Desktop record one or two overlapping non-modifier keys with optional modifiers; a third key rejects the draft. Releasing the first key saves the current combination, so sequential A then B records only A. Saving rejects combinations occupied by editable or fixed actions, including overlapping single-key and two-key bindings. The dialog close control exits recording. The recorder keeps the same height as key badges and uses a neutral grey border with secondary text. Other environments retain Escape cancellation and Tab navigation. Saving and cancellation return focus to the dialog. Clicking blank dialog space outside the inline editor closes it and discards any held combination; clicking its status text preserves the draft. macOS Web can record Option+Command+N reported as a dead key; composition and ordinary accent input remain protected. Remove clears the binding; Restore Default removes only that command’s override. System toasts announce successful writes and failures; a rejected combination marks the recorder with an error border. Release its non-modifier keys to record another combination without clicking; modifiers may remain held. Repeated identical errors leave a visible toast and its dismissal time unchanged; different errors and successful writes replace it immediately. An error can appear again after dismissal. Failed writes retain recorder focus and the draft for Retry Save or another recording. Configuration or command-catalog changes require review before a draft can be retried. Read failures disable editing and identify the active bindings and affected document in a system toast: Web uses the current origin’s localStorage entry `dsh.keybindings.v1`; Desktop uses `userData/keybindings.json`. Back up and repair damaged data before reloading the page or restarting Harness; upgrade Harness for a document written by a newer version. Restore All never overwrites unreadable data. The footer shows Restore All Defaults and the current runtime/platform’s override count, including removed bindings and commands that are not currently mounted. Search does not change the count. At zero overrides, the count is hidden and the action is disabled. Its confirmation initially focuses Cancel; cancellation returns focus to Restore All Defaults, including when opened from the recorder. Confirming restores only this profile. A stale revision closes the confirmation and requires another confirmation against the latest configuration; a failed write retains the accepted bindings and allows retry.
+悬停应用操作行时，整行显示圆角高亮并露出编辑图标；键盘聚焦也会显示该图标。点击行内任意位置进入行内录键。未绑定的命令不显示行内“移除”按钮。Windows 和 macOS Desktop 可录制一至两个按住时间重叠的非修饰键，可搭配修饰键；第三个键会使草稿被拒绝。释放第一个键即保存当前组合，因此先后按 A、B 只录入 A。保存会拒绝被可编辑或固定操作占用的组合，包括相互重叠的单键与双键绑定。弹窗关闭控件可退出录制。录制框与键位标签保持相同高度，使用中性灰边框与次级文字色。其他环境保留 Escape 取消和 Tab 导航。保存及取消后焦点返回弹窗。点击行内编辑区外的弹窗空白处会关闭编辑区，并丢弃尚未释放的组合；点击编辑区内的状态文字会保留草稿。macOS Web 可录制被报告为 dead key 的 Option+Command+N；输入法组合和普通重音输入仍受保护。移除清空绑定，恢复默认只删除该命令的覆盖。系统提示反馈保存成功和失败；组合被拒绝时，录键框显示错误边框。松开非修饰键后即可直接录入新组合，无需再次点击，修饰键可继续按住。同一错误重复发生时沿用仍在显示的提示及其消失时间；不同错误和保存成功立即替换提示。提示消失后，同类错误可再次显示。写入失败保留录键框焦点和草稿，可重试保存或直接录入新组合。配置或命令目录变化后，需要核对最新配置才能重试草稿。读取失败时禁用编辑，并通过系统提示说明当前使用的键位及受影响的配置位置：Web 使用当前来源的 localStorage 项 `dsh.keybindings.v1`；Desktop 使用 `userData/keybindings.json`。内容损坏时先备份并修复配置，再刷新页面或重新启动 Harness；配置由更新版本写入时应升级 Harness。“恢复全部默认”不会覆盖无法读取的数据。底部显示“恢复全部默认”和当前运行环境及平台的自定义项数，包括已移除的绑定和当前未挂载的命令。搜索不影响计数。没有自定义项时隐藏计数，并禁用该操作。确认框默认聚焦“取消”；取消后焦点返回“恢复全部默认”，从录制框打开确认时也如此。确认后仅恢复当前配置分组。配置版本过期时关闭确认框，需要针对最新配置重新确认；写入失败保留已接受的绑定，允许重试。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The General Settings entry and shell overlay share one declared interaction store. Catalog and configuration updates arrive through injected observable hooks; recording and persistence use injected service callbacks. The shared modal primitive owns top-layer Escape, Tab traversal, and restoration to the invoking control.
+通用设置入口与 shell 弹层共享一个已声明的交互 store。目录与配置通过注入的 observable hook 更新；录键和持久化使用注入的服务回调。共用模态组件负责顶层 Esc、Tab 导航和关闭后恢复触发控件焦点。
 
-All fixed actions come from the service's observable fixed catalog. Conversation and approval plugins contribute their own actions; this integration contributes shared menu actions. Rows follow locale updates and disappear when their registration is disposed.
+所有固定操作均来自服务的可观察固定目录。Conversation 和审批插件贡献各自的操作；本集成贡献共用菜单操作。行内容跟随语言更新，并在其注册被释放时移除。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步阅读
 
-- [Web Client](../../../docs/subsystems/web-client.md)
-- [UI primitives](../ui-primitives/README.md)
-- [Web app bundle](../../bundle/web-app/README.md)
+- [Web Client](../../../docs/subsystems/web-client.zh.md)
+- [UI primitives](../ui-primitives/README.zh.md)
+- [Web app bundle](../../bundle/web-app/README.zh.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+无；此包是浏览器侧 UI 插件，不注册面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；此包不组装或发送模型提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Loading or unloading command owners invalidates an open recording draft even when saved overrides are unchanged; review the current bindings before retrying.
-- Key recording uses physical positions with US-layout key names. Browser combinations are limited by the [shortcut service](../shortcuts/README.md). Only mounted feature owners contribute approval and double-Escape stop rows.
+- 加载或卸载命令 owner 会使打开的录键草稿失效，即使已保存的覆盖没有变化；重试前需核对当前键位。
+- 录键使用物理位置和美式键盘名称。浏览器组合受[快捷键服务](../shortcuts/README.zh.md)限制。审批和双 Esc 停止行只由已挂载的功能 owner 贡献。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,145 +1,145 @@
 ---
-description: "Browser half of dynamic Cordis packages for users and maintainers choosing, composing, or debugging how a page answers run requests and loads browser-half code."
+description: "动态 Cordis 包的浏览器半说明，供选择、组合或排查页面如何应答运行请求并装载浏览器半代码的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-cordis-client-runner
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-cordis-client-runner` runs the browser half of process-local dynamic packages for programmatic callers and existing browser controls. It loads a definition after an approved request or explicit user gesture, and removes it when the Host retracts the run. Page refresh does not restore definitions. Creator UI plugins use installed Client modules through Plugin Manager.
+`dsh-cordis-client-runner` 为程序调用方和现有浏览器控件运行进程内动态包的浏览器部分。它在请求获批或用户显式操作后加载定义，并在 Host 撤销运行时移除定义。页面刷新不会恢复定义。Creator UI 插件通过 Plugin Manager 使用已安装的 Client 模块。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this plugin in a web client whose composition also mounts the host runner — the host half runs in the process, this browser half in the page. When a dynamic package that has a browser half is run, the open pages receive a run request; this package carries out the load on this page, and the UI package (`ui-cordis`) renders the panel and cards a person uses to answer it. Host-only packages need no browser half and therefore no page: the host runs them itself.
+在组合里同时挂载了 host runner 的 web 客户端中挂载本插件——host 半跑在进程里，浏览器半跑在页面里。当某个带浏览器半的动态包被运行时，打开的页面会收到一次运行请求；本包在本页执行装载，UI 包（`ui-cordis`）则渲染人用来应答它的面板与卡片。纯 host 包不需要浏览器半，也就不需要页面：host 自己运行它们。
 
-### What the page does
+### 页面会做什么
 
-A browser half is written in plain JavaScript — no JSX, no TypeScript, no module imports — and runs as an async function. It receives a fixed set of names — `React`, `console`, `styles`, and `host` — while browser globals like `fetch` and `setTimeout` are unavailable. The plugin it returns can use the lifecycle verbs and only the services it declared in its own `inject`. Calling `host.call(method, args)` from the loaded half reaches its own host half. A crash that happens while React renders the loaded half is reported to the host with the slot, whether the crash removed the entry, and a message written for the author.
+浏览器半用纯 JavaScript 编写——无 JSX、无 TypeScript、不能 import 模块——并作为一个 async 函数运行。它拿到一组固定的名字——`React`、`console`、`styles` 与 `host`——而 `fetch`、`setTimeout` 这类浏览器全局不可用。返回的插件只能使用生命周期动词，以及它自己在 `inject` 里声明的服务。从已装载半调用 `host.call(method, args)` 会到达它自己的 host 半。React 渲染已装载半时发生的崩溃会上报 host，点名槽位、崩溃是否已把条目摘掉，以及写给作者的 message。
 
-### What the run surface offers
+### 运行界面提供什么
 
-A run surface can answer a pending host request — approving it, optionally covering future versions of the same plugin, or declining it — and can start a definition at the user's own gesture, which authorizes it. Each definition has at most one in-flight activity, so an affordance built on that state survives a remount. What the surface shows about this page is page-local: the last render crash per package, why this page's own attempt failed, and whether a package is loaded here — never the host's view of what is running.
+运行界面可以应答一次待审批的 host 请求——批准它（可选地同时覆盖同一插件的未来版本）或拒绝它——也可以按用户自己的手势启动一个定义，该手势本身就是授权。每个定义最多有一个在途活动，因此基于该状态构建的控件能在 remount 后存活。界面就本页显示的内容都是页面本地的：每包最后一次渲染崩溃、本页自己的尝试为何失败，以及某个包是否已在本页装载——绝不是 host 眼中「在跑」的视图。
 
-### Lifecycle boundaries
+### 生命周期边界
 
-Loading is idempotent: asking to load a revision this page already runs changes nothing, a newer revision replaces the loaded one, and the same revision after a retract loads afresh. Operations on a definition serialize. A refresh starts clean by design — the host still holds the definition, this page does not run it until asked again.
+装载是幂等的：要求装载这一页已在运行的 revision 不会改变任何东西，更新的 revision 顶替已装载的那个，同一 revision 在 retract 之后再装则重新装载。同一定义的操作串行执行。刷新按设计从干净状态开始——host 仍持有定义，本页在再次被要求之前不运行它。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design behind the browser half; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释浏览器半背后的设计；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-The browser half is built on one principle: a dynamic package must ride the same activation gating, fiber-effect cleanup, and status projection as a static one. The evaluated plugin is seated in the module table and mounted through `loader.create`; unload removes the entry, waits for its fiber's cleanup, then invalidates its factory and removes its styles. The guard is a whitelist — lifecycle verbs plus declared services — that mirrors the host-side sandbox facade, so a package author meets one contract on both halves. One observer feeds two outlets: the slot registry's entry-error seam is watched only here, and a crash belonging to a package this runner seated goes upstream to the host for the model and onto this package's own `renderFailures` for the panel.
+浏览器半建立在一个原则之上：动态包必须与静态包共享同一套激活门控、fiber effect 清理与状态投影。求值后的插件被塞进模块表，并经 `loader.create` 挂载；卸载先移除 entry，等待其 fiber 清理完成，再使 factory 失效并撤下样式。guard 是一份白名单——生命周期动词加已声明服务——与 host 侧沙箱门面对称，因此包作者在两侧面对同一个约定。一个观察者供两个出口：只有这里监视槽位注册表的 entry-error seam，凡属于本 runner 落座过的包的崩溃，一路上行给 host（给模型），一路发布到本包自己的 `renderFailures`（给面板）。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/client/index.ts`](src/client/index.ts) | Plugin entry: runner, orchestrator, inspect registry, forwarded-event subscription |
-| [`src/client/runtime.ts`](src/client/runtime.ts) | Load engine: convergence by run identity, guarded mount, retract |
-| [`src/client/orchestrator.ts`](src/client/orchestrator.ts) | Run orchestration: host half first, source fetch, browser half, one resolution |
-| [`src/client/evaluator.ts`](src/client/evaluator.ts) | Closure evaluation: the symbol surface and its teaching traps |
-| [`src/client/guard.ts`](src/client/guard.ts) | The whitelisting `ctx` façade for loaded browser halves |
-| [`src/client/inspect-registry.ts`](src/client/inspect-registry.ts) | Client Inspect Providers and the pending-query router |
-| [`src/client/providers.ts`](src/client/providers.ts) | First-party client Inspect Providers (slots, theme, events) |
-| [`src/client/timer.ts`](src/client/timer.ts) | The client timer service dynamic packages inject |
+| [`src/client/index.ts`](src/client/index.ts) | 插件入口：runner、编排器、inspect 注册表、转发事件订阅 |
+| [`src/client/runtime.ts`](src/client/runtime.ts) | 装载引擎：按运行标识收敛、guard 挂载、撤回 |
+| [`src/client/orchestrator.ts`](src/client/orchestrator.ts) | 运行编排：先 host 半、再取源码、再浏览器半、一次结算 |
+| [`src/client/evaluator.ts`](src/client/evaluator.ts) | 闭包求值：符号面及其教学陷阱 |
+| [`src/client/guard.ts`](src/client/guard.ts) | 已装载浏览器半收到的白名单 `ctx` façade |
+| [`src/client/inspect-registry.ts`](src/client/inspect-registry.ts) | Client Inspect Provider 与待答查询路由器 |
+| [`src/client/providers.ts`](src/client/providers.ts) | 第一方 client Inspect Provider（slots、theme、events） |
+| [`src/client/timer.ts`](src/client/timer.ts) | 动态包注入的 client 定时器服务 |
 
-### Inspecting slot inputs
+### 查询槽位输入
 
-The Slots provider's exact `listSubTree` lookup includes documented owner fields and top-level alias, intersection, and union declarations. Nested field-value types remain named references, so inspecting a Tool view exposes its shared callbacks and stage union without expanding the full Session graph.
+Slots provider 的精确 `listSubTree` 查询包含带说明的 owner 字段及顶层别名、交叉类型和联合类型声明。嵌套字段的值类型只列出引用名称，因此查询 Tool 视图可以获得共享回调和阶段联合，而不会展开完整 Session 类型图。
 
-### How a run is carried out
+### 一次 run 如何执行
 
-A `cordis/request-run` event asks this page whether to run a definition. Whoever answers — the page after an approval, or the user pressing run — drives the orchestration: the host half first (so a host-half failure short-circuits before the browser has moved), then the source fetch, then the browser half, then one resolution carrying what happened. The browser half's source is evaluated as an async function body with the symbol surface as parameters, the returned plugin is guard-wrapped and mounted through the loader, and the resolution reports the loaded revision or the failing stage with the closure's, guard's, or fiber's message. `host.call` routes through the Remote namespace; an omitted argument travels as `null`, and a payload the generated codec refuses becomes a teaching error naming the call and the contract.
+一条 `cordis/request-run` 事件问这一页要不要运行某个定义。作答的一方——审批后的页面，或按下运行的用户——驱动编排：先 host 半（host 半失败会在浏览器动作之前短路），再取源码，再浏览器半，最后一次结算带上发生的一切。浏览器半源码作为 async 函数体求值，符号面就是参数；返回的插件经 guard 包装后通过 loader 挂载；结算报告已装载的 revision，或失败阶段加闭包、guard 或 fiber 的消息。`host.call` 经 Remote namespace 路由；省略的入参以 `null` 过线，而生成 codec 拒收的载荷会变成一条点名「哪次调用 + 约定是什么」的教学错误。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the browser half to the host that asks it, the tools whose runs it answers, and the surface that renders it.
+当包级约定不够用时阅读以下页面。它们从浏览器半逐步进入发问的 host、其运行被应答的工具，以及渲染它的界面。
 
-- [Host runner](../cordis-host-runner/README.md) — the registry and run round trip this package answers.
-- [Tool package](../tool-cordis/README.md) — read-only runtime API discovery.
-- [UI package](../ui-cordis/README.md) — the panel and cards that operate this face.
-- [Extensions subsystem](../../../docs/subsystems/extensions.md) — the generated `ctx.dynamicCordisRunner` API and `cordis/*` events.
-- [Client shells and dynamic packages Agent Note](../../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.md) — package placement and build faces for the client halves.
+- [Host runner](../cordis-host-runner/README.zh.md)——本包应答的注册表与运行往返。
+- [工具包](../tool-cordis/README.zh.md)——只读运行时 API 发现。
+- [UI 包](../ui-cordis/README.zh.md)——操作这个面的面板与卡片。
+- [extensions 子系统](../../../docs/subsystems/extensions.zh.md)——生成的 `ctx.dynamicCordisRunner` API 与 `cordis/*` 事件。
+- [客户端外壳与动态包 Agent Note](../../../.agents/notes/implemented/architecture/2026-08-15-client-shells-and-dynamic-packages.zh.md)——浏览器半的包归属与构建面。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Run resolution relayed by the Host
+### Host 转发的运行结果
 
-#### What the model sees
+#### 模型看到的内容
 
-This package contributes no tool or prompt. It resolves `cordis/request-run` with activation success, missing services, rejection, or Host/Client failures. The Host runner owns any message relayed to the session.
+本包不提供工具或提示。它以激活成功、缺失服务、拒绝或 Host/Client 失败响应 `cordis/request-run`。发送给会话的任何消息由 Host runner 负责。
 
-#### Token effect
+#### Token 影响
 
-Conditional and bounded: at most one resolution per run request, spent inside the runner result the host already emits. The text is data-dependent (a definition's own error message) and this package retains nothing across requests — a page's later load failures are page-local diagnostics with no model-visible carrier.
+有条件且有界：每次 run 请求最多一个回答，花在 host 本来就会发出的那个 `run` 结果里。文本随数据而定（某个定义自己的错误消息），本包跨请求不留存任何东西——一页后续的装载失败是页面本地诊断，在模型侧没有任何承载物。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Host steering appends to the session history; this package does not rewrite earlier messages.
+Host steering 追加到会话历史；本包不改写更早的消息。
 
-### Render failure, after the run settled
+### run 落定之后的渲染期失败
 
-#### What the model sees
+#### 模型看到的内容
 
-React can fail after a successful load. The Client reports each owned entry failure with its slot, message, and whether the entry was removed. The Host retains the latest failure and steers the owning session; the page also displays its local failure.
+React 可能在加载成功后失败。Client 报告其拥有的每个 entry 失败，包括 slot、消息及 entry 是否已移除。Host 保留最新失败并向所属会话发送 steering；页面也显示本地失败。
 
-#### Token effect
+#### Token 影响
 
-Conditional and bounded by the host's retention, not by this page: one report per crash, and the host keeps only the latest per package, so a repeatedly crashing entry costs the model one message rather than a growing list. The report never enters a tool result of its own — the model pays for it only when it is steered or asks.
+有条件，且其上界由 host 的留存策略决定、不由这一页决定：每次崩溃一条报告，而 host 每包只留最新一条——所以一个反复崩溃的 entry 对模型的代价是一条消息，而不是一张越来越长的清单。报告本身不会自带任何工具结果：模型只在被 steer 或主动去问的时候才为它付费。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None of its own. Reports travel over RPC and are stored, not appended to the conversation; the model reads them through a steering message or an inspection it chose to make, which extends the tail like any other tool result.
+自身没有。报告经 RPC 送出并被存起来，而不是追加进对话；模型通过一条 steer 消息或自己发起的查看读到它们，那次查看与任何工具结果一样只延长尾部。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the browser half needs special care. They are current package constraints, not a task backlog.
+这些限制说明浏览器半何时需要特别小心。它们是当前包约束，不是任务积压。
 
-- **A refused resolution is not retried** — the acknowledgement of `resolveRequestRun` is not read, so when the host declines a stale success (`accepted: false`, because the definition's revision moved on while this page was loading) the page keeps what it loaded and does not orchestrate again. The request stays answerable — another page's answer or the caller's cancellation settles it — and the stop that bumped the revision retracts the stale load.
-- **The plugin stays parked until the host namespace exists** — it declares `remote.dynamicCordisRunner`, so it loads no browser half whose host half it could never reach.
-- **Slot admission has no carrier** — the dispatched row declares services, not target slots, so per-deployment allow or deny lists for slot admission have nowhere to ride.
-- **Guard whitelists are hand-mirrored twins** — the browser guard replicates the host-side sandbox facade; sharing one specification is deferred.
+- **被拒绝的回答不会重试**——`resolveRequestRun` 的 ack 不读，所以当 host 拒绝一个陈旧的成功答复（`accepted: false`——这一页装载期间定义的 revision 被顶掉了），这一页会保留已装的东西、也不再重新编排。那次请求仍可作答（别的页面作答或调用方取消都能收尾），而顶掉 revision 的那次 stop 会 retract 掉陈旧装载。
+- **host namespace 存在之前插件一直挂起**——它声明 `remote.dynamicCordisRunner`，因此绝不会装载一个永远够不到自己 host 半的浏览器半。
+- **槽位准入没有载体**——下发行声明的是服务，不是目标槽位，因此按部署的槽位允许／拒绝清单无处可驮。
+- **guard 白名单是手抄的孪生**——浏览器 guard 复刻 host 侧沙箱门面；抽取共享规格留待后续。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

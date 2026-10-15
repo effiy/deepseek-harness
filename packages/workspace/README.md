@@ -1,49 +1,49 @@
 ---
-description: "The workspace group map: the persistent workspace entity family, durable directory records, and header-validated session membership, for users and maintainers navigating the group."
+description: "workspace 组地图：持久工作区实体家族、用户目录的持久记录与经会话头验证的会话归属关系，供浏览本组的用户与维护者阅读。"
 kind: "package-group"
 ---
 
 # packages/workspace
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The workspace family lets a host product keep an ordered list of named projects and group each project's sessions by directory. Users can browse those projects and sessions, hide a session from the grouping without deleting it, and remove a project without deleting its folder or session history. Hidden or removed sessions remain available as ungrouped history. Choose this family for a persistent project surface; it requires session storage and a persistence backend, and it does not expose tools, prompts, or session events to the model.
+workspace 家族让宿主产品持久保存命名且有序的项目列表，并按目录归组每个项目的会话。用户可以浏览这些项目与会话、将会话从分组中隐藏而不删除该会话，以及移除项目而不删除其文件夹或会话历史。被隐藏或从项目中移除的会话仍可作为未分组的历史记录使用。需要持久项目界面时选用此家族；它需要会话存储和持久化后端，且不会向模型公开工具、提示词或会话事件。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Role | ctx key |
+| 包 | 职责 | ctx 键 |
 |---|---|---|
-| [`workspace`](workspace/README.md) | Provides named, ordered projects with the sessions that ran in each directory | `ctx.workspaceRegistry` |
+| [`workspace`](workspace/README.zh.md) | 提供命名且有序的项目，并按目录归组在其中运行的会话 | `ctx.workspaceRegistry` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [Workspace subsystem](../../docs/subsystems/workspace.md) — the authoritative feature contract for projects and their sessions.
-- [domain KV storage Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the storage design behind project records.
-- [Workspace UI product-flow Agent Note](../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md) — how the first start builds projects from session history and how the GUI orders them.
-- [historical Workspace registration deletion decision](../../.agents/notes/archived/feature/2026-07-27-workspace-registration-deletion.md) — why removing a project never deletes its folder or sessions.
+- [Workspace 子系统](../../docs/subsystems/workspace.zh.md)——项目及其会话的权威功能约定。
+- [领域 KV 存储 Agent Note](../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)——项目记录背后的存储设计。
+- [Workspace UI 产品流 Agent Note](../../.agents/notes/archived/feature/2026-07-25-workspace-ui-product-flow.md)——首次启动如何从会话历史构建项目，以及 GUI 如何排序。
+- [历史删除 Workspace 注册记录决策](../../.agents/notes/archived/feature/2026-07-27-workspace-registration-deletion.md)——为什么移除项目绝不会删除其文件夹或会话。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

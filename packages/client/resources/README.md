@@ -1,44 +1,44 @@
 ---
-description: "Client resource model: protocol-registered providers turn URL addresses into live values that any slot component reads through the useResource standard hook."
+description: "客户端资源模型：按协议注册的提供方把 URL 地址解析为实时值，任何 slot 组件都通过 useResource 标准钩子读取。"
 kind: "package-reference"
 ---
 # @deepseek-ai/dsh-client-resources
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use client resources when a component knows live data only by URL address, such as a tab record, link, or mention, while another client package owns the data. Resource addresses use `dsh-resource://<type>/…`; protocols that need a scope encode it in the path. Components receive the current value and later updates through the public `useResource` hook. Unsupported protocols and non-resource schemes, such as `sidebar://guide`, resolve to no resource.
+当组件只知道实时数据的 URL 地址，而数据由另一个客户端包拥有时，请使用客户端资源；例如 tab 记录、链接或提及。资源地址使用 `dsh-resource://<type>/…`；需要作用域的协议把作用域编进路径。组件通过公开的 `useResource` 钩子接收当前值与后续更新。不支持的协议与非资源 scheme（例如 `sidebar://guide`）不指向任何资源。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-  - [Read a resource](#read-a-resource)
-  - [Provide a protocol](#provide-a-protocol)
-  - [Hold a resource open](#hold-a-resource-open)
-- [Understand the implementation](#understand-the-implementation)
-  - [Lifecycle](#lifecycle)
-  - [Failures](#failures)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+  - [读取资源](#read-a-resource)
+  - [提供协议](#provide-a-protocol)
+  - [钉住资源](#hold-a-resource-open)
+- [理解实现](#understand-the-implementation)
+  - [生命周期](#lifecycle)
+  - [失败](#failures)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Nothing needs configuration to mount: the plugin provides `ctx.resources` and contributes the `resource` root keyed hook through `ctx.slots.provideRoot`, so every slot component receives it whatever its scope.
+挂载无需任何配置：插件提供 `ctx.resources`，并通过 `ctx.slots.provideRoot` 贡献 `resource` 根 keyed 钩子，因此每个 slot 组件不论作用域都能收到它。
 
 <a id="read-a-resource"></a>
-### Read a resource
+### 读取资源
 
-Every slot component receives `useResource` in its props. `useResource<P>(address)` names the protocol as the type argument and returns `{ status, value, failure }`: `none` when no provider is registered for the address's protocol (or the address is not a `dsh-resource://` URL), `loading` while the provider has not yielded, `live` with the latest `ok` frame's value, and `failed` when the latest frame reported a failure, with that failure beside the last value. Subscribing through the hook is what holds the resource open; a component that mounts while another holder keeps the resource alive reads the latest value at once.
+每个 slot 组件都在 props 上收到 `useResource`。`useResource<P>(address)` 以类型参数命名协议，返回 `{ status, value, failure }`：地址协议没有提供方（或地址不是 `dsh-resource://` URL）时为 `none`，提供方尚未产出值时为 `loading`，`live` 携带最新一个 `ok` 帧的值，`failed` 表示最新一帧报告了失败，失败放在最后一个值旁。通过钩子订阅就是钉住资源的方式；另一个持有者让资源保持存活时，新挂载的组件立刻读到最新值。
 
 <a id="provide-a-protocol"></a>
-### Provide a protocol
+### 提供协议
 
-The protocol's owning client package declares its value type in `ResourceProtocolMap` and registers one provider as an owned effect. `open` yields `RemoteResult` frames: the current content first and one frame per later change, with a failure as an `ok: false` frame rather than a throw; it must stop when `signal` aborts:
+协议所属的客户端包在 `ResourceProtocolMap` 声明其值类型，并以自有 effect 注册一个提供方。`open` 产出 `RemoteResult` 帧：先是当前内容，之后每次变化一帧，失败以 `ok: false` 帧而非抛错表达；必须在 `signal` 中止时停止：
 
 ```ts ignore-check
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -58,48 +58,48 @@ export function apply(ctx) {
 }
 ```
 
-A protocol has exactly one provider; a second registration throws. Registering a provider while addresses of its protocol are already held opens them; disposing it ends their streams and returns them to `none`.
+一个协议恰有一个提供方；第二次注册会抛错。提供方注册时若其协议的地址已被持有，则立即开流；提供方 dispose（资源释放）时结束这些流并让它们回到 `none`。
 
 <a id="hold-a-resource-open"></a>
-### Hold a resource open
+### 钉住资源
 
-`ctx.resources.pin(address, signal)` keeps a resource open without subscribing, until `signal` aborts. The right Sidebar pins every open tab's address for the tab record's lifetime, so switching tabs unmounts the body without closing its stream and switching back reads the latest value. `ctx.resources.source(address)` is the bare observable behind the hook, for callers outside React.
+`ctx.resources.pin(address, signal)` 在不订阅的情况下让资源保持打开，直到 `signal` 中止。右侧 Sidebar 在 tab 记录的存续期内钉住每个已打开 tab 的地址，因此切换 tab 卸载正文不会关闭其流，切回时读到最新值。`ctx.resources.source(address)` 是钩子背后的裸 observable，供 React 之外的调用方使用。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <a id="lifecycle"></a>
-### Lifecycle
+### 生命周期
 
-One record per address holds a snapshot store, a holder count (hook subscribers plus pins), and the running stream's `AbortController`. The first holder opens the provider's stream; every later holder shares it; the last holder's release aborts the stream and resets the snapshot to idle (`loading` with a provider, `none` without). Records are kept for the page lifetime so `source()` stays reference-stable across React's render-then-subscribe window and a StrictMode remount.
+每个地址一条记录，持有一个快照存储、一个持有者计数（钩子订阅者加 pin）与运行中流的 `AbortController`。第一个持有者打开提供方的流；之后的持有者共享它；最后一个持有者释放时中止流并把快照重置为空闲（有提供方为 `loading`，没有为 `none`）。记录在页面存续期内保留，使 `source()` 在 React 从渲染到订阅的窗口期以及 StrictMode 重挂载期间保持引用稳定。
 
 <a id="failures"></a>
-### Failures
+### 失败
 
-A failure is a frame, not a throw: a provider yields `{ ok: false, error }` and the resource turns `failed` with that error beside the last value; the next `ok` frame clears it. A stream that ends on its own keeps its last state. Frames that arrive after the release that aborted the stream are dropped, and the iterator is returned. A throw inside a provider's stream is a programming error and is not caught.
+失败是帧而非抛错：提供方产出 `{ ok: false, error }`，资源变为 `failed` 并把该错误放在最后一个值旁；下一个 `ok` 帧将其清除。自行结束的流保持其最后状态。在中止流的那次释放之后到达的帧都被丢弃，并归还迭代器。提供方流内的抛错是编程错误，不会被捕获。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package moves values between browser plugins and registers nothing model-facing.
+无，因为本包在浏览器插件之间搬运值，不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; resource streams do not assemble model requests.
+无；资源流不会组装模型请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Records live for the page lifetime** — an address's record stays in the registry after its last holder leaves; only its state is discarded. Memory grows with the number of distinct addresses ever read, not with reads.
-- **Providers own abort compliance** — the registry drops what a released stream still yields, but a provider that ignores `signal` keeps working until its next frame.
+- **记录在页面存续期内保留**——地址的记录在最后一个持有者离开后仍留在注册表中，只丢弃其状态。内存随读取过的不同地址数增长，而非随读取次数增长。
+- **中止合规由提供方负责**——注册表会丢弃已释放的流仍产出的帧，但忽略 `signal` 的提供方会一直工作到它的下一帧。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

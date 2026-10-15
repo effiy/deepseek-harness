@@ -1,41 +1,41 @@
 ---
-description: "The Agent Client Protocol package group: the automation-only server that exposes fresh harness agents to programmatic clients over JSON-RPC stdio."
+description: "ACP（Agent Client Protocol）包组：通过 JSON-RPC stdio 将全新 harness agent（智能体）暴露给程序化客户端的仅面向自动化的服务器。"
 kind: "package-group"
 ---
 
-# acp/ — Agent Client Protocol automation
+# acp/：Agent Client Protocol 自动化
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The acp group provides one package: a server that lets programs and automation run persistent DeepSeek Harness agents over the standard Agent Client Protocol. A client can create, list, resume, and close sessions; attach standard MCP servers; select model options; send text and image prompts; receive semantic updates; answer permission prompts; and cancel work without a human in the loop. The matching client for spawning such a server from another harness lives in `subagent/subagent-acp`. This page maps the group; the package README owns the per-package contract.
+acp 组提供一个包：一个服务器，让程序与自动化流程可以通过标准 Agent Client Protocol 运行持久 DeepSeek Harness agent。客户端可以创建、列出、恢复与关闭会话，挂载标准 MCP 服务器，选择模型选项，发送文本与图片提示词，接收语义更新，响应权限提示并取消工作——无需人类参与。从另一个 harness 启动这种服务器的配套客户端位于 `subagent/subagent-acp`。本页概述该包组；各包的具体约定由其 README 规定。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Role |
+| 包 | 职责 |
 |---|---|
-| [`acp/`](acp/README.md) | Lets programs manage persistent agents over ACP, attach MCP servers, select model options, prompt and cancel work, and receive semantic updates |
+| [`acp/`](acp/README.zh.md) | 让程序通过 ACP 管理持久 agent、挂载 MCP 服务器、选择模型选项、发送提示词、取消工作并接收语义更新 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [dsh-subagent-acp](../subagent/subagent-acp/README.md) — the out-of-process ACP client that spawns and drives this server.
-- [ACP as an automation-only protocol](../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.md) — the design record for the automation contract and its wire boundaries.
-- [Multiplex concurrent ACP sessions over one connection](../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md) — per-session isolation, ownership, and teardown decisions.
+- [dsh-subagent-acp](../subagent/subagent-acp/README.zh.md)——spawn 并驱动本服务器的进程外 ACP 客户端。
+- [ACP 作为仅面向自动化的协议](../../.agents/notes/implemented/simplification/2026-07-23-acp-automation-only-protocol.zh.md)——自动化约定及其协议边界的决策记录。
+- [在单个连接上多路复用并发 ACP 会话](../../.agents/notes/archived/feature/2026-06-14-acp-multi-session.md)——按会话隔离、归属与清理决策。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
-None.
+无。

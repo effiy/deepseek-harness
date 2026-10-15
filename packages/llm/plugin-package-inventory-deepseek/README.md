@@ -1,78 +1,78 @@
 ---
-description: "Active Loader package inventory metadata for deployments sending official DeepSeek requests."
+description: "面向发送官方 DeepSeek 请求的部署，说明活跃 Loader 包清单元数据。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-plugin-package-inventory-deepseek
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Best-effort active Loader-backed plugin package inventory for official DeepSeek LLM API requests. This function plugin injects the Loader, live Agent registry, and `ctx.deepseekLlmApiExtensions`, then owns the `dsh_plugin_packages` field. Enable it when the official API needs the active package list for request diagnostics.
+用于 DeepSeek 官方 LLM API 请求的尽力收集型活跃 Loader 插件包清单。该函数插件注入 Loader、存活 Agent 注册表与 `ctx.deepseekLlmApiExtensions`，并拥有 `dsh_plugin_packages` 字段。当官方 API 需要活动包清单进行请求诊断时，请启用它。
 
-## Table of Contents
+## 目录
 
-- [Configuration](#configuration)
-- [Collection](#collection)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [配置](#configuration)
+- [收集](#collection)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="configuration"></a>
-## Configuration
+## 配置
 
-| Key | Default | Meaning |
+| 配置键 | 默认值 | 含义 |
 |---|---:|---|
-| `enabled` | `true` | Register the `dsh_plugin_packages` contribution. Set it to `false` to omit package metadata. |
+| `enabled` | `true` | 注册 `dsh_plugin_packages` 贡献。将其设为 `false` 可省略包元数据。 |
 
-Shipped profiles use the default, so every official DeepSeek request carries the package inventory when preparation succeeds.
+随附 profile 使用该默认值，因此只要准备成功，每个 DeepSeek 官方请求都会携带包清单。
 
 <a id="collection"></a>
-## Collection
+## 收集
 
-Every request re-reads active non-group entries from the host Loader tree. When optional `ctx.agentPresets` is present and `sessionId` resolves to a live Agent joined to a standing preset, that preset's separate Loader tree joins the same collection; deployments without the service report the host tree only. Entries are included only while their root fiber is `ACTIVE` and their effective Loader state is enabled.
+每次请求都会重读宿主 Loader 树中的活跃非 group 配置项。存在可选 `ctx.agentPresets` 且 `sessionId` 解析到已加入 standing preset 的存活 Agent 时，该 preset 的独立 Loader 树也会加入同一次收集；未挂载该服务的部署只报告宿主树。只有根 fiber 处于 `ACTIVE` 且 Loader 有效状态为启用的配置项才会纳入。
 
-At activation, the plugin samples the optional `ctx.pluginPackages` service. Shipped app boot mounts that service before profile Loader entries, so bare package and package-subpath identities use the same authoritative runtime resolution as their imports, including its misses, without requiring a `./package.json` export. If the service is absent, the plugin retains native Node package-search lookup for its lifetime and does not switch an existing inventory when a resolver mounts later. A low-level embedder that wants runtime resolution identities must therefore mount `PluginPackages` before both the Loader entries and this plugin.
+插件在激活时读取一次可选的 `ctx.pluginPackages` 服务。随附 app boot 会在 profile Loader 配置项之前挂载该服务，因此裸包和包子路径的身份使用与其 import 相同的权威 runtime resolution，包括它未命中的情况，并且无需包导出 `./package.json`。若该服务不存在，插件会在整个生命周期中保留 Node 原生包搜索，之后再挂载 resolver 也不会切换既有清单。因此，希望使用 runtime resolution 身份的底层嵌入方必须先挂载 `PluginPackages`，再挂载 Loader 配置项和本插件。
 
-Each ordinary entry uses its owning Loader tree base. A standing preset's root entries use the harness base, matching the preset Loader's deliberate bare-package override; nested includes retain their own bases. Relative and absolute modules walk to their nearest manifest; manifests without a non-blank string `name` are omitted. A missing or invalid `version` produces a name-only entry, regardless of `private`. A nested directory with its own manifest does not inherit its parent's identity. Package resolution, manifest reading, and JSON parsing failures omit only that entry and log one warning per module; inventory metadata does not block model requests. Entries are deduplicated by name and optional version and sorted with a locale-independent comparison; name-only entries sort before same-name versioned entries, and different versions remain separate.
+每个普通配置项使用其所属 Loader 树的基址。standing preset 的根配置项使用宿主基址，与 preset Loader 对裸包的显式覆写保持一致；嵌套 include 仍使用自身基址。相对与绝对模块会向上查找最近的 manifest（元数据清单）；`name` 不是非空白字符串的 manifest 会被省略。`version` 缺失或无效时，只上报名称，不受 `private` 影响。拥有自身 manifest 的嵌套目录不会继承父包的身份。包解析、manifest 读取或 JSON 解析失败时，系统只省略对应配置项，并对每个模块只记录一次警告；清单元数据不会阻塞模型请求。系统按名称和可选版本去重，并使用与 locale 无关的比较排序；只有名称的配置项排在同名且有版本的配置项之前，不同版本仍分开保留。
 
-The version-1 `dsh_plugin_packages` field contains `{ name, version }` or `{ name }` entries; `version` is included only when it is a non-blank string. Disabled, pending, failed, disposed, unloading, structural `cordis:` rows, ordinary dependencies, loose files without an owning package identity, programmatically mounted child fibers, and in-memory dynamic plugins are excluded.
+版本 1 的 `dsh_plugin_packages` 字段包含 `{ name, version }` 或 `{ name }` 配置项；仅当 `version` 为非空白字符串时才包含该字段。系统会排除禁用、pending、failed、disposed、unloading 状态，结构性 `cordis:` 配置项，普通依赖，没有所属包身份的松散文件，以编程方式挂载的子 fiber，以及内存动态插件。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Package inventory metadata
+### 包清单元数据
 
-#### What the model sees
+#### 模型看到的内容
 
-Nothing. `dsh_plugin_packages` is provider metadata outside the model's messages, system prompt, and tool schemas.
+无。`dsh_plugin_packages` 是位于模型消息、系统提示词与工具 schema 之外的提供方元数据。
 
-#### Token effect
+#### Token 影响
 
-Zero model-input tokens; the complete inventory adds only HTTP request bytes.
+模型输入 token 为零；完整清单只会增加 HTTP 请求字节数。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; package lifecycle changes do not alter the model-visible prefix.
+无；包生命周期变化不会改变模型可见前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Loader package identity only** — programmatic child fibers and in-memory dynamic plugins do not have authoritative npm names and versions and remain outside this inventory.
-- **Unavailable identities are omitted** — the inventory can be partial when package metadata is unavailable.
-- **In-place package replacement requires restart** — manifest identities are cached for the process lifetime. Loader enable, disable, mount, unmount, and ordinary source HMR still refresh the active entry set, but replacing a mounted package's manifest with another version in the same process is not a supported upgrade path.
+- **仅含 Loader 包来源**——以编程方式创建的子 fiber 与内存动态插件没有权威 NPM 名称／版本来源，因此不在该清单内。
+- **省略不可用身份**——包元数据不可用时，清单可能不完整。
+- **原地替换包需要重启**——manifest 身份会在进程存活期内缓存。Loader 的启用、禁用、挂载、卸载与普通源码 HMR 仍会刷新存活配置项集合，但在同一进程中把已挂载包的 manifest 替换为另一版本并不是受支持的升级路径。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

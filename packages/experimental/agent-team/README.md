@@ -1,41 +1,41 @@
 ---
-description: "Run named teammates with direct inbox messages and a durable shared task board in experimental Team compositions."
+description: "在实验性 Team 组合中运行具名 teammate，使用直接 inbox 消息和持久共享任务板。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-agent-team
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-experimental-agent-team` gives one session a Lead, named teammates, direct messages, and a durable shared task board. Sends use each target Agent’s inbox and can cold-resume stored teammates. Team retains roster and task state; message persistence follows the target Agent’s normal policy. Mount `dsh-experimental-tool-agent-team` for model tools. The package is experimental and requires durable session storage.
+`dsh-experimental-agent-team` 为一个会话提供 Lead、具名 teammate、直接消息和持久共享任务板。发送使用目标 agent（智能体）的 inbox，并可冷恢复已存储的 teammate。Team 保留 roster 与任务状态，消息持久化遵循目标 Agent 的常规策略。挂载 `dsh-experimental-tool-agent-team` 可提供模型工具。本包为实验性功能，需要持久会话存储。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Add this package when one agent needs named helpers in a shared working directory, direct peer messages, and durable roster and task state. Mount it with `@deepseek-ai/dsh-experimental-tool-agent-team` to expose the model tools.
+当一个 agent 需要共享工作目录中的具名助手、直接 peer 消息以及持久 roster 与任务状态时，加入本包。与 `@deepseek-ai/dsh-experimental-tool-agent-team` 一起挂载可提供模型工具。
 
-### When to choose it
+### 何时选择
 
-Choose it for cooperation in one shared workspace with durable roster and task state. Separate working directories, coordination across processes, and automatic task-owner release are unsupported. Durable session storage is required.
+适用于在同一共享工作区协作并保留持久 roster 和任务状态。不支持独立工作目录、跨进程协调和自动释放任务 owner。需要持久会话存储。
 
-### Smallest working setup
+### 最小工作配置
 
 <a id="smallest-working-setup"></a>
 
-The smallest addition to an existing composition is durable session storage plus both Team packages:
+对现有组合的最小增量是持久会话存储加两个 Team 包：
 
 ```yaml
 # smallest team setup — durable storage plus both Team packages
@@ -44,182 +44,182 @@ The smallest addition to an existing composition is durable session storage plus
 - name: '@deepseek-ai/dsh-experimental-tool-agent-team'
 ```
 
-With the tools installed, the model does the rest on request — for example, "create a teammate named reviewer to check the diff", then "send reviewer the change summary". All limits are optional and validated at startup:
+工具安装后，模型会按请求完成其余工作——例如先「创建一个名为 reviewer 的 teammate 检查 diff」，再「把变更摘要发给 reviewer」。所有限制都是可选的，并在启动时校验：
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `maxMembers` | `16` | Maximum teammates a team may ever create, including failed ones |
-| `maxTasks` | `256` | Maximum active tasks on the board |
-| `maxMessageBytes` | `65,536` | Maximum size of one sent message |
-| `disposalTimeoutMs` | `5,000` | Time allowed for shutdown cleanup |
+| `maxMembers` | `16` | 一支团队最多可创建的 teammate 数，包括失败的 |
+| `maxTasks` | `256` | 任务板上最多的活动任务数 |
+| `maxMessageBytes` | `65,536` | 单条发送消息的最大尺寸 |
+| `disposalTimeoutMs` | `5,000` | 关闭清理允许的时间 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-experimental-agent-team) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-experimental-agent-team)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### Teammates
+### Teammate
 
-Ask the Lead to create a teammate: give it a unique lowercase name such as `reviewer` and describe its job. A teammate starts fresh with no memory of the Lead's conversation, or as a fork that inherits the Lead's completed turns; the creation request chooses which. Teammate names are permanent — even a teammate whose creation failed keeps its name, and no name is ever reused.
+请 Lead 创建 teammate：给它一个唯一的小写名字（例如 `reviewer`）并描述其职责。teammate 可以 fresh 启动（不携带 Lead 对话的任何记忆），也可以作为 fork 启动（继承 Lead 已完成的轮次）；创建请求决定用哪种。teammate 名字是永久的——即使创建失败的 teammate 也保留其名字，任何名字都不会被复用。
 
-The roster shows every member with its role (`lead` or `teammate`) and current status: `running`, `inactive` (no turn is executing, whether loaded or stored), `provisioning`, or `failed`. A member that is not loaded receives its messages when it wakes.
+roster 显示每个成员的职责（`lead` 或 `teammate`）与当前状态：`running`、`inactive`（当前没有执行轮次，包括已加载和仅存储的成员）、`provisioning` 或 `failed`。未加载的成员会在唤醒后收到其消息。
 
-Only the Lead can create teammates or interrupt them.
+只有 Lead 可以创建 teammate 或中断它们。
 
-### Messages between teammates
+### teammate 之间的消息
 
-Any member can send to another member or the Lead. Each attempt either returns the target inbox `MessageId` or throws. Team does not retain unaccepted send intent, retry new messages after restart, or deduplicate explicit resends.
+任何成员都可向其他成员或 Lead 发送消息。每次尝试要么返回目标 inbox 的 `MessageId`，要么抛出错误。Team 不保留尚未接收的发送意图，不在重启后重试新消息，也不对显式重发去重。
 
-Steer gives a running target the message at its nearest step boundary and starts or cold-resumes an inactive target. Success means inbox acceptance, not model processing or a separate synchronous storage flush. Accepted messages follow ordinary Agent persistence and inbox recovery.
+Steer 让 running target 在最近的步骤边界接收消息，并启动或冷恢复 inactive target。成功表示 inbox 接收，不表示模型已处理或已完成单独的同步存储 flush。获准消息遵循普通 Agent 的持久化和 inbox 恢复策略。
 
-### Shared task board
+### 共享任务板
 
-Any member can add a task with a title, details, optional dependencies on other tasks, and optional hints about which files it will touch. A task is claimable only when everything it depends on is complete.
+任何成员都可以添加任务，包含标题、详情、对其他任务的可选依赖，以及可选的文件触及提示。只有其全部依赖完成后，任务才可 claim。
 
-Tasks have an owner: a member claims a task to start work, completes it when done, releases it back, or reopens it; the Lead can assign a task to any member. Every change is compare-and-set: an update based on an outdated copy is rejected, so two members cannot silently overwrite each other's work.
+任务有 owner：成员 claim 任务开始工作，完成后标记完成、释放回板或重新打开；Lead 可以把任务分配给任意成员。每次变更都是 compare-and-set：基于过期副本的更新会被拒绝，因此两个成员不会悄悄覆盖彼此的成果。
 
-File hints produce warnings when two in-progress tasks plan to touch overlapping paths — they never block anything. Deleted tasks remain in history but disappear from the active list.
+当两个 in-progress 任务计划触及重叠路径时，文件提示会产生警告——它们绝不阻止任何操作。已删除任务保留在历史中，但从活动列表中消失。
 
-### Waiting and interruption
+### 等待与中断
 
-A member can wait for the next team change — a teammate's status, an incoming message, or a task update — instead of polling repeatedly; the wait reports only whether it timed out, and the caller re-reads the current state afterward.
+成员可以等待下一次团队变化——teammate 的状态、新消息或任务更新——而不必反复轮询；等待只报告是否超时，调用方随后重新读取当前状态。
 
-The Lead can stop a teammate's current turn without deleting its queued messages; task ownership is unchanged.
+Lead 可以停止 teammate 的当前轮次，而不会删除其排队的消息；任务归属不变。
 
-### What success and failure look like
+### 成功与失败的表现
 
-Success returns a teammate roster row, an accepted inbox message id, or an updated task revision. Invalid member names, unready tasks, stale revisions, exhausted limits, and failed message admission report errors.
+成功会返回 teammate roster 行、获准 inbox 消息 id 或更新后的任务 revision。无效成员名称、未就绪任务、过期 revision、上限耗尽和消息准入失败均报告错误。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the service and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释服务背后的设计决策并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-The service is built on one separation and three commitments:
+本服务建立在一个分离与三项承诺之上：
 
-- **Durable log, derived state.** The Lead log owns roster and tasks; each target Agent owns its accepted messages.
-- **Process-local ownership.** Continuation delivery owns target locking, cold recovery, and lifecycle authorization.
-- **Explicit authority.** Every service method takes the exact live calling `Agent`; only the Lead spawns, reassigns, or interrupts.
-- **Bounds that fail loud.** Every limit is a validated deployment value, and exhaustion reports a typed error instead of reusing an id or name.
+- **持久日志，派生状态。** Lead 日志拥有 roster 与任务，各目标 Agent 拥有其接收的消息。
+- **进程内归属。** Continuation 投递拥有目标锁、冷恢复和生命周期授权。
+- **显式权限。** 每个服务方法都接收确切的实时调用方 `Agent`；只有 Lead 可以 spawn、reassign 或 interrupt。
+- **超出上限时明确失败。** 每个限制都是经过校验的部署值，耗尽时报告类型化错误，而不是复用 id 或名字。
 
-The [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) owns the identity, mailbox, task, and shared-checkout decisions.
+[Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.zh.md)负责身份、mailbox、任务与共享 checkout 决策。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, service registration, recovery scheduling |
-| [`src/roster.ts`](src/roster.ts) | Team identity, membership resolution, provisioning, and roster teardown |
-| [`src/task-board.ts`](src/task-board.ts) | Task CAS commands, DAG validation, and derived views |
-| [`src/journal.ts`](src/journal.ts) | Serialized Lead-log transactions and commit notification |
-| [`src/projection.ts`](src/projection.ts) | Strict replay projection that decodes and validates Team events and publishes the `agentTeam` client view |
-| [`src/task-view.ts`](src/task-view.ts) | Pure task readiness, owner-name, and write-overlap derivation shared by the task board and the client view |
-| [`src/activity.ts`](src/activity.ts) | One-shot change waiters and disposal release |
-| [`src/lifecycle.ts`](src/lifecycle.ts) | Shared admission cutoff and bounded settlement |
+| [`src/index.ts`](src/index.ts) | 插件入口：`Config` schema、服务注册、恢复调度 |
+| [`src/roster.ts`](src/roster.ts) | Team 身份、成员关系解析、provisioning 与 roster 拆除 |
+| [`src/task-board.ts`](src/task-board.ts) | 任务 CAS 命令、DAG 校验与派生视图 |
+| [`src/journal.ts`](src/journal.ts) | 串行化的 Lead 日志事务与提交通知 |
+| [`src/projection.ts`](src/projection.ts) | 解码并校验 Team 事件、发布 `agentTeam` 客户端视图的严格回放投影 |
+| [`src/task-view.ts`](src/task-view.ts) | 任务板与客户端视图共用的纯任务派生：就绪状态、owner 名称与写入范围重叠 |
+| [`src/activity.ts`](src/activity.ts) | 一次性变更等待者与 dispose（资源释放）时的等待解除 |
+| [`src/lifecycle.ts`](src/lifecycle.ts) | 共享准入截止与有界结算 |
 
-### Team identity and roster
+### Team 身份与 roster
 
-Every ordinary runtime root is the implicit Lead of a Team whose `TeamId` equals its `SessionId`; there is no creation event, and durable Team state begins with the first member or task record. `spawnTeammate()` first appends and flushes a `provisioning` member record, then asks the configured provider to create the reserved child; a provider failure appends a durable `failed` member. A fresh child starts with no Lead history; a fork child captures the Lead's completed-turn prefix once. Recovery reconciles an unterminated provisioning record against the child's independently persisted Session: a matching direct-parent and continuable descriptor plus a recorded initial user message produces `active`, and anything else produces `failed`. If recovery wins a same-process race, the creator accepts the terminal state or reports `TEAM_PROVISIONING_CONFLICT` and drains the child. Names are reserved by the first provisioning record and never reused.
+每个普通运行时 root 都是一个隐式 Team 的 Lead，其 `TeamId` 等于 `SessionId`；不存在创建事件，持久 Team 状态从第一条成员或任务记录开始。`spawnTeammate()` 先追加并 flush 一条 `provisioning` 成员记录，再要求配置的提供方创建预留 child；提供方失败会追加一条持久的 `failed` 成员。fresh child 不携带 Lead 历史；fork child 只捕获一次 Lead 的已完成 turn 前缀。恢复把未终结的 provisioning 记录对照 child 独立持久化的会话进行对账：直接 parent 与 continuable descriptor 匹配、且初始用户消息已记录则产生 `active`，其他任何情况都产生 `failed`。如果恢复在同进程竞争中先完成，creator 会接受终态，或报告 `TEAM_PROVISIONING_CONFLICT` 并 drain 该 child。名字由第一条 provisioning 记录保留，且永不复用。
 
-### Direct messages and historical compatibility
+### 直接消息与历史兼容
 
-`sendMessage()` checks exact caller membership, rejects self-messaging, and bounds the complete sender-framed UTF-8 content. It returns the existing inbox identity and emits Team activity only after acceptance. The target stores `agent-message` source with the actual `senderSessionId`; the first content block is `Team message from <name>:`. No new `team/message/queued` or `team/message/delivered` records are written for these sends. Team adds no per-target send ordering; delivery order belongs to the target inbox. The client presents these messages with the ordinary Agent title and icon; the message body retains the sender name.
+`sendMessage()` 检查确切调用方的成员身份，拒绝自发消息，并限制包含发送者前缀的完整 UTF-8 内容大小。它返回现有 inbox 身份，并仅在接收后发出 Team activity。目标保存带真实 `senderSessionId` 的 `agent-message` source；首个内容块为 `Team message from <name>:`。这些发送不写入新的 `team/message/queued` 或 `team/message/delivered` 记录。Team 不额外保证同目标发送顺序；投递顺序由目标 inbox 管理。客户端使用普通 Agent 消息标题和图标展示这些消息；正文保留发送者名称。
 
-Lead delivery calls `Agent.steer()` directly. Teammate delivery uses the continuation owner's host-only Steer path, which preserves the Team sender source while authorizing the Lead-to-child edge and cold-resuming inactive targets. Sibling messages never impersonate the Lead through the public adjacent-Agent messaging operation.
+投递给 Lead 时直接调用 `Agent.steer()`。投递给 teammate 时使用 continuation owner 的 host-only Steer 路径；该路径会保留 Team 发送者 source，同时授权 Lead-to-child edge 并冷恢复 inactive target。sibling 消息绝不会通过公开的相邻 Agent 消息操作伪装成 Lead。
 
-### Shared task board
+### 共享任务板
 
-Tasks are complete versioned snapshots; every mutation carries `expectedRevision`, and a stale caller receives `TEAM_TASK_STALE_REVISION` instead of overwriting a newer value. Numeric `task-<n>` ids require a safe-integer suffix, and id-space exhaustion reports `TEAM_TASK_LIMIT` instead of reusing the final id. Deleted tasks remain tombstones for replay and id stability but do not consume `maxTasks` or appear in `listTasks()`. `writeScopes` are normalized workspace-relative prefixes; views warn on overlap with in-progress tasks but never block claim or authorize writes.
+任务是完整版本化快照；每次变更都携带 `expectedRevision`，陈旧调用方会收到 `TEAM_TASK_STALE_REVISION`，而不会覆盖更新的值。数字 `task-<n>` id 的后缀必须是安全整数，id 空间耗尽时报告 `TEAM_TASK_LIMIT`，而不是复用最后一个 id。已删除任务作为 tombstone 保留以供回放与维持 id 稳定，但不占用 `maxTasks`，也不出现在 `listTasks()` 中。`writeScopes` 是规范化后的 workspace 相对前缀；视图会对与 in-progress 任务的重叠发出警告，但绝不阻止 claim 或授予写权限。
 
-### Waiting and interruption
+### 等待与中断
 
-`waitForChange()` waits for one roster, task, message-acceptance, or live-status edge that occurs after registration, from ten seconds through one hour, and reports only whether it timed out; runtime disposal releases current waits. Cancellation preserves an Error reason or reports a non-Error reason through `TEAM_WAIT_ABORTED`. `interrupt()` is Lead-only and delegates to the continuable-subagent interrupt path, which cancels only a live teammate's current turn with `keepInbox`; it neither releases task ownership nor deletes durable mail.
+`waitForChange()` 等待注册之后发生的下一条 roster、task、消息接收或实时状态边，时长从 10 秒到 1 小时，并且只报告是否超时；运行时 dispose 会释放当前等待。取消会保留 Error reason；非 Error reason 则通过 `TEAM_WAIT_ABORTED` 报告。`interrupt()` 仅限 Lead，委托 continuable-subagent 的 interrupt 路径，以 `keepInbox` 只取消 live teammate 的当前 turn；它既不释放任务 owner，也不删除持久 mail。
 
-### Durability model
+### 持久性模型
 
-Roster and task mutations append `team/member` and `team/task` to the exact live Lead Session and flush before reporting success or waking waiters. Historical `team/message/queued` and `team/message/delivered` records remain readable; Team writes neither. All four event types are log-only: they never enter the conversation surface, so derived model history is untouched by coordination records. Session event `seq` and `time` own ordering and timing; snapshots do not duplicate them.
+roster 与任务变更将 `team/member` 和 `team/task` 追加到精确的 live Lead 会话，并在报告成功或唤醒等待者之前 flush。历史 `team/message/queued` 与 `team/message/delivered` 记录仍可读取；Team 不再写入这两种记录。这四种事件仅存在于日志：它们从不进入会话表面，因此派生模型历史不受协作记录影响。顺序与时间由会话事件的 `seq` 与 `time` 负责，快照不重复保存。
 
-Historical mailbox events and `team-message` sources remain readable, and the projection still reports queued-minus-delivered records. Team never delivers or acknowledges them: a historical message that its target had not recorded stays undelivered.
+历史 mailbox 事件与 `team-message` source 仍可读取，投影仍报告 queued-minus-delivered 记录。Team 不会投递或确认这些记录：目标尚未记录的历史消息保持未投递。
 
-Mailbox projection and checkpoint admission preserve every decoded JSON field of accepted content outside the locally declared validators, including an own `__proto__` key. Local field checks cover `text`, `reasoning`, `image`, and `tool-call`; accepted unknown tags remain opaque. Team projection cache version 4 rebuilds checkpoints from earlier cache versions from the Session log; the Session format version is unchanged.
+Mailbox 投影与 checkpoint 准入保留本地声明的校验器之外获准内容中全部已解码 JSON 字段，包括自有 `__proto__` 键。本地字段检查覆盖 `text`、`reasoning`、`image` 和 `tool-call`；获准的未知标签保持不透明。Team 投影缓存版本 4 从 Session 日志重建较早缓存版本的 checkpoint；Session 格式版本保持不变。
 
-### Disposal
+### Dispose
 
-The runtime lifecycle tracks sends and complete creation transactions in one operation set. Disposal closes admission, aborts and awaits those operations, then releases the roster’s live children and descendants. Non-Team children remain untouched. Admitted operations share one `disposalTimeoutMs` settlement deadline; each subsequent Team child drain has its own deadline. This value is not a whole-service shutdown bound. Cleanup failures are reported.
+运行时生命周期用同一个操作集合跟踪发送和完整创建事务。dispose 关闭准入，中止并等待这些操作，然后释放 roster 中的 live child 及其后代。非 Team child 不受影响。已获准操作共享一个 `disposalTimeoutMs` 等待期限；随后每个 Team 的 child drain 各有独立期限。此值不是整个服务关闭的总时限。清理失败会明确报告。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the shared subsystem types to the tool surface and the decisions behind the design.
+当包级约定不够用时阅读以下页面。它们从共享子系统类型逐步进入工具表面与设计背后的决策。
 
-- [Agent Teams subsystem](../../../docs/subsystems/agent-team.md) — durable Team types and the `ctx.agentTeams` service API.
-- [tool-agent-team package](../tool-agent-team/README.md) — the tools that let the model create, message, and coordinate teammates.
-- [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.md) — identity, mailbox, task, and shared-checkout decisions.
-- [Experimental package reference](../AGENTS.md) — placement, publication, and dependency isolation.
+- [Agent Teams 子系统](../../../docs/subsystems/agent-team.zh.md)——持久 Team 类型与 `ctx.agentTeams` 服务 API。
+- [tool-agent-team 包](../tool-agent-team/README.zh.md)——让模型创建 teammate、向其发送消息并进行协调的工具。
+- [Agent Teams Agent Note](../../../.agents/notes/implemented/feature/2026-08-05-agent-teams.zh.md)——身份、mailbox、任务与共享 checkout 决策。
+- [实验包参考](../AGENTS.md)——位置、公开发布与依赖隔离。
 
 -----
 
 <a id="model-experience"></a>
 
-### Browser projection
+### 浏览器投影
 
-The `agentTeam` Session projection publishes the Lead Session's durable roster identities and phases, member errors, non-deleted task views, and any `failure` beside the last valid state. Its `apply` replaces only the touched collection; mailbox-only changes retain the client view reference and produce no frame. The [subsystem reference](../../../docs/subsystems/agent-team.md#web-projection) defines the wire types.
+`agentTeam` Session 投影发布 Lead Session 的持久成员身份与阶段、成员错误、未删除任务视图，以及最后有效状态旁的 `failure`。其 `apply` 只替换被触及的集合；仅邮箱的变化保留客户端视图引用，不产生 frame。[子系统参考](../../../docs/subsystems/agent-team.zh.md#web-projection) 定义传输类型。
 
-The [Web UI](../client-ui-agent-team/README.md) reads the shared Session projections and overlays activity from Session status. Task creation and updates belong to Team agents through the service and model tools. The `./client` export supplies browser-safe roster, task, and projection types.
+[Web UI](../client-ui-agent-team/README.zh.md) 读取共享 Session 投影，并从 Session 状态叠加活动信息。任务创建与更新由 Team agent 通过服务和模型工具完成。`./client` 导出可供浏览器使用的 roster、任务与投影类型。
 
-## Model Experience
+## 模型体验
 
-### Peer messages
+### Peer 消息
 
-#### What the model sees
+#### 模型看到什么
 
-Each peer message is a user-role message prefixed with its sender name, followed by the original content blocks. Roster, task, and historical mailbox records remain log-only.
+每条 peer 消息都是以发送者名称为前缀的用户角色消息，后接原始内容块。roster、task 和历史 mailbox 记录仍仅存在于日志。
 
-#### Token effect
+#### Token 影响
 
-Each peer delivery adds the sender prefix plus message content to the target history. Task and roster mutations add no model tokens; their model-facing representation belongs to `@deepseek-ai/dsh-experimental-tool-agent-team` results.
+每次 peer 投递都会把发送者前缀与消息内容加入 target 历史。任务与 roster 变更不增加模型 token；其面向模型的呈现属于 `@deepseek-ai/dsh-experimental-tool-agent-team` 结果。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Peer messages append after the target's reusable history prefix. Cold resume reuses the persisted conversation before appending the new message.
+Peer 消息追加在 target 可复用历史前缀之后。冷恢复会先复用持久对话，再追加新消息。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what a team cannot do yet or what needs special operational care. They are current package constraints, not a comparison with other coordination mechanisms.
+这些限制说明一支团队目前不能做什么、或哪些方面需要特别的运维关注。它们是当前包约束，不是与其他协作机制的对比。
 
-- **Whole-view broadcasts** — each roster or task change sends the complete roster and non-deleted task board, including descriptions, to every connected browser, even when it is viewing another Session.
-- **Experimental prototype with no stability promise** — the package is public, but its contracts can change freely while it incubates.
-- **One process and one shared checkout** — members share cwd and observe edits immediately; this package provides no worktree, remote member, merge, or filesystem lock.
-- **Advisory write scopes** — Bash, formatters, code generators, and direct external writers can bypass filesystem version checks; Leads must coordinate ownership and review the final diff.
-- **Flat immutable roster** — only the Lead creates direct teammates; there is no nested Team, rename, deletion, or name reuse.
-- **No automatic ownership release** — inactivity, interruption, process exit, and failed work do not release a task owner.
-- **No send retry guarantee** — Team does not retain or deduplicate new attempts; concurrent processes over one Team are unsupported. Historical queued messages that never reached their target are not delivered.
+- **完整视图广播** — 每次 roster 或任务变化都会把完整 roster 和未删除任务板（含描述）发给所有已连接浏览器，即使它正在查看其他 Session。
+- **实验原型，无稳定性承诺**——本包公开发布，但孵化期间约定仍可自由变更。
+- **单进程、共享 checkout**——成员共享 cwd，修改立即可见；本包不提供 worktree、远端成员、merge 或文件锁。
+- **write scope 仅作提示**——Bash、formatter、代码生成器与直接外部写入可以绕过文件版本检查；Lead 必须协调 owner 并检查最终 diff。
+- **扁平且不可变的 roster**——只有 Lead 可以创建直接 teammate；不支持嵌套 Team、重命名、删除或名字复用。
+- **不会自动释放 owner**——成员不活动、interrupt、进程退出与工作失败都不会释放任务 owner。
+- **无发送重试保证**——Team 不保留新尝试，也不对其去重；不支持多个进程同时操作一个 Team。从未到达目标的历史排队消息不会被投递。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers and is explicitly non-authoritative.
+本开发备注是维护者的工作上下文，明确不具权威性。
 
 #### Promotion
 
-Promotion to a product-role group requires reviewing the public contract, limitations, test evidence, release payload, runtime dependents, and a named stable owner, per the [experimental subtree rules](../AGENTS.md).
+promotion 到产品角色组需要按[实验子树规则](../AGENTS.md)审查公共约定、限制、测试证据、发布载荷、运行时依赖与具名稳定 owner。
 
-#### Future directions
+#### 未来方向
 
-Undecided directions include nested Teams, automatic ownership release policies, cross-process mailbox transactions, and filesystem isolation via worktrees; none of these are committed.
+尚未决定的探索方向包括嵌套 Team、自动释放 owner 的策略、跨进程 mailbox 事务，以及通过 worktree 实现文件系统隔离；这些都没有承诺。
 
 </details>

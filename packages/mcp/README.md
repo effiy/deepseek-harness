@@ -1,52 +1,52 @@
 ---
-description: "The MCP package group: connect external Model Context Protocol servers, call their tools, and read their resources."
+description: "MCP 包组：连接外部 Model Context Protocol 服务器，调用其工具并读取其资源。"
 kind: "package-group"
 ---
 
-# MCP — Model Context Protocol
+# MCP — 模型上下文协议
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The `mcp/` group lets the model call external Model Context Protocol (MCP) tools and read server resources. Configure only `mcp-client` entries; shipped profiles already mount `mcp-resources` once. MCP tools and prompt text appear only for callers with a configured server in scope. Connections also supply server instructions. Package READMEs own configuration and limitations.
+`mcp/` 组让模型调用外部 Model Context Protocol（MCP）工具并读取服务器资源。只需配置 `mcp-client` 条目；随附 profile 已统一挂载 `mcp-resources` 一次。只有作用域中存在已配置服务器的调用方才会看到 MCP 工具与提示词文本。连接还会提供服务器指令。配置与限制由各包的 README 说明。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-The client owns each configured connection; the shared resource package supplies resource tools across those connections.
+客户端拥有每个已配置连接；共享资源包为这些连接提供资源工具。
 
-| Package | What it provides |
+| 包 | 提供的能力 |
 |---|---|
-| [`mcp-client/`](mcp-client/README.md) | Connect one MCP server, expose its tools and instructions, and provide its resource operations |
-| [`mcp-resources/`](mcp-resources/README.md) | Discover and read resources through shared tools with explicit server selection |
+| [`mcp-client/`](mcp-client/README.zh.md) | 连接一台 MCP 服务器，暴露其工具与指令，并提供其资源操作 |
+| [`mcp-resources/`](mcp-resources/README.zh.md) | 通过显式选择服务器的共享工具发现和读取资源 |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-Try the worked example configurations to see the plugin in action, then read the Agent Note for the behavior decisions behind it.
+先用可运行的示例配置体验插件，再阅读 Agent Note 了解其背后的行为决策。
 
-- [historical MCP client plugin Agent Note](../../.agents/notes/archived/feature/2026-07-07-mcp-client-plugin.md) — the bridge's design: server-qualified naming, discovery, execution, and environment scrubbing.
-- [Resources and instructions reference](mcp-resources/README.md) — on-demand resource access and scoped server guidance.
-- [Third-party memory MCP guide](../../docs/user/guide/mcp-memory.md) — runnable overlay rows and setup instructions.
-- [Tools subsystem reference](../../docs/subsystems/tools.md) — the `ToolRuntime` that receives the registered tools.
+- [历史MCP 客户端插件 Agent Note](../../.agents/notes/archived/feature/2026-07-07-mcp-client-plugin.md)——桥接的设计：服务器限定命名、发现、执行与环境清洗。
+- [资源与指令 参考](mcp-resources/README.zh.md)——按需资源访问与作用域服务器指引。
+- [第三方记忆 MCP 指南](../../docs/user/guide/mcp-memory.zh.md)——可运行的 overlay 配置行与设置说明。
+- [工具子系统参考](../../docs/subsystems/tools.zh.md)——接收已注册工具的 `ToolRuntime`。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

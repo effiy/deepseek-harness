@@ -1,54 +1,54 @@
 ---
-description: "App-owned command lines for dsh app bins: your app parses its own flags, --help, and exit behavior from the launcher's remaining arguments."
+description: "dsh app bin 的应用自有命令行：应用从启动器剩余参数中解析自己的 flag、--help 与退出行为。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-cmdline
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-cmdline` lets an app parse its own flags, `--help`, and errors from the arguments left unchanged after launcher flags. Parsed values can override configuration defaults without rewriting configuration. The app can also request process exit through the launcher's shutdown path. Use this package for app bins with their own command-line interface. It adds no prompt, schema, or model-visible content.
+`dsh-cmdline` 让应用从启动器 flag 之后原样留下的参数中解析自己的 flag、`--help` 与错误。解析值可以覆盖配置默认值，而无需改写配置。应用还可以通过启动器的关停路径请求进程退出。适用于拥有自有命令行界面的应用 bin。它不增加提示词、schema 或模型可见内容。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Your app reads the invocation's inner arguments at startup, and any number of its plugins can use them. The common path: a startup plugin reads the arguments, parses them, and publishes the parsed values; other rows configure themselves from those values.
+你的应用在启动时读取本次调用的内层参数，任意数量的插件都可以使用它们。常用路径是：启动插件读取参数、解析它们，再发布解析后的值；其他行由这些值配置自身。
 
-### The launcher values
+### 启动器提供的值
 
-The launcher makes three things available to your app:
+启动器向你的应用提供三样东西：
 
-- `ctx.cmdlineArgs` — the inner arguments of your invocation. Reading them returns an immutable snapshot and never consumes or changes them: `dsh --profile tui --resume abc` gives your app `['--resume', 'abc']`.
-- `ctx.appExit` — a way to ask the process to exit once the tree has shut down, wired to the launcher's shutdown controller.
-- `ctx.appReady` — the successful-startup signal, committed only after the Loader tree and launcher-owned setup succeed.
+- `ctx.cmdlineArgs`——本次调用的内层参数。读取它返回一份不可变快照，且绝不会消费或修改它们：`dsh --profile tui --resume abc` 给你的应用 `['--resume', 'abc']`。
+- `ctx.appExit`——在整棵树关闭后请求进程退出的方式，接到启动器的关停控制器上。
+- `ctx.appReady`——成功启动信号，只在 Loader 树与启动器自有设置成功后提交。
 
-An app launched with no arguments sees an empty list — that is the honest answer, not a missing value.
+没有参数的启动会看到空列表——这是诚实的答案，而不是缺失的值。
 
-`exitOnStdinEnd(ctx, label)` binds a successfully started stdio application's EOF to `ctx.appExit(0)`. It never reads or resumes stdin, so a protocol transport receives bytes buffered before it mounts; startup rejection wins over a racing EOF, and the owning fiber removes both pending listeners.
+`exitOnStdinEnd(ctx, label)` 把已成功启动的 stdio 应用 EOF 绑定到 `ctx.appExit(0)`。它绝不读取或恢复 stdin，因此协议传输会收到挂载前已缓冲的字节；启动拒绝优先于竞态 EOF，所属 fiber 会移除两个待处理的监听器。
 
-### Parsing your flags
+### 解析你的 flag
 
-You bring your own commander program: declare your flags and your actions, and the package runs it against the inner arguments. Your action is the only place validation happens, and it publishes whatever your rows need. The plugin's Loader row carries no special marker:
+你自带自己的 commander program：声明你的 flag 与 action，本包会针对内层参数运行它。校验只发生在你的 action 中，并由它发布你的行所需的任何值。插件的 Loader 行不携带特殊标记：
 
 ```yaml
 - id: web-startup
   name: '@deepseek-ai/dsh-web-app/startup'
 ```
 
-Rows configured from the parsed values inject the published service and read it directly in their config:
+由解析值配置的行注入发布的服务，并在其配置中直接读取它：
 
 ```yaml
 - id: webserver
@@ -59,90 +59,90 @@ Rows configured from the parsed values inject the published service and read it 
     port: !!js ctx.webStartup.port ?? 3080
 ```
 
-The outcomes: `dsh --profile web --port 8080` starts the server on port 8080 even when the config says 3080, because the flag wins. `--help` prints your app's help and exits 0 without starting anything; a rejected value (for example a non-numeric port) prints your error and exits nonzero, and no row that depends on the parsed values ever starts.
+结果：即使配置写的是 3080，`dsh --profile web --port 8080` 也会让服务器监听 8080 端口，因为 flag 优先。`--help` 打印你的应用帮助并以 0 退出、不启动任何内容；被拒绝的值（例如非数字端口）打印你的错误并以非零码退出，任何依赖解析值的行都不会启动。
 
-### How flags beat config values
+### flag 如何胜过配置值
 
-The value written beside a `!!js` expression is the fallback: the flag wins when present, the written value is used otherwise. Resolution happens once at startup, after your parser ran, so a flag is never silently reset by a later config reload.
+写在 `!!js` 表达式旁的值是后备：flag 存在时 flag 优先，否则使用写下的值。配置求值在启动时、你的解析器运行之后执行一次，因此 flag 绝不会被之后的配置重载悄悄重置。
 
-### Reading the same arguments from several plugins
+### 多个插件读取同一份参数
 
-Any number of plugins can read the same arguments — reading never consumes them — and each can parse what it needs and publish its own values. The launcher does not decide who owns the command line: an app with no reader ignores its arguments.
+任意数量的插件都可以读取同一份参数——读取绝不会消费它们——每个插件都能解析自己需要的部分并发布各自的值。启动器不会决定谁是命令行的所有者：没有读取方的应用会忽略自己的参数。
 
-Apps built outside this repository behave the same way: their `--help` prints and exits instead of crashing, even though they carry their own commander copy.
+本仓库之外构建的应用行为一致：即使它们自带 commander 副本，其 `--help` 也会打印并退出，而不是崩溃。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains how the outcomes above are realized and points at the code that realizes them; everything here is developer-facing and not needed to use the package.
+本节解释上述结果如何实现，并指出实现它们的代码位置；这里的内容面向开发者，使用本包并不需要。
 
-### Design notes
+### 设计说明
 
-- **Launcher facts, not config.** `cmdlineArgs` and `appExit` are provided on the host context before the tree mounts; they are not Loader rows, so no composition owns or overrides them.
-- **Positional split.** The launcher recognizes no app row: the first token after its own flags starts the app's arguments, so the app owns its flag family, its `--help` text, and its parse errors.
-- **Structural error detection.** `isCommanderError` reads commander's error code prefix instead of using `instanceof`, because an out-of-tree plugin brings its own commander copy whose `CommanderError` identity differs; `configureExitAndOutput` walks every subcommand because commander copies exit and output settings only at registration.
-- **Injectable output streams.** `internals` holds the output streams so tests can capture commander's text without touching the process.
+- **启动器事实，而非配置。** `cmdlineArgs` 与 `appExit` 在树挂载前提供到宿主上下文上；它们不是 Loader 行，因此没有任何组合持有或覆盖它们。
+- **按位置切分。** 启动器不认识任何应用行：自身 flag 之后的第一个 token 就是应用参数的起点，因此 flag 家族、`--help` 文本与解析错误都由应用自己持有。
+- **结构化错误识别。** `isCommanderError` 读取 commander 的错误码前缀，而不是用 `instanceof`，因为树外插件会带来自己的一份 commander 副本，其 `CommanderError` 身份不同；`configureExitAndOutput` 会遍历每个子命令，因为 commander 只在注册时复制退出与输出设置。
+- **可注入的输出流。** `internals` 持有输出流，使测试无需触碰进程即可捕获 commander 的文本。
 
-### Parsing contract
+### 解析约定
 
-The parse path is one small family with two owners: `provideCmdline` freezes the host arguments and provides `cmdlineArgs` and `appExit` before any tree entry mounts, and `parseCmdline` runs your commander program against the immutable arguments, routing every command's help, version, and error output through the launcher. A rejected value, `--help`, or `--version` prints commander's text and requests `ctx.appExit` without publishing anything, so dependent rows never activate; Loader defers each row's `!!js` interpolation until its declared injections are active. Per-export contracts live in the code, not this README — see [`src/index.ts`](src/index.ts).
+解析流程由两部分负责：`provideCmdline` 冻结宿主参数，并在任何配置树条目挂载前提供 `cmdlineArgs` 与 `appExit`；`parseCmdline` 针对不可变参数运行你的 commander program，把每个命令的 help、version 与错误输出都接到启动器上。被拒绝的值、`--help` 或 `--version` 会打印 commander 文本并请求 `ctx.appExit`，且不发布任何内容，因此依赖行绝不会激活；Loader 会把每行的 `!!js` 插值推迟到该行声明的注入全部激活之后。各导出的约定在代码中，不在本 README——见 [`src/index.ts`](src/index.ts)。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `CmdlineArgs`/`AppExit` types, `provideCmdline`, `parseCmdline`, commander exit/output routing |
+| [`src/index.ts`](src/index.ts) | `CmdlineArgs`/`AppExit` 类型、`provideCmdline`、`parseCmdline`、commander 退出／输出路由 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the handoff mechanism to the apps that consume it.
+当包级约定不够用时阅读以下页面。它们从交接机制逐步进入消费它的应用。
 
-- [dsh-app-boot](../app-boot/README.md) — the boot sequence that provides these launcher values.
-- [dsh-web-app bundle](../../bundle/web-app/README.md) — an app that owns the Web flag family through this package.
-- [dsh-headless bundle](../../bundle/headless/README.md) — the one-shot runner that reads its task from the command line.
+- [dsh-app-boot](../app-boot/README.zh.md)——提供这些启动器值的启动序列。
+- [dsh-web-app 组合包](../../bundle/web-app/README.zh.md)——通过此包持有 Web flag 家族的应用。
+- [dsh-headless 组合包](../../bundle/headless/README.zh.md)——从命令行读取任务的一次性 runner。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package resolves the process command line before any session exists; configured rows own every model-visible consequence.
+无。本包在任何会话存在之前解析进程自身的命令行；所有模型可见的影响都由配置行产生。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；本包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe where app-owned command lines are a poor fit or need special care. They are current package constraints, not a task backlog.
+这些限制说明应用自有命令行在何时不合适，或何时需要特别注意。它们是当前包约束，不是任务积压。
 
-- **Launcher flags must precede app arguments** — the split is positional: the first token the launcher does not recognize starts the inner arguments, so `--patch` placed after an app flag belongs to the app. The launcher's parser consumes one `--`, so an app argument that must survive as a literal `--` needs `-- --`.
-- **An app-owned service has no statically declared provider** — consumer rows name it through ordinary injection; a bundle that omits its provider fails at settlement with pending entries naming the service rather than at load.
-- **A user patch that replaces a row's whole `config` drops its expressions** — a flag beats the value written beside it, not a literal a user wrote in place of the expression; keeping the expression is what keeps the flag winning.
+- **启动器的 flag 必须写在应用参数之前**——切分按位置进行：启动器不认识的第一个 token 就是内层参数的起点，因此写在某个应用 flag 之后的 `--patch` 属于应用。启动器的解析器会消耗掉一个 `--`，因此需要以字面量 `--` 传给应用的参数必须写成 `-- --`。
+- **应用自有服务没有静态声明的提供方**——消费方行通过普通注入点名它；缺少提供方的组合包会在结算时失败，由待处理条目点名该服务，而不是在加载时失败。
+- **用户 patch 若整体替换某行的 `config`，会连同其中的表达式一起丢掉**——flag 胜过的是表达式旁写着的那个值，而不是用户用字面量替换掉表达式之后的结果；保留表达式才能保留 flag 的优先级。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+本开发备注是维护者的工作上下文：开放设计问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-#### Open: parser surface
+#### 待定：解析器表面
 
-`parseCmdline` is a commander adapter, not a command-line framework: help, version, and error output follow commander's formatting, and the exit/output routing assumes commander's control-flow model. A different parser would need its own routing and error handling; nothing in the `cmdlineArgs` service contract depends on commander.
+`parseCmdline` 是 commander 适配器，而不是命令行框架：help、version 与错误输出遵循 commander 的格式，退出／输出路由也假定 commander 的控制流模型。改用其他解析器需要它自己的路由与错误处理；`cmdlineArgs` 服务约定中没有任何内容依赖 commander。
 
 </details>

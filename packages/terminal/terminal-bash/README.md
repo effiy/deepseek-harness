@@ -1,41 +1,41 @@
 ---
-description: "The shipped shell backend for persistent terminal sessions: interactive bash or pwsh under the shared sandbox policy, with readiness detection and bounded line-oriented output."
+description: "持久终端会话的随产品交付的 shell 后端：在共享沙箱策略下启动交互式 bash 或 pwsh，带就绪检测与有界逐行输出。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-terminal-bash
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-terminal-bash` starts a persistent interactive shell under the deployment's sandbox policy: the session stays alive across tool calls, readiness for input is detected, and bounded line-oriented output is retained for reads. It provides the `shell` backend type and supports bash on POSIX and pwsh on Windows through a `shellDialect` setting. The same backend composes with local or remote execution worlds through the mounted subprocess provider. Full-screen terminal applications are outside its line-oriented contract.
+`dsh-terminal-bash` 在部署的沙箱策略下启动持久交互式 shell：会话跨工具调用存活，检测 shell 何时可以接收输入，并保留有界的逐行输出供读取。它提供 `shell` 后端类型，并通过 `shellDialect` 设置在 POSIX 上支持 bash、在 Windows 上支持 pwsh。通过已挂载的子进程提供方，同一个后端既可以与本地执行世界组合，也可以与远程执行世界组合。全屏终端应用不在其逐行约定的范围内。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-A terminal without an explicit initial directory starts in the owner's current Session directory. Its sandbox permission root remains governed by Session policy.
+未显式指定初始目录的终端从所属 Session 的当前目录启动。沙箱权限根目录仍由 Session 策略控制。
 
-Mount this backend when a composition needs persistent shell sessions — state such as cwd, exported variables, functions, or running interactive children must survive across tool calls. It is the default `shell` type: a composition that mounts `@deepseek-ai/dsh-terminal` without it has no sessions to open.
+当组合需要持久 shell 会话时挂载此后端——cwd、导出的变量、函数或正在运行的交互式子进程等状态必须跨工具调用存活。它是默认的 `shell` 类型：组合只挂载 `@deepseek-ai/dsh-terminal` 而不挂载它时，将没有任何会话可打开。
 
-### When to choose it
+### 何时选择
 
-Choose this backend when work needs an interactive shell or REPL whose state persists: stepping a debugger, exploring in a Python or Node REPL, or returning to a shell after interrupting a foreground command. Choose the one-shot bash tool for bounded commands that should start and end in one call. The bash dialect targets POSIX; the pwsh dialect targets Windows hosts where `dsh-pwsh-local` can resolve a pwsh executable.
+当工作需要状态持续存在的交互式 shell 或 REPL 时选择此后端：在调试器中单步执行、在 Python 或 Node REPL 中探索，或中断前台命令后回到 shell。对于应当一次调用即开始并结束的有界命令，请选择单次 bash 工具。bash 方言面向 POSIX；pwsh 方言面向 `dsh-pwsh-local` 能解析出 pwsh 可执行文件的 Windows 主机。
 
-### Composition
+### 组合方式
 
-Mount the terminal service, a subprocess provider, the sandbox and policy services, this backend, and a tool package:
+挂载终端服务、子进程提供方、沙箱与策略服务、此后端以及一个工具包：
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -46,138 +46,138 @@ Mount the terminal service, a subprocess provider, the sandbox and policy servic
 - name: '@deepseek-ai/dsh-tool-terminal'
 ```
 
-`danger-full-access` starts the shell directly. Confined modes require a same-world `ctx.sandbox` provider: without one, the spawn fails before the shell starts. Confinement preparation receives the opening signal; cancellation prevents terminal allocation even if the provider returns later.
+`danger-full-access` 直接启动 shell。受限模式要求同一执行世界中存在 `ctx.sandbox` 提供方：缺少时，spawn 会在 shell 启动前失败。限制准备过程接收打开操作的取消信号；即使提供方稍后返回，取消仍会阻止终端分配。
 
-### Configuration
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `backendType` | `shell` | Backend type registered on `ctx.terminals` |
-| `shellDialect` | `bash` | Interactive shell stack: `bash` or `pwsh` |
-| `shellPath` / `shellArgs` | per dialect | Shell executable and arguments; empty selects the dialect defaults |
-| `maxReadBytes` | `262144` | Maximum UTF-8 bytes returned by one read or settled send |
-| `timeoutMs` | `30000` | Absolute bound on one send wait |
-| `disposeGraceMs` | `3000` | Grace before teardown escalates to `SIGKILL` |
+| `backendType` | `shell` | 注册到 `ctx.terminals` 的后端类型 |
+| `shellDialect` | `bash` | 交互式 shell 栈：`bash` 或 `pwsh` |
+| `shellPath` / `shellArgs` | 按方言 | shell 可执行文件与参数；为空时选择方言默认值 |
+| `maxReadBytes` | `262144` | 一次读取或一次结算发送返回的最大 UTF-8 字节数 |
+| `timeoutMs` | `30000` | 一次发送等待的绝对上限 |
+| `disposeGraceMs` | `3000` | 清理升级到 `SIGKILL` 前的宽限时间 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-terminal-bash) is the exhaustive source for every field, including the readiness timings (`pollIntervalMs`, `exactProbeAfterMs`, `idleSilenceMs`, `handoffGraceMs`, `promptTailGraceMs`), terminal size (`rows`, `cols`), and scrollback bounds (`scrollbackLines`, `scrollbackMaxBytes`).
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-terminal-bash)是每个字段的穷尽式真源，包括就绪计时（`pollIntervalMs`、`exactProbeAfterMs`、`idleSilenceMs`、`handoffGraceMs`、`promptTailGraceMs`）、终端尺寸（`rows`、`cols`）与 scrollback 上限（`scrollbackLines`、`scrollbackMaxBytes`）。
 
-### Shell dialects and readiness
+### shell 方言与就绪
 
-Both dialects expose the same readiness contract, so consumers are dialect-agnostic. A send settles when the shell is ready again: after the controlled prompt is verified, after the foreground process group provably waits on stdin (Linux), after output silence (`inferred_idle`), or at the absolute `timeoutMs`. A prompt marker whose printable tail has not arrived yet holds the send on the exact path for `promptTailGraceMs` beyond `idleSilenceMs + handoffGraceMs`, because the marker and its tail are written by the same prompt render. An `inferred_idle` or `timeout` result does not prove the foreground command exited.
+两种方言暴露相同的就绪约定，因此消费方与方言无关。当 shell 再次就绪时发送即结算：受控提示符被验证之后、前台进程组被证明在等待 stdin（Linux）之后、输出静默（`inferred_idle`）之后，或到达绝对 `timeoutMs`。若提示符标记已到达而其可打印尾部尚未到达，send 会在 `idleSilenceMs + handoffGraceMs` 之外继续等待 `promptTailGraceMs`，因为标记与尾部由同一次提示符渲染写出。`inferred_idle` 或 `timeout` 结果并不证明前台命令已退出。
 
-### Sandboxing and safe operation
+### 沙箱与安全运行
 
-The shell runs under the effective sandbox boundary for its whole life. Changing the effective sandbox mode is rejected while the owner still has open sessions or a spawn in progress — wait for creation to settle and close the sessions first, so a terminal opened with wider access cannot survive a downgrade. The backend supplies only terminal-specific environment overrides; the subprocess provider applies its shared credential scrub.
+shell 在整个生命周期内运行在有效的沙箱边界之下。当所有者仍有打开的会话或进行中的 spawn 时，改变有效沙箱模式会被拒绝——请先等待创建完成并关闭会话，避免以更宽权限打开的终端在权限降级后继续存在。后端只提供终端专属的环境覆盖；共享凭据清理由子进程提供方负责。
 
-### Observable outcomes and failures
+### 可观察结果与失败
 
-An open returns the session id and a bounded startup message. Sends settle with one of the four wait reasons and a session status; `session_exit` means the top-level shell exited. Setup failures reject the open: a missing sandbox provider in a confined mode, a shell that exits during startup, a shell that fails to reach readiness before the startup timeout, or caller cancellation. Cleanup failures reject the close instead of claiming success.
+打开会返回会话 id 与有界启动消息。发送以四种等待原因之一与一个会话状态结算；`session_exit` 表示顶层 shell 已退出。设置失败会拒绝打开：受限模式下缺少沙箱提供方、shell 在启动期间退出、shell 未能在启动超时前达到就绪，或调用方取消。清理失败会拒绝关闭，而不是声称成功。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design behind the backend and points at the code that realizes it; the observable behavior is covered in [Use this package](#use-this-package).
+本节解释后端背后的设计并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中说明。
 
-### Design concept
+### 设计理念
 
-One backend serves both dialects: bash and pwsh share the same session machinery — sanitizer, bounded buffers, readiness polling, cancellation, and teardown — and differ only in argv, environment, and prompt installation. Bash receives a private marker through `PS1` plus `PROMPT_COMMAND`. Pwsh writes a prompt function, pins UTF-8 console encoding, and publishes startup only after the backend reports `stdin_read`; echoed setup text cannot publish the shell. A zero-scrollback `@xterm/headless` instance consumes raw PTY data and returns terminal-protocol replies through the same handle, while the line sanitizer remains the only output projection.
+一个后端服务两种方言：bash 与 pwsh 共享同一套会话机制——清理器、有界缓冲区、就绪轮询、取消与关闭——只在 argv、环境与提示符安装方式上不同。bash 通过 `PS1` 加 `PROMPT_COMMAND` 接收私有标记。pwsh 会写入提示符函数、固定 UTF-8 控制台编码，并只在后端报告 `stdin_read` 后发布启动；回显的设置文本不能发布 shell。一个不保留 scrollback 的 `@xterm/headless` 实例会消费原始 PTY 数据，并通过同一句柄返回终端协议响应；逐行 sanitizer 仍是唯一输出投影。
 
-Scrollback and unread send output retain independently owned strings with incremental byte and newline counts, so sanitized slices cannot retain discarded control sequences. Appending and evicting text takes amortized time proportional to incoming text; reads assemble the retained chunks. Retention preserves code-point boundaries and counts the empty line after a trailing newline. The [historical retention decision](../../../.agents/notes/archived/bug-fix/2026-09-11-incremental-terminal-retention.md) records the complexity and measurement rationale.
+Scrollback 和尚未读取的发送输出保留独立拥有的字符串，并增量维护字节数与换行符数，因此清理后的切片不会保留已丢弃的控制序列。追加与淘汰文本的摊还耗时与输入文本量成正比；读取时才拼接保留的分片。保留策略维持码点边界，并将末尾换行符之后的空行计入行数。[历史保留策略决策](../../../.agents/notes/archived/bug-fix/2026-09-11-incremental-terminal-retention.md)记录复杂度与测量依据。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Backend registration, sandbox-mode fence, argv and environment assembly, startup sequence |
-| [`src/config.ts`](src/config.ts) | Dialect resolution, defaults, and validation of every timing field |
-| [`src/session.ts`](src/session.ts) | `LocalPtySession`: send lifecycle, readiness polling, scrollback, signals, close |
-| [`src/sanitize.ts`](src/sanitize.ts) | Streaming control-sequence sanitizer and line normalization |
+| [`src/index.ts`](src/index.ts) | 后端注册、沙箱模式限制、argv 与环境组装、启动序列 |
+| [`src/config.ts`](src/config.ts) | 方言解析、默认值与每个计时字段的校验 |
+| [`src/session.ts`](src/session.ts) | `LocalPtySession`：发送生命周期、就绪轮询、scrollback、信号、关闭 |
+| [`src/sanitize.ts`](src/sanitize.ts) | 流式控制序列清理器与行规范化 |
 
-### Readiness model
+### 就绪模型
 
-Three bounded tiers settle a send: exact stdin-wait evidence from the subprocess provider (Linux only), the verified private prompt marker with an exact printable tail, and output silence (`inferred_idle`); an absolute timeout always bounds the wait. Pwsh startup uses one deadline across its complete setup loop, so an `inferred_idle` follow-up does not restart the bound. Evidence collected before the provider write is discarded at the write boundary, a stdin wait that predates the write is not post-write readiness, and unknown foreground state is never a positive exact-idle signal.
+三个有界档位结算一次发送：来自子进程提供方的精确 stdin 等待证据（仅 Linux）、带精确可打印尾部的受控私有提示符标记，以及输出静默（`inferred_idle`）；绝对超时始终限制等待。pwsh 启动的完整设置循环共用同一个截止时间，因此 `inferred_idle` 后续发送不会重新计时。提供方写入前收集的证据会在写入边界丢弃，早于写入的 stdin 等待不算写入后就绪，未知的前台状态绝不是精确空闲的正向信号。
 
-### Send cancellation and teardown
+### 发送取消与关闭
 
-Cancellation marks queued input as canceled, then signals the current foreground process group with a real `SIGINT` after any in-flight provider write settles; it never emulates interruption by writing `\x03`. Closing stops readiness polling, terminates the provider-owned process tree, awaits quiescence, and settles the active send as `session_exit`.
+取消先把排队输入标记为已取消，再在任何在途的提供方写入结算后向当前前台进程组发送真正的 `SIGINT`；它绝不会通过写入 `\x03` 模拟中断。关闭会停止就绪轮询、终止提供方拥有的进程树、等待完全停稳，并把活跃发送结算为 `session_exit`。
 
-### Sandbox-mode fence
+### 沙箱模式限制
 
-A write that would change the effective sandbox mode is rejected before the `sandbox/mode` event commits while that owner has an open session or a spawn in progress. The fence is attached to the exact owner and outlives a provider reload that retains existing sessions.
+当所有者存在打开的会话或进行中的 spawn 时，凡是会改变有效沙箱模式的写入都会在 `sandbox/mode` 事件提交前被拒绝。该限制绑定到确切所有者，并在保留现有会话的提供方重新加载后依然有效。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the shared terminal model to the service, the tools, and the execution-world substrate.
+当包级约定不够用时阅读以下页面。它们从共享终端模型进入服务、工具与执行世界基底。
 
-- [Terminal subsystem reference](../../../docs/subsystems/terminal.md) — the service contract this backend implements and the generated `ctx.terminals` surface.
-- [terminal service](../terminal/README.md) — backend registration, owner fencing, and cleanup semantics.
-- [tool-terminal tools](../../experimental/tool-terminal/README.md) — the model-facing tools that operate sessions.
-- [Subprocess seam](../../../docs/subsystems/subprocess.md) — the terminal primitive that owns PTY allocation and process-tree cleanup.
-- [Persistent PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the capability design and deferred boundaries.
-- [Persistent pwsh Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md) — the Windows substrate and the pwsh dialect.
+- [终端子系统参考](../../../docs/subsystems/terminal.zh.md)——此后端实现的服务约定与生成的 `ctx.terminals` 接口面。
+- [terminal 服务](../terminal/README.zh.md)——后端注册、所有者限制与清理语义。
+- [tool-terminal 工具](../../experimental/tool-terminal/README.zh.md)——操作会话的面向模型工具。
+- [子进程 seam](../../../docs/subsystems/subprocess.zh.md)——负责 PTY 分配与进程树清理的终端原语。
+- [持久 PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.zh.md)——能力设计与暂缓边界。
+- [持久 pwsh Agent Note](../../../.agents/notes/archived/architecture/2026-08-11-pwsh-persistent-pty.md)——Windows 基底与 pwsh 方言。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Indirect consumer
+### 间接消费方
 
-#### What the model sees
+#### 模型看到什么
 
-This package registers no prompt or tool. Through `@deepseek-ai/dsh-tool-terminal` or another PTY consumer, the model may receive bounded startup output, send deltas, scrollback pages, readiness reasons, and cleanup errors.
+此包不注册提示词或工具。模型通过 `@deepseek-ai/dsh-tool-terminal` 或其他 PTY 消费方可能收到有界的启动输出、发送增量、scrollback 页、就绪原因与清理错误。
 
-#### Token effect
+#### Token 影响
 
-Retained PTY scrollback is not placed in model history until a consumer returns bounded output.
+在消费方返回有界输出之前，保留的 PTY scrollback 不会进入模型历史。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; consumer results remain append-only.
+不会直接失效；消费方结果保持仅追加。
 
-### Sandbox policy context
+### 沙箱策略上下文
 
-#### What the model sees
+#### 模型看到什么
 
-While this backend is composed, the `sandbox-policy` owner contributes the capability-neutral `sandbox:policy` runtime-context clause to prompts.
+组合此后端期间，`sandbox-policy` 归属方会向提示词贡献与具体能力无关的 `sandbox:policy` 运行时上下文子句。
 
-#### Token effect
+#### Token 影响
 
-The policy clause is present on requests while the backend is mounted.
+后端挂载期间，请求中会包含该策略子句。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-A standing-policy change appends a superseding runtime-context snapshot after retained history.
+常驻策略发生变化时，会在保留的历史之后追加一份取代先前状态的运行时上下文快照。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the backend is a poor fit or needs special operational care. They are current package constraints, not a general shell comparison or a task backlog.
+这些限制说明后端何时不合适或需要特别的运维注意。它们是当前包约束，不是通用 shell 对比或任务积压。
 
-- **Line-oriented output only** — a headless xterm maintains control-sequence state only for terminal-protocol replies. Returned output remains normalized to lines, and full-screen alternate-buffer interaction is unsupported.
-- **Readiness is heuristic without an exact tier** — exact stdin-wait detection depends on the mounted subprocess provider; providers that cannot prove it (macOS, Windows) settle on prompt-marker and silence/timeout readiness.
-- **pwsh bootstrap in a constrained sandbox** — the prompt function and UTF-8 pin write through `[Console]::`, which the Windows ACL sandbox's read-only mode may deny. When that prevents marker readiness, startup rejects at `timeoutMs` instead of publishing an incomplete shell.
-- **Cleanup guarantees belong to the provider** — process-tree teardown is the `SubprocessTerminalHandle` contract, not this backend's.
-- **Sessions do not survive process exit** — a harness restart destroys every session.
+- **仅逐行输出**——headless xterm 只为终端协议响应维护控制序列状态。返回输出仍按行规范化；不支持全屏备用缓冲区交互。
+- **没有精确档时，就绪是启发式的**——精确 stdin 等待检测取决于已挂载的子进程提供方；无法证明该状态的提供方（macOS、Windows）按提示符标记与静默／超时就绪结算。
+- **受限沙箱中的 pwsh 引导**——提示符函数与 UTF-8 编码固定操作通过 `[Console]::` 写入，Windows ACL 沙箱的只读模式可能拒绝。若因此无法获得标记就绪状态，启动会在 `timeoutMs` 到期时拒绝，而不会发布不完整的 shell。
+- **清理保证属于提供方**——进程树清理是 `SubprocessTerminalHandle` 的约定，而不是此后端的。
+- **会话不随进程退出存活**——harness 重启会销毁所有会话。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

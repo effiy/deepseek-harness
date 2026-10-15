@@ -1,31 +1,31 @@
 ---
-description: "DeepSeek api-key authentication and model discovery."
+description: "DeepSeek API key authentication and model discovery."
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-llm-deepseek-api-key
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Register authentication and model discovery for `deepseek-official`. This plugin shares the [Messages transport](../llm-deepseek/README.md) and owns credential resolution and catalog availability.
+为 `deepseek-official` 注册独立的鉴权和模型发现插件。通过 [llm-deepseek](../llm-deepseek/README.zh.md) 共用 Messages 请求实现；本包拥有凭据解析和目录可用性判断。
 
-Authentication resolution returns the validated API key in `x-api-key` for both Messages and Files requests.
+鉴权解析将验证后的 API key 放入 `x-api-key`，供 Messages 和 Files 请求共同使用。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用此包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用此包
 
-`apiKeyEnv` defaults to `DEEPSEEK_API_KEY` and resolves per request and model discovery. When the credentials service exists, its precedence applies; only compositions without that service read the launch environment directly. Requests with missing credentials fail with `MISSING_CREDENTIAL`; malformed credentials fail with `INVALID_CREDENTIAL`. Model discovery returns an empty catalog when the credential is missing, hiding the route from model selectors while retaining its settings entry. Malformed credentials and other lookup failures propagate. Adding or removing a key affects the next discovery call.
+`apiKeyEnv` 默认为 `DEEPSEEK_API_KEY`，在每次请求和模型发现时解析凭据。已组合 credentials 服务时，按其优先级解析；只有未组合该服务时才直接读取启动环境。请求时凭据缺失以 `MISSING_CREDENTIAL` 失败；格式错误以 `INVALID_CREDENTIAL` 失败。模型发现在凭据缺失时返回空目录，在模型选择器中隐藏该路由，但保留其设置入口。凭据格式错误和其他读取失败继续上报。添加或删除密钥会影响下一次模型发现。
 
 ```yaml
 - id: llm-deepseek
@@ -35,44 +35,44 @@ Authentication resolution returns the validated API key in `x-api-key` for both 
     apiKeyEnv: DEEPSEEK_API_KEY
 ```
 
-The endpoint and credential reference come from one configuration resolution. In-flight requests retain that snapshot; subsequent updates affect subsequent calls. Account login state cannot change this route’s credential.
+端点和凭据引用来自同一次配置解析；进行中的请求保留该快照，后续配置更新仅影响后续请求。账号登录态不影响该路由使用的凭据。
 
-`models` is an independently configurable catalog for this provider; defaults and protocol capabilities come from the shared transport. Discovery does not probe inference endpoints. The settings namespace is the Cordis entry id, or the plugin name without an entry. Product profiles retain the official entry id `llm-deepseek` and use `llm-deepseek-account` for the account route.
+`models` 是该 provider 独立的可配置目录；默认值和协议能力来自共享传输包。目录判断不探测推理端点。设置命名空间采用 Cordis entry id，没有 entry 时采用插件名。产品保留 official 的 `llm-deepseek` entry id，账号使用 `llm-deepseek-account`。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
-Registrations and listeners dispose with the plugin. Shared Host wiring supplies attachments, request extensions, anonymous identity, and atomic retry-policy updates; this plugin registers only its own route.
+注册和监听随插件生命周期释放。共享 Host 绑定提供附件访问、请求扩展、匿名标识和重试策略的原子更新；本包只注册自己的路由。
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-[LLM streaming](../../../docs/subsystems/llm-streaming.md) · [Messages](../llm-deepseek/README.md)
+[LLM streaming](../../../docs/subsystems/llm-streaming.zh.md) · [Messages](../llm-deepseek/README.zh.md)
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Authenticated model requests
+### 已鉴权的模型请求
 
 #### What the model sees
 
-Requests on `deepseek-official` add no model-visible text from this plugin; the shared Messages transport serializes requests.
+`deepseek-official` 请求不包含本插件添加的模型可见文本；请求由共享 Messages 传输序列化。
 
 #### Token effect
 
-Authentication and discovery add no input tokens; the selected model and request content determine actual usage.
+鉴权和目录过滤不增加输入 token；实际调用的 token 由所选模型与请求内容决定。
 
 #### KV Cache effect
 
-Credentials and catalog availability do not enter model input; the protocol transport owns request-prefix serialization.
+凭据与目录可用性不进入模型输入；协议传输拥有请求前缀的序列化。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- The catalog is configuration metadata, not remote validation that a model is accepted; actual calls can still fail.
+- 目录是配置元数据，不验证远端是否接受模型；实际调用仍可能失败。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
-Registration and authentication tests also cover the Loader composition in the shared transport package.
+注册与鉴权的测试也覆盖共享传输包中的 Loader 组合场景。

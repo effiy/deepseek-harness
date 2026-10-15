@@ -1,111 +1,111 @@
 ---
-description: "Workspace-directory picking seam for the web GUI host: the service contract, capability vocabulary, and error codes the native and browse backends implement."
+description: "面向 web GUI 宿主的工作区目录选择 seam：原生与浏览后端所实现的服务约定、能力词汇与错误码。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-host-directory-picker
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The web GUI lets an operator choose a workspace directory with either an OS chooser or an in-app browser. Use the native option when the operator can reach the host display; use the browser option for remote clients or when directory listing and creation must stay in the app. Consumers receive the interaction kind and can present the matching workflow. Directory picking is limited to the GUI host and never affects the agent loop. The browser workflow exposes one directory tree at a time; multiple roots are unsupported.
+web GUI 让操作者通过 OS 选择器或应用内浏览器选择工作区目录。操作者能接触宿主屏幕时使用原生选项；远程客户端或需要在应用内列举和创建目录时使用浏览选项。消费方会获得交互类型，并能呈现匹配的工作流。目录选择仅限 GUI 宿主，不会影响 agent loop（智能体循环）。浏览工作流一次只公开一棵目录树；不支持多根目录。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount exactly one directory-picker backend and let the workspace flow drive it: the seam itself is only the service contract, so a composition without a backend has no way to pick a directory.
+挂载且只挂载一个目录选择后端，然后让工作区流程驱动它：seam 本身只是服务约定，因此没有后端的组合就无从选择目录。
 
-### Choosing a backend
+### 选择后端
 
-The [native backend](../directory-picker-native/README.md) is the right choice when the operator sits at the host's display: `directoryPicker/pick` opens one OS chooser and returns the chosen absolute path, or `null` on cancel. The [browse backend](../directory-picker-browse/README.md) works everywhere — it lists one directory level and creates child directories from the browser, so remote clients that cannot reach an OS dialog still pick a workspace. When the host situation varies between boots, compose the [adaptive chooser](../directory-picker-auto/README.md), which resolves the situation once at boot and mounts the matching backend.
+当操作者坐在宿主屏幕前时，[原生后端](../directory-picker-native/README.zh.md)是正确选择：`directoryPicker/pick` 打开一个 OS 选择器，返回所选绝对路径，取消时返回 `null`。[浏览后端](../directory-picker-browse/README.zh.md)处处可用——它在浏览器中列举一个目录层级并创建子目录，因此无法触达 OS 对话框的远程客户端依然能选择工作区。当宿主处境在两次启动之间变化时，组合[自适应选择器](../directory-picker-auto/README.zh.md)，它在启动时判定一次处境并挂载匹配的后端。
 
-### The capability contract
+### 能力约定
 
-`capability()` returns a discriminated union describing how an operator selects a directory: `{ kind: 'native', pick(signal) }` for the OS chooser, or `{ kind: 'browse', list(path?), createDirectory(path, name) }` for the in-app browser. Consumers switch on `kind`; a capability kind no composition implements means the UI hides the picking affordance rather than failing. Browse failures throw the typed `DirectoryPickerError` with a closed code set — `directory-unreadable`, `directory-exists`, or `directory-create-failed` — each carrying the subject path, which the picking Remote controller maps 1:1 onto wire failure codes.
+`capability()` 返回一个可辨识联合类型，说明操作者如何选择目录：OS 选择器为 `{ kind: 'native', pick(signal) }`，应用内浏览器为 `{ kind: 'browse', list(path?), createDirectory(path, name) }`。消费方按 `kind` 分支；遇到未知能力类型时，界面会隐藏选择入口，而不是失败。浏览失败抛出带类型的 `DirectoryPickerError`，其错误码集合是封闭的——`directory-unreadable`、`directory-exists` 或 `directory-create-failed`——每个都携带出错对象的路径，目录选择 Remote 控制器将其 1:1 映射为协议错误码。
 
-### What rows carry
+### 行携带什么
 
-`DirectoryEntry` rows expose the absolute `path` and a host-owned `hidden` flag (dot-prefixed on POSIX) so display policy stays client-side; clients never join path segments themselves. `DirectoryListing.crumbs` is the ancestor chain from the filesystem root to the listed directory — every crumb is a jump target, and the root crumb is labeled by its full path.
+`DirectoryEntry` 行暴露绝对 `path` 与宿主判定的 `hidden` 标志（POSIX 上为点前缀约定），展示策略留在客户端；客户端绝不自行拼接路径段。`DirectoryListing.crumbs` 是从文件系统根到被列举目录的祖先链——每个 crumb 都是跳转目标，根 crumb 以完整路径标注。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-### Design concept
+### 设计理念
 
-The seam is built on one separation: the interaction shape a backend provides is a contract, not an implementation detail. `DirectoryPicker` is an abstract Cordis service with a single `capability()` method; a backend subclass registers as `ctx.directoryPicker`, and loading a second implementation throws the standard duplicate-service error. The capability object must be stable for the service lifetime because consumers may capture it across calls.
+该 seam 建立在一个分离之上：后端提供的交互形态是约定，而不是实现细节。`DirectoryPicker` 是只有一个 `capability()` 方法的抽象 Cordis 服务；后端子类以 `ctx.directoryPicker` 注册，加载第二个实现会抛出标准的重复服务错误。能力对象在服务生命周期内必须保持稳定，因为消费方可能跨调用持有它。
 
-### The merge-extensible vocabulary
+### 可合并扩展的词汇
 
-`DirectoryPickerCapabilities` is a merge-extensible map keyed by capability kind, and `DirectoryPickerCapability` derives the union from it. A new backend declaration-merges its shape here (the entry's `kind` literal must equal its key) instead of editing this package. Each backend package also ships a browser entrypoint that registers the matching interaction in ui-workspace's directory-flow slots, so one composition row selects both the host capability and the client flow.
+`DirectoryPickerCapabilities` 是以能力类型为键的可合并扩展映射，`DirectoryPickerCapability` 从它派生联合类型。新后端通过声明合并将其形态加入此映射（条目的 `kind` 字面量必须等于其键），而无需改动本包。每个后端包还随附一个 browser 入口，在 ui-workspace 的 directory-flow slot 中注册匹配的交互，因此一行组合配置同时选择宿主能力与客户端流程。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Service Definition: abstract `DirectoryPicker`, capability vocabulary, typed error, Context merge |
+| [`src/index.ts`](src/index.ts) | Service Definition：抽象 `DirectoryPicker`、能力词汇、类型化错误、Context 合并 |
 
-### Failure vocabulary
+### 失败词汇
 
-`DirectoryPickerError` carries a closed `DirectoryPickerErrorCode` plus the absolute subject path, so consumers map business codes without string matching. The seam Agent Note records the design rationale, the separation from `ctx.fs`, and the policy decisions.
+`DirectoryPickerError` 携带封闭的 `DirectoryPickerErrorCode` 加出错对象的绝对路径，消费方无需字符串匹配即可映射业务错误码。设计依据、与 `ctx.fs` 的切分与策略裁决见 seam Agent Note。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these when the seam contract is not enough: the decision record first, then the two backends and the adaptive chooser that compose it.
+当 seam 约定不够用时阅读以下内容：先看决策记录，再看组合它的两个后端与自适应选择器。
 
-- [Directory-picker capability seam decision](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md) — design rationale, the `ctx.fs` separation, and the policy decisions.
-- [Native backend](../directory-picker-native/README.md) — the OS-chooser interaction and its platform tooling.
-- [Browse backend](../directory-picker-browse/README.md) — the in-app listing and creation interaction for remote clients.
-- [Adaptive chooser](../directory-picker-auto/README.md) — boot-time resolution between the two backends.
-- [Workspace subsystem](../../../docs/subsystems/workspace.md) — the workspace records the picked directory feeds.
+- [目录选择能力 seam 决策](../../../.agents/notes/archived/architecture/2026-07-28-directory-picker-capability-seam.md)——设计依据、`ctx.fs` 切分与策略裁决。
+- [原生后端](../directory-picker-native/README.zh.md)——OS 选择器交互及其平台工具。
+- [浏览后端](../directory-picker-browse/README.zh.md)——面向远程客户端的应用内列举与创建交互。
+- [自适应选择器](../directory-picker-auto/README.zh.md)——两个后端之间的启动时判定。
+- [工作区子系统](../../../docs/subsystems/workspace.zh.md)——接收所选目录的工作区记录。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the GUI-host picking seam registers nothing model-facing.
+无。GUI 宿主的目录选择 seam 不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；该包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the seam contract leaves a decision to a future consumer. They are current package constraints, not a task backlog.
+这些限制说明 seam 约定何时把决定留给未来的消费方。它们是当前包约束，不是任务积压。
 
-- **No multi-root support** — the browse contract exposes one ancestry chain per listing; per-deployment root scoping (and Windows drive-root enumeration above a drive) waits for a consumer that needs it, per the DirectoryPicker Agent Note.
+- **不支持多根目录**——浏览约定每次列举只公开一条祖先链；按部署限定浏览根（以及在盘符根的上一级枚举 Windows 各盘符根目录）等到出现需要它的消费方再做，见 DirectoryPicker Agent Note。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

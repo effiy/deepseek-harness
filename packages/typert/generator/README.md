@@ -1,35 +1,35 @@
 ---
-description: "The build-time Typert generator: source type analysis, compiler-independent models, and artifact emission for maintainers wiring Typert publication or consuming generated artifacts."
+description: "构建时 Typert 生成器：源代码类型分析、与编译器无关的模型与产物生成，供接入 Typert 发布或消费生成产物的维护者阅读。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-typert-generator
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-typert-generator` lets maintainers turn public TypeScript types into build artifacts and compiler-independent models. Packages opt in through the `./typert` and optional `./client/typert` exports, and generation rejects declarations, publish lists, Remote exports, or Zod projections that it cannot represent correctly. Repository builds emit executable schema factories and matching declarations, while tools can call `WorkspaceAnalyzer` for inspection or catalog generation without publishing artifacts. Generation runs only at build time and never in a live agent session.
+`dsh-typert-generator` 让维护者把公开的 TypeScript 类型转换为构建产物和与编译器无关的模型。包通过 `./typert` 和可选的 `./client/typert` 导出选择加入；如果声明、发布清单、Remote 导出或 Zod 投影无法被正确表示，生成过程就会失败。仓库构建会生成可执行 schema factory 与配套声明，工具也可以调用 `WorkspaceAnalyzer` 完成检查或目录生成而不发布产物。生成过程只在构建时运行，绝不会进入实时 agent（智能体）会话。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-This package is for package and repository maintainers who wire Typert generation into a build or consume generated artifacts. Publication is opt-in: declare the export entries, run the build, and the artifacts appear in `lib/`; static analysis needs no artifact.
+本包供把 Typert 生成接入构建或消费生成产物的包维护者与仓库维护者使用。发布是选择加入的：声明导出入口、运行构建，产物即出现在 `lib/` 中；静态分析则不需要产物。
 
-### Publishing Typert artifacts from a package
+### 从包中发布 Typert 产物
 
-A contributing package declares the host-face artifact export in `package.json`; packages that contribute both faces also declare `./client/typert`, and packages with Remote methods declare `./remote`:
+参与贡献的包在 `package.json` 中声明宿主侧产物导出；同时贡献两侧的包还要声明 `./client/typert`，含 Remote 方法的包还要声明 `./remote`：
 
 ```yaml
 exports:
@@ -41,105 +41,105 @@ files:
   - "lib/typert.host.d.ts"
 ```
 
-After the build, `lib/typert.host.js` and `lib/typert.host.d.ts` exist and the [loader](../loader/README.md) registers the contribution in Loader compositions. The generated declaration file exposes `TYPERT` as `unknown`, so contributing packages never depend on the runtime registry. The generator fails the build when a declaration is missing, points at the wrong file, or publishes Remote artifacts without Remote methods; unsupported Zod projections fail with a `TypertEmitError` naming the construct instead of flattening or weakening the source type.
+构建完成后，`lib/typert.host.js` 与 `lib/typert.host.d.ts` 即存在，[loader](../loader/README.zh.md) 会在 Loader 组合中注册该贡献。生成的声明文件把 `TYPERT` 暴露为 `unknown`，因此参与贡献的包永远不会依赖运行时注册表。当声明缺失、指向错误文件，或在没有 Remote 方法的情况下发布 Remote 产物时，生成器会使构建失败；不支持的 Zod 投影会以 `TypertEmitError` 指明具体构造并失败，而不会展平或弱化源类型。
 
-### Analyzing a workspace statically
+### 静态分析工作区
 
-Static consumers call `WorkspaceAnalyzer` directly against the workspace's `tsconfig.host.json` and `tsconfig.client.json` aggregates, select a face and package subset, and read the resulting `FaceModel` and type graph without emitting or loading runtime artifacts. `analyzeInBatches()` processes a large package selection through bounded compiler programs with the same model shape, and `discoverPackages()` finds contributing packages without building a type-checker program.
+静态消费方直接针对工作区的 `tsconfig.host.json` 与 `tsconfig.client.json` 聚合配置调用 `WorkspaceAnalyzer`，选择 face 与包子集，并在不生成或加载运行时产物的前提下读取生成的 `FaceModel` 与类型图。`analyzeInBatches()` 通过有界的编译器程序处理大批量包选择，模型形态保持一致；`discoverPackages()` 无需构建类型检查程序即可找出参与贡献的包。
 
-JSON, YAML, SVG, PNG, JPEG, and WebP resource exports contribute no TypeScript declarations and are excluded from the API model. Missing JavaScript or TypeScript export sources remain errors.
+JSON、YAML、SVG、PNG、JPEG 和 WebP 资源导出不提供 TypeScript 声明，因此不进入 API 模型。JavaScript 或 TypeScript 导出源文件缺失时仍报错。
 
-### Running generation inside a tsdown build
+### 在 tsdown 构建中运行生成
 
-The package's `./tsdown` subpath provides `typertPlugin()` for the root tsdown config: it lowers standard decorators in TypeScript dependencies before bundling and emits the model-driven face artifacts at the package output root. In `package` mode it emits only the bundled package; in `workspace` mode it emits every explicit contributor once.
+包的 `./tsdown` 子路径为根 tsdown 配置提供 `typertPlugin()`：它在打包前转换 TypeScript 依赖中的标准装饰器，并在包输出根目录生成模型驱动的 face 产物。`package` 模式只生成当前打包的包；`workspace` 模式对每个显式贡献方各生成一次。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains how the generator reaches a compiler-independent model and what it emits; the observable build behavior is covered in [Use this package](#use-this-package).
+本节解释生成器如何得到与编译器无关的模型以及它生成什么；可观察的构建行为已在[使用本包](#use-this-package)中说明。
 
-### Design concept
+### 设计理念
 
-The generator is built on one separation: extraction and emission are decoupled through the compiler-independent model. `WorkspaceAnalyzer` reads TypeScript programs seeded from the face aggregate tsconfigs and produces `FaceModel` and `TypeGraph` data; `FaceModelEmitter` consumes only that model and never receives compiler nodes. The model retains declaration identity, generic parameters and applications, explicit inheritance, conditional and mapped types, import attributes, abstract modifiers, and source JSDoc, and excludes constructors, static members, and non-public members.
+生成器遵循一项核心分离原则：提取与生成通过与编译器无关的模型解耦。`WorkspaceAnalyzer` 读取以 face aggregate tsconfig 为种子的 TypeScript 程序，产出 `FaceModel` 与 `TypeGraph` 数据；`FaceModelEmitter` 只消费该模型，绝不接收编译器节点。模型保留声明标识、泛型参数及应用、显式继承、条件类型与映射类型、导入属性、abstract 修饰符与源码 JSDoc，并排除构造函数、静态成员与非公共成员。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Public API: analyzer, emitter, workspace generator, renderer, catalog projection |
-| [`src/analyzer.ts`](src/analyzer.ts) | `WorkspaceAnalyzer`: face programs, check/write modes, batching, discovery, source index |
-| [`src/model.ts`](src/model.ts) | Compiler-independent model types |
-| [`src/emitter.ts`](src/emitter.ts) | `FaceModelEmitter`: Zod schema and declaration emission, Remote declarations |
-| [`src/workspace.ts`](src/workspace.ts) | `WorkspaceTypertGenerator`: discovery, generation, export and files validation |
-| [`src/tsdown-plugin.ts`](src/tsdown-plugin.ts) | tsdown plugin face: decorator lowering and artifact emission |
-| [`src/cordis-catalog.ts`](src/cordis-catalog.ts) | Catalog projection used by the generated Cordis catalogs |
+| [`src/index.ts`](src/index.ts) | 公共 API：分析器、生成器、工作区生成器、渲染器、目录投影 |
+| [`src/analyzer.ts`](src/analyzer.ts) | `WorkspaceAnalyzer`：face 程序、check/write 模式、分批、发现、源码索引 |
+| [`src/model.ts`](src/model.ts) | 与编译器无关的模型类型 |
+| [`src/emitter.ts`](src/emitter.ts) | `FaceModelEmitter`：Zod schema 与声明生成、Remote 声明 |
+| [`src/workspace.ts`](src/workspace.ts) | `WorkspaceTypertGenerator`：发现、生成、导出与文件清单校验 |
+| [`src/tsdown-plugin.ts`](src/tsdown-plugin.ts) | tsdown 插件面：装饰器转换与产物生成 |
+| [`src/cordis-catalog.ts`](src/cordis-catalog.ts) | 生成 Cordis 目录所用的目录投影 |
 
-### Analysis and faces
+### 分析与 face
 
-Host and Client are independent TypeScript programs. Direct project references establish compiler-face membership, while `dsh.client` package subpaths establish runtime-face contribution; `package.json#exports` marks every cross-package public boundary, and imports or re-exports are the only cross-face edges. A relative import that resolves inside the referencing package is followed through that module's re-exports until a package specifier appears, so package-local forwarding modules keep their original declaration references; a relative import that resolves into another package fails. `check` mode fails on syntax or semantic diagnostics, missing public annotations, private cross-package references, and reachable declaration merges the model cannot retain losslessly; `write` mode inserts checker-derived annotations and returns a clean check-mode model. Types owned by NPM dependencies remain `external` references instead of being expanded. A stream method's return type may be `Iterable<Out>`, `AsyncIterable<Out>`, or the protocol's `RemoteStream<Out, In>`, recognized by symbol and declaring package like the standard-library wrappers; a second type argument other than `never` yields the descriptor's uplink codec, and the generated Client signature returns `RemoteStreamHandle<Out, In>`.
+Host 与 Client 是两个独立的 TypeScript 程序。直接项目引用确定编译器 face 的成员归属，`dsh.client` 包子路径则确定运行时 face 的贡献；`package.json#exports` 划定所有跨包公开边界，跨 face 的边只能来自导入或重新导出。解析到本包内部模块的相对导入会沿该模块的重新导出继续追踪，直到出现包说明符，因此包内转发模块保留原始声明引用；解析到其他包的相对导入会失败。`check` 模式遇到语法或语义诊断、缺失的公开类型标注、跨包私有引用，以及模型无法无损保留的可达声明合并时都会失败；`write` 模式插入类型检查器推导出的标注，并返回无诊断的 check 模式模型。NPM 依赖拥有的类型继续以 `external` 引用表示，不会被展开。流方法的返回类型可以是 `Iterable<Out>`、`AsyncIterable<Out>` 或协议包的 `RemoteStream<Out, In>`，后者与标准库包装器一样按符号名与声明所在包识别；第二个类型参数不为 `never` 时产出描述符的上行编解码器，生成的 Client 签名则返回 `RemoteStreamHandle<Out, In>`。
 
-### Emission and publication contract
+### 生成与发布约定
 
-`FaceModelEmitter` emits executable JavaScript containing success-cached Zod schema factories and the `TYPERT` contribution, plus a declaration file whose factories return `z.ZodType<SourceType>` through the package's public export; unsupported Zod projections fail. The Host face with Remote methods additionally emits `typert.remote-client.*` projections of Host Remote contracts for the Client. `WorkspaceTypertGenerator` validates each contributor's `package.json`: `./typert` and `./client/typert` (and `./remote` when Remote methods exist) must point at the exact generated files, and the `files` list must include them.
+`FaceModelEmitter` 输出包含只缓存成功结果的 Zod schema factory 与 `TYPERT` 贡献的可执行 JavaScript，以及把 factory 通过包的公开导出标注为返回 `z.ZodType<SourceType>` 的声明文件；不支持的 Zod 投影会失败。含 Remote 方法的 Host face 还会额外为 Client 生成 Host Remote 约定的 `typert.remote-client.*` 投影。`WorkspaceTypertGenerator` 校验每个贡献方的 `package.json`：`./typert` 与 `./client/typert`（存在 Remote 方法时还有 `./remote`）必须指向精确的生成文件，且 `files` 清单必须包含它们。
 
-[Unary binary results](../protocol/README.md) are recognized after generic type resolution. Their codecs validate the byte-array type and JSON metadata without iterating, copying, or freezing the byte payload; generated Client declarations retain the authored metadata and narrow the byte backing to `ArrayBuffer`.
+[一元二进制结果](../protocol/README.zh.md)在泛型类型解析后被识别。其 codec 校验字节数组类型与 JSON 元数据，不遍历、复制或冻结字节载荷；生成的 Client 声明保留原有元数据类型，并将字节的底层缓冲区收窄为 `ArrayBuffer`。
 
-### Catalog projection
+### 目录投影
 
-The runtime type closure indexes exported workspace declarations and referenced framework enums. Vendored declarations stay outside business API discovery; their enums remain available when a public result refers to them.
+运行时类型闭包索引导出的 workspace 声明和被引用的框架 enum。Vendor 声明不参与业务 API 发现；公共结果引用其中 enum 时，目录仍提供其定义。
 
-The root export includes the model-driven extraction, completeness checks, and deterministic text renderers used by this repository's Cordis catalogs. They accept a `CordisCatalogPolicy`; repository-owned type links, foundation and exemption classifications, and inherited Cordis entries stay in `scripts/gen-cordis-catalog.ts` and are passed in explicitly, so this package contains projection mechanics, not a hidden copy of the repository's documentation taxonomy.
+根导出包含本仓库 Cordis 目录使用的模型驱动提取逻辑、完整性检查与确定性文本渲染器。它们接受 `CordisCatalogPolicy`；由仓库持有的类型链接、基础类型／豁免分类与继承的 Cordis 条目仍位于 `scripts/gen-cordis-catalog.ts`，由调用方显式传入，因此本包只包含投影机制，不会隐式复制仓库的文档分类体系。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough; they move from the generated model to the runtime and the Remote-call path.
+当包级约定不够用时阅读以下页面；它们从生成模型逐步进入运行时与 Remote 调用路径。
 
-- [Typert subsystem reference](../../../docs/subsystems/typert.md) — the Remote contracts and registry interfaces the generator models.
-- [Typert protocol](../protocol/README.md) — the declarations generated artifacts extend and consume.
-- [Typert registry](../registry/README.md) — the runtime store the emitted artifacts feed.
-- [API Gateway reference](../../../docs/api-gateway.md) — how generated Remote descriptors are invoked end to end.
-- [Compiler-independent model Agent Note](../../../.agents/notes/implemented/architecture/2026-07-27-compiler-independent-typert-model.md) — the model design, alternatives, and consequences.
+- [Typert 子系统参考](../../../docs/subsystems/typert.zh.md)——生成器建模的 Remote 约定与注册表接口。
+- [Typert 协议](../protocol/README.zh.md)——生成产物所扩展并消费的声明。
+- [Typert 注册表](../registry/README.zh.md)——生成产物所供给的运行时存储。
+- [API 网关参考](../../../docs/api-gateway.zh.md)——生成的 Remote 描述符如何端到端被调用。
+- [与编译器无关的模型 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-27-compiler-independent-typert-model.zh.md)——模型设计、备选方案与后果。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the build-time generator runs outside any agent runtime and touches no model request.
+无，因为构建时生成器在任何 agent 运行时之外运行，不触及任何模型请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct effect; generated artifacts reach a request only when a consumer places them in one.
+无直接影响；生成产物只有在消费方将其放入请求时才会触及请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the generator cannot model or emit; they are current package constraints, not a task backlog.
+这些限制说明生成器无法建模或生成的构造；它们是当前包约束，不是任务积压。
 
-- **Package export patterns are skipped** — contributing packages need concrete export targets; wildcard export patterns are not analyzed.
-- **Namespace re-exports across faces fail** — named and star re-exports produce links, but a namespace re-export cannot be represented until `TypeTargetModel` can model a module namespace without flattening it.
-- **The Zod emitter supports a deliberate subset** — generic schema declarations and computed constructs such as conditional or mapped schema roots fail until a concrete schema-factory policy exists.
-- **No generated schema imports across faces** — cross-face links are represented for analysis, but no generated schema requires a runtime cross-face Zod import.
-- **Discovery covers concrete public exports only** — declarations neither exported nor imported by the reachable graph are intentionally outside the package model.
+- **包导出模式会被跳过**——参与贡献的包需要具体的导出目标；通配符导出模式不会被分析。
+- **跨 face 的命名空间重新导出会失败**——具名与星号重新导出会生成链接，但在 `TypeTargetModel` 能够不经展平表示模块命名空间之前，命名空间重新导出无法表示。
+- **Zod 生成器只支持有意限定的子集**——泛型 schema 声明，以及以条件类型或映射类型为 schema 根的计算构造，都会失败，直到存在明确的 schema 工厂策略。
+- **没有生成的 schema 跨 face 导入**——跨 face 链接会在模型中表示以供分析，但生成的 schema 均不需要跨 face 的运行时 Zod 导入。
+- **发现范围只覆盖具体公开导出**——既未导出、也未由可达图导入的声明按设计排除在包模型之外。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

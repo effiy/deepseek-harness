@@ -1,157 +1,157 @@
 ---
-description: "The right Sidebar of the dsh web client: one docking surface per session, two presentations, the navigation controller ctx.sidebarRight, the tab-type registry ctx.sidebarRightTabs, and the Tab domain."
+description: "dsh Web 客户端的右侧 Sidebar：每会话一个停靠面、两种呈现形态、导航控制器 ctx.sidebarRight、tab 类型注册表 ctx.sidebarRightTabs 与 Tab 域。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar-right
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The right Sidebar: where the docking kit meets this product. It holds one docking surface per session, draws it as one edge-anchored panel in the frame's right column in either of two presentations, puts the expand button in the conversation header, and owns the navigation controller (`ctx.sidebarRight`), the tab-type registry (`ctx.sidebarRightTabs`), and the Tab domain that tells each open tab how it was navigated to and how long it lives.
+右侧 Sidebar：停靠套件与本产品相遇的地方。它为每个会话持有一个停靠面，以两种呈现形态之一把它画成贴靠框架右列边缘的一块面板，把展开按钮放进会话 header，并拥有导航控制器（`ctx.sidebarRight`）、tab 类型注册表（`ctx.sidebarRightTabs`），以及告诉每个已开 tab 它是如何被导航到、能活多久的 Tab 域。
 
-## Table of Contents
+## 目录
 
-- [What lives here, and what does not](#what-lives-here-and-what-does-not)
-- [Presentations](#presentations)
-- [The expand button](#the-expand-button)
-- [State](#state)
-- [Extension seats](#extension-seats)
+- [什么住在这里，什么不住](#what-lives-here-and-what-does-not)
+- [呈现形态](#presentations)
+- [展开按钮](#the-expand-button)
+- [状态](#state)
+- [扩展席位](#extension-seats)
 - [`ctx.sidebarRight`](#ctxsidebarright)
-- [The Tab domain](#the-tab-domain)
-- [The guide](#the-guide)
-- [Copy](#copy)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [Tab 域](#the-tab-domain)
+- [引导页](#the-guide)
+- [文案](#copy)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="what-lives-here-and-what-does-not"></a>
-## What lives here, and what does not
+## 什么住在这里，什么不住
 
-The layout itself — the split tree, its operations, the drag gestures, the floating panels — belongs to `@deepseek-ai/dsh-client-ui-dockkit` and stays host-agnostic. This package supplies everything that kit refuses to know: the product's copy, what a tab's `kind` means, which tab a fresh pane is seeded with, where the surface is mounted, and how other plugins reach it.
+布局本身——分裂树、它的操作、拖拽手势、浮窗——属于 `@deepseek-ai/dsh-client-ui-dockkit`，并保持与宿主无关。本包提供套件拒绝知道的一切：产品文案、tab 的 `kind` 是什么意思、新格用哪个 tab 播种、停靠面挂在哪里、其它插件如何触达它。
 
 <a id="presentations"></a>
-## Presentations
+## 呈现形态
 
-Normal and fullscreen presentations share the same content tree, so switching does not remount tabs. The normal panel anchors to the right column; fullscreen covers the viewport while retaining the wide-screen columns underneath. Opening below 768px uses fullscreen automatically; leaving fullscreen on a narrow viewport closes the panel, and widening does not reopen a closed panel. A fullscreen opening keeps the underlying columns unchanged until its slide finishes, then prepares the normal track without a column transition. Before a fullscreen panel retreats, closing prepares a full-width conversation and restoring prepares the normal right track; the background does not animate during the retreat.
+普通与全屏共用同一棵面板内容树，切换不会重挂载Tab。普通面板贴靠右栏；全屏面板覆盖窗口并保留宽屏底层列宽。窗口低于768px时打开右栏自动全屏；窄屏退出全屏会收起右栏，变宽不重新打开已关闭的右栏。 全屏打开时，底层列宽保持不变，直到滑入结束后才无过渡地准备普通轨道。 全屏面板退场前，关闭先准备全宽会话区，恢复先准备普通右轨道；退场期间底层不播放宽度动画。
 
-| Mode | The track | The panel |
+| 形态 | 轨道 | 面板 |
 |---|---|---|
-| `push` (default) | Panel width: the conversation makes room | In the track; its left edge and the conversation's right edge travel together, on the frame's own curve |
-| `fullscreen` | Retains the wide-screen normal track; automatic narrow-screen fullscreen takes no track | Covers the entire viewport |
+| `push`（默认） | 面板宽度：会话区让出空间 | 在轨道内；它的左缘与会话区的右缘沿框架自己的曲线一起移动 |
+| `fullscreen` | 保留宽屏普通轨道；窄屏自动全屏不占轨道 | 覆盖整个窗口 |
 
-In Windows Electron, `html[data-windows-titlebar]` keeps fullscreen panels below the caption and to the right of the expanded sidebar. The frame's `--dsh-windows-sidebar-width` supplies that inset and maximum width; `--dsh-windows-content-radius` supplies the top-left radius. Only fullscreen panels clip overflow for that corner.
+在 Windows Electron 中，`html[data-windows-titlebar]` 让全屏面板保持在顶栏下方及展开侧栏的右侧。框架的 `--dsh-windows-sidebar-width` 提供该缩进及最大宽度；`--dsh-windows-content-radius` 提供左上圆角。仅全屏面板为该圆角裁剪溢出内容。
 
-The seat reports presentation through `ctx.layout.openRightbar(track, fullscreen)` / `closeRightbar()`; the frame does not inject this package. Switching fullscreen on a wide viewport leaves the center width unchanged, and the width handle appears only in expanded normal mode. Independent floating panels and `float`/`dock` operations remain available.
+席位通过 `ctx.layout.openRightbar(track, fullscreen)` / `closeRightbar()` 报告呈现，框架不注入本包。宽屏切换全屏不改变中栏宽度；宽度拖拽区只在普通展开态显示。独立浮窗及 `float`/`dock` 操作保持可用。
 
-The panel has no header row. Its two controls — the presentation switch and the collapse button — ride the kit's chrome seat at the far end of the top-right pane's tab strip, so the strip is the panel's whole top edge. Each strip reads, left to right: the tab capsules with close controls where allowed, the add control (drawn only while that pane holds no guide tab; it opens the guide there through `ctx.sidebarRight.openTab`), the pane's split control, and in the top-right pane the two panel controls. Only the chips give way in a narrow pane; the controls after them never shrink or clip.
+面板没有标题行。它的两个控件——形态切换与折叠按钮——搭在套件 chrome 席位上，位于右上格 tab 条的最末端，因此 tab 条就是面板的整条上边。每条 tab 条从左到右读作：在允许时带关闭按钮的 tab 胶囊，添加控件（只在该格没有引导 tab 时绘制；它通过 `ctx.sidebarRight.openTab` 在该格打开引导页），该格的分栏控件，以及右上格里的两个面板控件。窄格里只有 chip 让位；其后的控件从不收缩或被裁切。
 
 <a id="the-expand-button"></a>
-## The expand button
+## 展开按钮
 
-The shortcut reference includes right-sidebar toggle, split and panel fullscreen commands. The same effective binding appears on the corresponding controls. Split and fullscreen require focus within a visible dock pane; conversation focus leaves them unavailable. Split remains visible when unavailable; its focusable tooltip shows the current binding and explains the pane limit or width requirement. Files, browser, and terminal providers contribute their own commands. Guide buttons display effective shortcuts as unboxed text inline without duplicate tooltips.
+快捷键速查包含右侧栏切换、分栏和面板全屏命令，对应控件显示同一份有效键位。分栏与全屏要求焦点位于可见的停靠分栏内；焦点在聊天区时不可用。不可分栏时控件仍可见，可聚焦的提示显示当前键位，并说明分栏数量上限或宽度要求。文件、浏览器和终端提供者分别注册自己的命令。开始页按钮内以无背景文字显示有效快捷键，不额外弹出重复提示。
 
-While the panel is hidden, one button in the conversation header's corner seat (`conversation.session.header.corner`, past the utilities' right edge and level with the Session log control) is the way back in. Its glyph is the left sidebar's collapse icon mirrored. It uses the shared compact Button, matching the adjacent More action’s radius and hover fill. It shares the panel's store (the slot runtime allows one handle across two same-scope seats); while the panel is shown it renders nothing, and the corner seat collapses with it. A collapsed Sidebar therefore costs the conversation nothing: no rail, no width, and the transcript's scrollbar stays at the column's edge. Without a session there is no button and no panel.
+面板隐藏时，会话 header 角落席位里的一个按钮（`conversation.session.header.corner`，在工具组右缘之外，与 Session 日志控件齐平）是回去的路。它的图形是左侧 sidebar 折叠图标的镜像。它使用公共紧凑 Button，与相邻更多操作按钮共用圆角和 hover 底色。它与面板共用一个存储（slot 运行时允许两个同作用域席位共用一个 handle）；面板显示时它什么也不渲染，角落席位随之收起。于是折叠的 Sidebar 不花会话区任何代价：没有轨条、没有宽度，转录的滚动条留在列的边缘。没有会话就没有按钮也没有面板。
 
-The panel takes the conversation's ground colour and content font sizes rather than a raised layer of its own: it is a column of the page, not a card over it.
+面板取会话区的底色与正文字号，而不是自成一层浮起的表面：它是页面的一列，不是压在页面上的卡片。
 
-The root-scoped `rightbar` entry renders the selected Session and background Sessions with initialized `keepMounted` bodies through separate `rightbar.session` subtrees. Each View owns its Session reference. Only the foreground subtree reports a frame track; other subtrees stay hidden without deleting tab state.
+root 作用域的 `rightbar` 入口通过独立的 `rightbar.session` 子树渲染选中的 Session，以及拥有已初始化 `keepMounted` 正文的后台 Session。每个 View 拥有自身的 Session reference。只有前台子树上报框架列宽；其他子树保持隐藏，不删除 tab 状态。
 
 <a id="state"></a>
-## State
+## 状态
 
-One `SurfaceState` per session id — the layout, its recorded sequence, and how many ids it has minted — held in a store declared at the registration. Every action follows the same shape: mint the ids the intent needs, ask a kit planner which operations carry it out, record them, then assign the session's whole surface back. No action edits a layout in place, which is what keeps the kit's pure functions the only thing that computes one.
+每个会话 id 一个 `SurfaceState`——布局、它记录的序列、以及它已铸造的 id 数——保存在注册时声明的存储里。每个动作都遵循同一形态：铸造意图需要的 id，向套件 planner 询问由哪些操作承载，记录它们，然后把该会话的整个停靠面赋回去。没有任何动作就地编辑布局，这正是让套件的纯函数成为唯一计算布局之处的原因。
 
-Carrying the mint counter in the surface is what makes a recorded sequence replayable: operations embed the ids they create, so replaying from the same initial state reproduces the same tree. Every action records one history entry, however many operations it needed. Expanding, collapsing, and switching presentation are recorded too.
+把铸造计数器带在停靠面里，是记录的序列可回放的原因：操作内嵌它们创建的 id，因此从同一初始状态回放能复现同一棵树。每个动作记录一条历史，无论它需要多少操作。展开、折叠与切换形态也都被记录。
 
-After every action the kit's settle planner keeps the expanded surface populated: a docked pane whose last tab was moved out or floated is merged away, and an emptied root pane receives the default page. A collapsed surface holds no such backfill — a session starts collapsed and empty, and a close that collapses the column leaves it empty — the expansion that would first show an empty layout is what seeds the default page. Explicit closing follows [the default-page and close rules](#the-guide). While expanded there is always at least one tab, and never an empty pane — so there is no separate "close pane" gesture.
+每个动作之后，套件的 settle planner 保证展开的停靠面有内容：最后一个 tab 被搬走或浮出的停靠格会被并掉；根格被清空时填入默认页。折叠的停靠面没有这种回填——会话以折叠且为空的停靠面开始，收起整列的关闭也让它保持为空——首次会展示空布局的那次展开才播种默认页。显式关闭遵循[默认页与关闭规则](#the-guide)。展开期间永远至少有一个 tab，永远没有空格——因此没有单独的「关闭格」手势。
 
-The docked surface's last tab carries one more rule, decided in the store's `closeTab` and mirrored to the kit through `canCloseTab`: the guide standing as the only docked tab draws no close control and no menu close item — its chip sits quiet, and with no extension item contributed a secondary press opens no menu — and a programmatic close of it records nothing; any other tab standing alone closes together with the column in one entry — the layout stays empty until the next expansion seeds its current default page. Floating panels take no part in the rule: the foreground Session's floats render whether or not the column is expanded, and their tabs close freely.
+停靠面的最后一个 tab 还多带一条规则，由 store 的 `closeTab` 决定并经 `canCloseTab` 镜像给套件：作为唯一停靠 tab 的引导页不画关闭控件也不画菜单里的关闭项——它的 chip 呈安静样式，在没有扩展条目时次键按下也不弹出菜单——对它的编程式关闭什么都不记录；任何其它 tab 独自留下时，点击关闭会连同整列一起收起，记为一条历史，布局保持为空，直到下次展开时创建当时的默认页。浮动面板不参与这条规则：前台 Session 的浮窗无论列是否展开都会渲染，其 tab 照常关闭。
 
-The store saves each Session's layout, tab identities, selection, split ratios, floating rectangles, presentation and identity counter as JSON under `dsh.sidebar-right.v1.<sessionId>` in localStorage. Reload restores that layout before tab bodies render; switching Sessions keeps their layouts independent. Providers restore their own content from the retained tab identity and resource address, including [terminal reconnection](../ui-sidebar-terminal/README.md#use-this-package). Navigation parameters, resource contents and live connections are not layout state. Undo history stays in memory and resets on reload. Saved field types, node membership, selection, identity counters and the one-pane or two-horizontal-pane dock layout are validated before adoption or startup discovery; invalid data clears only its Session key. Storage failures leave the current layout usable in memory. Windows at the same origin share the last saved layout per Session; each active window keeps its own current layout until reload.
+store 将每个 Session 的布局、标签身份、选中项、分栏比例、浮窗矩形、呈现方式和身份计数以 JSON 保存到 localStorage 的 `dsh.sidebar-right.v1.<sessionId>`。刷新时在渲染标签正文前恢复布局；不同 Session 的布局独立。provider 根据保留的标签身份和资源地址恢复自身内容，包括[终端重连](../ui-sidebar-terminal/README.zh.md#use-this-package)。导航参数、资源内容和活动连接不属于布局状态。撤销历史只保留在内存中，刷新后清空。采用布局或启动探测前会校验保存字段类型、节点成员关系、选中项、身份计数，以及单格或左右两格的停靠布局；无效数据只清除对应 Session 的 key。存储失败时，当前布局仍可在内存中使用。同源窗口共享每个 Session 最后保存的布局；活动窗口在刷新前保留各自的当前布局。
 
-`sidebarRight.openTabs` publishes stable metadata for every open tab across saved and adopted Sessions. Startup discovery reads the layout keys without mounting dormant content, pinning files or activating Agents. Adopted stores replace their own metadata on membership commits, and permanently cleared scopes remove it. Other windows' storage writes do not overwrite this window's live membership. Providers use this inventory to restore their own resource lifetimes.
+`sidebarRight.openTabs` 发布所有已保存和已采用 Session 的打开标签元数据，并保持快照引用稳定。启动时读取布局 key，不挂载非当前内容、pin 文件或激活 Agent。已采用的 store 在标签成员变化时更新自己的元数据，永久清除的 scope 删除对应记录。其他窗口写入 storage 不会覆盖当前窗口的活动成员关系。provider 使用该清单恢复自己的资源生命周期。
 
 <a id="extension-seats"></a>
-## Extension seats
+## 扩展席位
 
-A tab type registers in two stages, and the shipped guide type goes through exactly the same public path a type from another package does (`ui-sidebar-documentpreview` is the live proof). Both stages sit inside the type's own `ctx.effect`, so the registration lives exactly as long as the plugin that made it.
+tab 类型分两阶段注册，随包发布的引导类型走的正是别的包的类型走的同一条公开路径（`ui-sidebar-documentpreview` 是活的证明）。两个阶段都在类型自己的 `ctx.effect` 里，因此注册与创建它的插件同生共死。
 
-1. **The type** — `ctx.sidebarRightTabs.register({ id, kind, patterns?, priority?, canOpen?, title, guide?, keepMounted? })`, a static declaration with no runtime hook, returning a disposer. `id` is this implementation's identity in the tab system, unique across every registration (a package name is the natural value; the shipped guide is `@deepseek-ai/dsh-client-ui-sidebar-right/guide`): a kind is not unique once an extension may take a builtin's over, so the implementation names itself, and a second registration of an `id` throws. A resource type names `patterns`, globs over `dsh-resource://` addresses: one containing `:` matches the whole address (`dsh-resource://file/**`); one without matches the URI's path at any depth, ignoring case (`*.md`), and an address that is not a URI matches no such pattern. A page type — the guide, a file tree — names none and is opened by kind. `canOpen(address)` vetoes a match. `title(address)` is the tab chip's text, captured when the tab opens. `guide` lists entry boxes for the guide page; picking one opens the contributing type as a page. A `kind` carries at most one `builtin` and one `extension` registration (the extension is in force; the builtin resumes when it leaves); any other collision on a kind throws. The `id` is also the key the type's body and title register under, so an extension and the builtin it takes over hold distinct cells and the seat renders the one in force.
-2. **The body** — `ctx.slots.register({ name: 'sidebar.right.pane.tab', key: definition.id }, Body)` reads `{ sidebar, panel, tab }` through the framework-injected `useTabInfo()`. `sidebar` supplies expansion and fullscreen information; `panel.id` identifies its pane; `tab` contains the record fields, `visible`, `navigation`, `signal`, and `actions`. These are not parallel owner props; the type's own store still uses `useStore`/`actions`. Optional title registrations and guide replacements share this hook; an absent title registration uses the text captured at open time. The title wrapper retains tab and occurrence DOM markers without adding a layout box, so dockkit controls icon spacing and vertical alignment in docked tabs and floating headers.
+1. **类型**——`ctx.sidebarRightTabs.register({ id, kind, patterns?, priority?, canOpen?, title, guide?, keepMounted? })`，一份没有运行时钩子的静态声明，返回 disposer。`id` 是这个实现在 tab 系统里的身份，在全部注册中唯一（包名是天然取值；随包引导页是 `@deepseek-ai/dsh-client-ui-sidebar-right/guide`）：一旦 extension 可以接管 builtin 的 kind，kind 就不再唯一，所以实现要自己命名，同一 `id` 的第二次注册会 throw。资源类型给出 `patterns`，即作用于 `dsh-resource://` 地址的 glob：含 `:` 的匹配整个地址（`dsh-resource://file/**`）；不含的匹配 URI 路径的任意深度且忽略大小写（`*.md`），不是 URI 的地址不匹配任何这类模式。页类型——引导页、文件树——不给出模式，按 kind 打开。`canOpen(address)` 否决一次命中。`title(address)` 是 tab chip 的文字，在 tab 打开时捕获。`guide` 列出引导页的入口框；选中一个即把贡献它的类型作为页打开。一个 `kind` 最多承载一份 `builtin` 与一份 `extension` 注册（extension 生效；它离开后 builtin 恢复）；kind 上的其它任何撞名都 throw。`id` 同时也是该类型正文与标题注册时用的 key，因此 extension 与它接管的 builtin 各占一个格位，席位渲染生效的那个。
+2. **正文**——`ctx.slots.register({ name: 'sidebar.right.pane.tab', key: definition.id }, Body)` 通过框架注入的 `useTabInfo()` 读取 `{ sidebar, panel, tab }`。`sidebar` 提供开合与全屏信息，`panel.id` 命名所在格，`tab` 包含原记录字段、`visible`、`navigation`、`signal` 和 `actions`。这些字段不再作为平铺owner props传入；类型自己的store仍使用 `useStore`/`actions`。可选标题注册及引导替换共享该hook；未注册标题时使用打开时保存的文本。标题包装保留 tab 与 occurrence 的 DOM 标记，但不引入布局盒，因此停靠 tab 和浮窗标题中的图标间距与垂直对齐由 dockkit 控制。
 
-Which type opens a resource follows the editor-resolver convention: the types whose `patterns` match are ranked by `priority` band — `extension` (a type from outside the product, the highest, and the default when none is named), `builtin`, `fallback` (plain viewers anything more specific should beat) — then by the length of the matched pattern, then by registration order; `canOpen` removes a candidate. The bands are string literals so a type in another package needs no runtime import from here. `candidates(address)` returns the ranking, `claim(address, kind?)` the decision; naming a `kind` skips its globs but keeps its `canOpen`.
+由哪个类型打开资源遵循编辑器解析器的惯例：`patterns` 命中的类型先按 `priority` 档排序——`extension`（产品外的类型，最高档，也是未命名时的默认）、`builtin`、`fallback`（任何更具体的类型都应胜过的通用查看器）——再按命中模式的长度，再按注册顺序；`canOpen` 会剔除候选。各档是字符串字面量，因此别的包里的类型不需要从这里做运行时导入。`candidates(address)` 返回排序，`claim(address, kind?)` 返回决定；指定 `kind` 时跳过它的 glob 但保留它的 `canOpen`。
 
-Two more seats extend what is already there: `sidebar.right.tab.guide` (chain) replaces the guide tab's body without replacing the tab, and `sidebar.right.tab.menu.item` (list) appends content-level actions to a tab's menu after the kit's own layout actions. No seat exists for pane-level actions or for collapsed-state controls yet, because nothing needs one.
+另有两个席位扩展已有之物：`sidebar.right.tab.guide`（chain）替换引导 tab 的正文而不替换 tab，`sidebar.right.tab.menu.item`（list）在套件自己的布局动作之后向 tab 菜单追加内容级动作。目前没有面向格级动作或折叠态控件的席位，因为还没有东西需要它。
 
 <a id="ctxsidebarright"></a>
 ## `ctx.sidebarRight`
 
-`openResource(address, options?)` and `openTab(kind, options?)` are the navigation controller, and every way into the column calls one of them: the conversation's file links and a tool row's line reference (`openResource(fileAddress, { params: { line } })`), the strip's add control and a guide entry box (`openTab`), a file tree's rows (`tab.actions.openResource`). A resource address is a `dsh-resource://<type>/…` URI; without `options.kind` the registry claims it (globs and `canOpen`, best band wins), with it that kind's type in force opens it. A page is named by kind; the tab is recorded under an address this package composes and nobody else spells (`contract/seed.ts`). Both run the same steps as one history entry: a resource tab already showing the same (kind, contentId) is focused wherever it sits unless `revealIfOpened: false`; ordinary page tabs always deduplicate within the target pane, regardless of that option; otherwise a new tab lands in `options.replaceTab`'s pane and slot (closing that tab), else `options.paneId`, else the active docked pane; the panel expands, because content the user cannot see is not opened. Then the Tab domain records the navigation — `params` reach the body as `navigation.params`, with `revision` stepped — outside the layout history. `params` is typed by what is opened: a viewer for a resource type merges its entry into `SidebarRightResourceParamsMap` (the text preview declares `{ line?: number }`); a page type that takes parameters merges into `SidebarRightTabParamsMap` under its kind; values are JSON-shaped by convention, unchecked at run time. An address outside `dsh-resource://`, one no type claims, or a kind nothing registered throws: that is a wiring mistake, not a user error.
+`openResource(address, options?)` 与 `openTab(kind, options?)` 是导航控制器，进入该列的每条路都调用其中之一：会话区的文件链接与工具行的行号引用（`openResource(fileAddress, { params: { line } })`），tab 条的添加控件与引导入口框（`openTab`），文件树的行（`tab.actions.openResource`）。资源地址是 `dsh-resource://<type>/…` URI；不带 `options.kind` 时由注册表认领（glob 与 `canOpen`，最高档胜出），带它时由该 kind 生效的类型打开。页按 kind 命名；tab 记录在本包拼出、别处无人书写的地址下（`contract/seed.ts`）。两者以同一组步骤作为一条历史运行：已展示同一 (kind, contentId) 的资源 tab 被聚焦，不限所在分栏，除非 `revealIfOpened: false`；页 tab 始终只在目标分栏内去重，不受该选项影响；否则新 tab 落到 `options.replaceTab` 所在的格与位置（并关掉那个 tab），再退而落到 `options.paneId`，再退而落到活跃停靠格；面板展开，因为用户看不到的内容不算打开。随后 Tab 域记录这次导航——`params` 以 `navigation.params` 抵达正文，`revision` 递增——不进布局历史。`params` 按所开之物定型：某资源类型的查看器把自己那项并入 `SidebarRightResourceParamsMap`（文本预览声明 `{ line?: number }`）；接受参数的页类型按其 kind 并入 `SidebarRightTabParamsMap`；值约定为 JSON 形状，运行时不校验。`dsh-resource://` 之外的地址、无人认领的地址、或未注册的 kind 都会 throw：那是接线错误，不是用户错误。
 
-`preferNewPane: true` first asks the target docked pane to split under the normal two-pane and room rules, then falls back to that pane when no split is available. `replaceTab` takes precedence and disables this preference.
+`preferNewPane: true` 会先按普通的两格上限与空间规则尝试分割目标停靠格，无法分栏时回退到该格。`replaceTab` 优先并会禁用这项偏好。
 
-`close(tabId)` closes a tab; `active()` reads the active tab. `isExpanded()` and `toggleExpanded()` read and drive the column's expansion; `toggleFullscreen(target)` applies the panel control’s display-mode action to a captured dock pane. Layout operations, for callers that arrange the column programmatically, each recorded like the gesture it stands in for: `focus(tabId)` focuses a tab and its pane; `split(paneId?)` splits a docked pane (the active one by default) under the same pane budget and room rule as the strip's control and returns the new pane's id, or `undefined` — recording nothing — when it cannot; `float(tabId, rect?)` takes a docked tab out into a panel; `dock(paneId)` returns a floating panel to the active docked pane. A tab or pane that does not exist, or already is where the call would put it, is left alone. The face exposes operations only: no layout snapshot, no operation log, no lookup by address. `_undo()` / `_redo()` step the on-screen surface's history; they are `@internal` — the sequence has no user-facing control, and these exist for tests. Commands act on the on-screen Session through its adopted store; with no Session on screen, or before the runtime mints its store, they throw rather than write into a surface nobody draws. `mounted` is the observable of the Session on screen: the selected Session while the Conversation fills the main column, `undefined` while a global panel replaces it or no Session is selected. The plugin derives it from the Session selection and `ctx.layout.panelInfo`, and it changes before React renders the change that causes it, so a component rendered in that commit reads the arriving Session and may act on it from its effects: the frame renders that Session's seat in the same pass, which mints its store. Seats never publish it; each reports only what it renders with: the room its docking kit measured, which `split` and `preferNewPane` apply to that Session's panes (unmeasured panes have room), and whether its frame width presents the panel fullscreen automatically, which the fullscreen command applies. The plan review's automatic open reads `mounted` through a bound hook.
+`close(tabId)` 关闭一个 tab；`active()` 读取活动 tab。`isExpanded()` 与 `toggleExpanded()` 读取并驱动该列的展开；`toggleFullscreen(target)` 对捕获的停靠分栏执行面板控件的显示模式操作。布局操作供以编程方式安排该列的调用方使用，每个都像它替代的手势一样被记录：`focus(tabId)` 聚焦一个 tab 及其格；`split(paneId?)` 在与 tab 条控件相同的格预算与空间规则下分栏一个停靠格（默认活跃格），返回新格的 id，做不到时返回 `undefined`——且不记录任何东西；`float(tabId, rect?)` 把停靠 tab 浮出为浮窗；`dock(paneId)` 把浮窗放回活跃停靠格。不存在的 tab 或格、或已处于调用目标状态的，都原样不动。该接口只暴露操作：没有布局快照、没有操作日志、没有按地址查找。`_undo()` / `_redo()` 步进屏幕上停靠面的历史；它们是 `@internal`——序列没有面向用户的控件，这两个只为测试存在。命令通过屏幕上会话已采用的 store 作用于该会话；没有会话在屏幕上、或运行时尚未创建它的 store 时，命令 throw，而不是写进一个没人绘制的面里。`mounted` 是「屏幕上的会话」的可观察值：Conversation 占据主栏时为选中的会话，全局面板替代它或没有选中会话时为 `undefined`。插件从会话选择与 `ctx.layout.panelInfo` 推导它，它在 React 渲染引起变化的那次更新之前就已改变，因此同一次提交里渲染的组件读到的是到来的会话，并可以在自己的 effect 里对它行动：框架在同一轮渲染里渲染该会话的席位，席位随之创建它的 store。席位从不发布它；每个席位只上报它渲染时依据的事实：停靠套件测得的空间，`split` 与 `preferNewPane` 把它用于该会话的分栏（未测量的分栏视为有空间）；以及框架宽度是否让面板自动全屏，全屏命令据此执行。计划审阅的自动打开通过绑定的 hook 读取 `mounted`。
 
-`focusedTarget(element?)` resolves the current DOM pane and tab, including an embedding iframe; outside focus returns no page. `commandTarget(element?)` additionally allows an outside open to use the on-screen Session's active dock pane. Captures include the occurrence and navigation revision; `isTargetCurrent(target)` rejects changed Sessions, moved or reopened tabs, and intervening navigation. Focus and pointer activation remain separate from persisted layout selection.
+`focusedTarget(element?)` 解析当前 DOM 分栏和标签页，也接受嵌入 iframe；焦点位于外部时不返回页面。`commandTarget(element?)` 另外允许外部打开动作使用屏幕上会话的活动停靠分栏。捕获值包含 occurrence 和导航版本；`isTargetCurrent(target)` 拒绝会话变更、已移动或重新打开的标签页，以及期间发生的导航。焦点和指针激活独立于持久化的布局选择。
 
 <a id="the-tab-domain"></a>
-## The Tab domain
+## Tab 域
 
-The Tab domain retains a branded occurrence id, navigation, an abort signal, and bound actions per (Session, tab id). A private assembly callback adopts each Session's store, reconciles restored records immediately, and follows its commits. Reconstructing a Session store replaces its adoption, releasing the old subscription and cleanup reference. Only record removal or plugin unload aborts the signal; closing the sidebar and switching Sessions retain records, while undo restores a new occurrence. `useTabInfo()` composes framework-bound store and navigation hooks without manual component subscriptions or render-time record creation. `tab.actions` always target their own Session; `tab.visible` distinguishes bodies from titles and excludes background Sessions; foreground floating tabs remain visible when the sidebar closes. `adopt` is absent from the public controller.
+Tab 域按（Session，Tab id）保留品牌化 occurrence id、导航、中止信号与绑定动作。私有装配回调采用各 Session 的 store，立即对齐恢复的记录，再跟随其提交。同一 Session 的 store 重建会替换其 `adopt` 注册，同时释放旧订阅与清理引用。记录消失或插件卸载才中止 signal，收起和切会话不销毁记录；undo 恢复的是新 occurrence。`useTabInfo()` 组合框架绑定的 store 与导航 hook，不在组件中手写订阅或在渲染时创建记录。`tab.actions` 始终作用于自己的会话；`tab.visible` 区分正文与标题，并排除后台 Session；前台浮窗不受整栏收起影响。`adopt` 不在公开控制器上。
 
-A type's `keepMounted: true` retains visited bodies across tab and Session changes, collapse, and docking. Each View supplies its stable hold callback through owner props, so rebuilding Session injection bindings does not release a body. Unvisited bodies are not mounted eagerly.
+类型声明 `keepMounted: true` 后，已访问正文会在切 tab、切 Session、收起和停靠切换期间保留。每个 View 通过 owner props 提供自身稳定的持有回调，因此 Session injection binding 重建不会释放正文。未访问的正文不会提前挂载。
 
-Tab owners register `registerCloseHandler(kind, handler)` through an effect. A handler synchronously retains any background cleanup before allowing explicit close or replacement. The resource owner tracks completion and retry; the sidebar does not wait. A thrown handler preserves the tab. Collapse, presentation changes and plugin disposal do not invoke close handlers; the tab abort signal identifies occurrence disposal, not an explicit close.
+标签页所有者通过 effect 注册 `registerCloseHandler(kind, handler)`。handler 在允许显式关闭或替换前同步保存后台清理任务。资源所有者跟踪完成和重试，侧栏不等待清理。handler 抛错时保留标签页。折叠、展示方式改变和插件卸载不调用关闭 handler；tab abort signal 标识 occurrence 卸载，不代表显式关闭。
 
-Close and refresh commands resolve the focused pane and tab occurrence. Page bodies bind their refresh operation through `tab.actions.bindCommands()` and release it on unmount; ended occurrences cannot regain capabilities. Refresh never reloads the application. Shortcut page opens, sidebar expansion, and all splits focus the selected dock or floating pane after its DOM commits, including singleton reveals and guide replacements. Sidebar expansion focuses the active dock pane; collapse preserves focus inside floating panes. Pane focus preserves existing text selections. If a focused page input or iframe is replaced, focus returns to its visible pane only while no other element owns focus; an outside pointer gesture or explicit blur cancels this restoration. Close checks the captured identity again and uses resource cleanup. After a keyboard or native-menu close, focus moves to a surviving visible pane in the same Session so consecutive close commands continue there. Stale targets and cleanup failures never fall back to closing a window. Modal restrictions follow the [shortcut service](../shortcuts/README.md). The close command first requests the foreground modal’s close action; a modal that declines dismissal, a menu, or an unregistered dialog blocks closing the sidebar or window behind it. Closing the sole docked guide with a shortcut or native menu collapses the sidebar and retains the guide. Desktop requests window closure through the shortcut service only when no modal is open and no sidebar page owns focus; Web leaves the browser open.
+关闭与刷新命令解析聚焦 pane 和 tab occurrence。页面通过 `tab.actions.bindCommands()` 绑定刷新操作，并在卸载时释放；已结束的 occurrence 不能重新获得能力。刷新不会重载应用。通过快捷键打开页面、展开侧栏或执行分栏操作后，焦点在 DOM 提交后移至选中的停靠或浮动分栏，包括显示已有单例页面和替换引导页。展开侧栏时聚焦活动停靠分栏；收起时保留浮动分栏内的焦点。分栏获得焦点时保留现有文本选区。聚焦的页面输入框或 iframe 被替换时，仅在没有其他元素持有焦点的情况下将焦点交还其可见分栏；外部指针操作或显式失焦会取消此次恢复。关闭会再次检查捕获的身份并执行资源清理。通过快捷键或原生菜单关闭后，焦点移至同一 Session 中仍可见的分栏，让连续关闭继续作用于右栏。过期目标和清理失败均不会回退为关窗。模态限制遵循[快捷键服务](../shortcuts/README.zh.md)。关闭命令优先请求前台弹窗的关闭操作；弹窗拒绝关闭、菜单或未注册的对话框都会阻止关闭后方侧栏或窗口。通过快捷键或原生菜单关闭唯一的停靠引导页时，收起右栏并保留引导页。Desktop 仅在没有弹窗且焦点没有所属的右栏页面时通过快捷键服务请求关闭窗口；Web 保留浏览器窗口。
 
 <a id="the-guide"></a>
-## The guide
+## 引导页
 
-Each `guide` entry has an `id` unique within its provider. The guide renders `sidebar.right.tab.guide.entry` by the active definition id, forwarding the entry id, resolved title and optional description, plus the framework `useTabInfo` hook. A provider can register a custom card under its definition id; otherwise the standard icon/title button renders. The sidebar owns width and placement, while custom components own their markup and interaction. Guide cards use the shared R20 radius, including hover fills and provider-owned split buttons. Entry identity remains stable across sorting and unrelated registrations. Unboxed shortcut text aligns at the right. The terminal shell menu sits beside its entry title.
+每个 `guide` 入口具有 provider 内唯一的 `id`。开始页按当前生效的定义 id 渲染 `sidebar.right.tab.guide.entry`，传入入口 id、解析后的标题、可选描述，以及框架提供的 `useTabInfo` hook。provider 可按自己的定义 id 注册自定义卡片；未注册时使用默认图标与标题按钮。侧栏负责宽度和排列，自定义组件负责内部结构和交互。引导卡片统一使用 R20，包含悬停底色与提供方自有的分体按钮。排序或其他注册变化不会改变入口身份。无背景的快捷键文字右对齐。终端 Shell 菜单位于入口标题旁。
 
-A tab type can declare `multiple: true` for independent instances such as terminals. Each open receives a distinct content address, so placement and docking preserve those instances; ordinary pages retain per-pane uniqueness.
+终端等需要独立实例的 tab 类型可声明 `multiple: true`。每次打开都会获得独立内容地址，因此移动和停靠会保留这些实例；普通页面仍在每个格内去重。
 
-Default pages depend on the number of registered guide entries, not the number of tab types or open tabs. Exactly one entry opens its page directly; zero or multiple entries open the guide. Explicitly adding a guide still opens the guide, even with one entry. The sole docked guide is the only tab that cannot close; closing any other sole tab also collapses the column. The chip, context menu, and `close` API apply the same rule.
+默认页取决于已注册的引导入口数，不取决于 tab 类型数或已打开的 tab 数。恰好一个入口时直接打开对应页面；没有入口或有多个入口时打开引导页。即使只有一个入口，显式添加引导页仍会打开引导页。只有作为唯一停靠 tab 的引导页不可关闭；关闭其它任何唯一 tab 时会同时收起整列。chip、上下文菜单与 `close` API 使用同一规则。
 
-The guide tab is a muted compass over one entry capsule per `guide` entry the registered types contributed, in `order`, centred in the body; the guide has no words of its own. A capsule shows the entry's glyph — or the guide's quieter cube placeholder when the entry registered none — and its title; while at most four entries are listed, an entry that registered a `description` shows it under the title, and a longer list drops every description. Picking a default capsule calls `tab.actions.openTab(entry.kind, { replaceTab: true })`, so the guide gives way to the page it opened. A pane holds at most one guide tab. The strip's add control is drawn only while its pane holds none and opens one there with `openTab('guide', { paneId, revealIfOpened: false })`, so a guide in another pane does not capture the click; opening the guide into a pane that already has one focuses it instead; a guide dragged, dropped, or docked into such a pane merges into it — the arriving guide closes and the pane's own is focused; `duplicateTab` on the guide records nothing. A split, an expanded empty root pane, and the pane a sole tab vacates by dropping on its own edge use the same default-page rule, one tab per new pane; the self-edge drop leaves the dragged tab focused. A plain `openTab('guide')` opens or focuses the guide only within the active or named pane. Splitting an empty pane does nothing and returns no new pane. The product allows two horizontal panes, initially equal, with divider ratios limited to 20%–80%. Insufficient width blocks a new split; with two panes already present, a body drop moves the tab between panes instead of creating a third. At the two-pane limit, split controls are disabled with a focusable reason; closing back to one pane enables them.
+引导 tab 是一枚弱化的罗盘，下方是各已注册类型贡献的每个 `guide` 条目一个入口胶囊，按 `order` 排列并在正文中居中；引导页自己没有文字。胶囊显示条目的图标——条目没注册图标时用引导页自己更浅的立方体占位符——和标题；列出的条目不超过四个时，注册了 `description` 的条目在标题下显示它，更长的列表则去掉所有描述。点击默认胶囊会调用 `tab.actions.openTab(entry.kind, { replaceTab: true })`，于是引导页让位给它打开的页。一个格最多持有一个引导 tab。tab 条的添加控件只在该格没有引导 tab 时绘制，并以 `openTab('guide', { paneId, revealIfOpened: false })` 在该格打开一个，这样别的格里的引导页不会截走这次点击；把引导页开进已有引导页的格则改为聚焦它；把引导页拖入、放入或收回到这样的格会合并进去——来者关闭，该格自己的被聚焦；对引导页 `duplicateTab` 不记录任何东西。分栏、展开且为空的根格、以及唯一 tab 拖到本格边缘分屏后腾出的格使用相同的默认页规则，每个新格一个 tab；这种本格边缘拖放让被拖的 tab 保持聚焦。普通的 `openTab('guide')` 只在活跃或指定分栏内打开或聚焦引导页。对空分栏执行 split 不产生变化，也不返回新分栏。产品最多保留左右两格，默认均分，分隔条限定在 20%～80%。宽度不足以容纳两格时不允许新分栏；已有两格时，正文拖放用于跨格移动，不再创建第三格。达到两格上限时禁用分栏控件并提供可聚焦的原因提示；关闭回单格后重新启用。
 
 <a id="copy"></a>
-## Copy
+## 文案
 
-Every string in the column comes from the `sidebarRight` locale namespace, including the kit's accessible names. A tab's title is fixed when the tab is minted; a type's display name follows the current language.
+该列里的每个字符串都来自 `sidebarRight` 语言命名空间，包括套件的无障碍名称。tab 的标题在 tab 铸造时固定；类型的显示名跟随当前语言。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the package is a browser-side UI plugin layer that registers nothing model-facing.
+无，因为本包是浏览器侧 UI 插件层，不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；本包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Browser-local layout.** Layout does not synchronize between devices; provider-specific state requires its provider's recovery support.
-- **No surface without a session.** State is keyed by session id, so the hero screen shows nothing on the right.
-- **Hard-coded stacking.** The content tree uses a fixed stacking layer; floats reorder within it without raising that layer above menus.
-- **Retained Session deletion.** Catalog absence alone does not retire an initialized retained View; its tab lifetimes and plugin teardown own release.
-- **Undo is not exposed.** The recorded sequence is stepped only through the `@internal` service methods; product controls are deliberately absent.
-- **Titles are fixed at open time.** A type's `title(address)` is captured into the record; a live title comes only from the optional title seat.
-- **No content navigation stack.** Stepping back replays layout operations; an editor-style back/forward over visited content is not built.
+- **布局保存在当前浏览器。** 布局不跨设备同步；provider 专属状态需要由该 provider 支持恢复。
+- **没有会话就没有停靠面。** 状态按会话 id 键控，因此 hero 画面右侧什么都不显示。
+- **硬编码的层叠。** 内容树使用固定层叠层；浮窗在该层内重排，不会把整层抬到菜单之上。
+- **保活 Session 的删除。** 仅从目录消失不会使已初始化的保活 View 退休；释放由 tab 生命周期和插件卸载负责。
+- **未暴露撤销。** 记录的序列只能通过 `@internal` 服务方法步进；产品控件是有意缺席的。
+- **标题在打开时固定。** 类型的 `title(address)` 被捕获进记录；会变的标题只来自可选的标题席位。
+- **没有内容导航栈。** 后退回放的是布局操作；编辑器式的「已访问内容」前进/后退尚未构建。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

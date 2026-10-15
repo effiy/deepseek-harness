@@ -1,37 +1,37 @@
 ---
-description: "Prerequisite mounting, production AgentLoop drivers, and explicit Inbox stubs for agent-loop tests."
+description: "为 agent-loop 测试提供先决依赖挂载、生产 AgentLoop 驱动与职责明确的 Inbox 桩。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-agent-loop-testkit
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-agent-loop-testkit` to give AgentLoop tests the standard prerequisites and a production loop driver without repeating setup. The harness creates real Agents and exposes Inbox input claiming for tests of durable events, recovery, notifications, and claim behavior. For consumer tests that need only queue editing, choose the process-local Inbox stub; choose the fail-fast Inbox when pending input must never be touched. Tests still own adapters, optional plugins, load order, and context disposal, and the package adds no model-visible behavior.
+使用 `dsh-agent-loop-testkit` 可以为 AgentLoop 测试准备标准先决条件和生产 loop 驱动，避免重复设置。harness 可以创建真实 Agent，并公开 Inbox 输入认领能力，以测试持久事件、恢复、通知和认领行为。只需编辑队列的消费方测试应选择进程内 Inbox 桩；待处理输入绝不应被访问时，应选择快速失败的 Inbox。测试仍然负责适配器、可选插件、加载顺序和上下文释放，本包不会添加模型可见行为。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Consumer-only tests with structural Agent stubs can use `provideWorkingDirectoryFixture(ctx, defaultDirectory?)`. It supplies directory values without validating paths, changing directories, or recording events. Tests of directory behavior use `mountAgentLoopTestDependencies(ctx, { workingDirectory: true })` and real temporary directories.
+仅测试消费方且使用结构化 Agent 桩的测试可调用 `provideWorkingDirectoryFixture(ctx, defaultDirectory?)`。它只提供目录值，不校验路径、不切换目录，也不记录事件。目录行为测试使用 `mountAgentLoopTestDependencies(ctx, { workingDirectory: true })` 与真实临时目录。
 
-This package gives an AgentLoop test a working service topology and keeps the choice between production Inbox behavior and a structural stub explicit.
+本包为 AgentLoop 测试提供可用的服务拓扑，并要求测试明确选择生产 Inbox 行为或结构化桩。
 
-### Drive a production Agent
+### 驱动生产 Agent
 
-Use `mountAgentLoopTestHarness()` when the test covers durable Inbox events, projection recovery or validation, live Inbox notifications, or loop-driver claims. Mount any load-order-sensitive consumers after the prerequisites and before creating the Agent. The context owns the loop and every Agent returned by the harness.
+当测试覆盖持久 Inbox 事件、投影恢复或校验、实时 Inbox 通知，或 loop 驱动的认领策略时，使用 `mountAgentLoopTestHarness()`。应在挂载先决依赖后、创建 Agent 前挂载所有对加载顺序敏感的消费方。上下文拥有 loop 以及该 harness 返回的每个 Agent。
 
 ```ts
 import { Context } from '@deepseek-ai/cordis'
@@ -53,11 +53,11 @@ agent.inbox.append('next-turn', message)
 const admitted = harness.claim(agent, 'next-turn', 1)
 ```
 
-The dependency helper forwards system-prompt and tool-registry configuration through `options` and provides no test defaults beyond those services' own defaults. A plugin-load failure rejects the helper call; services activated earlier in the sequence remain context-owned and unwind when the context is disposed.
+依赖辅助函数通过 `options` 转发系统提示词与工具注册表配置，除这些服务自有的默认值外不提供测试默认值。插件加载失败会使辅助函数调用被拒绝；顺序中较早激活的服务仍归上下文所有，并在上下文释放时一并解除。
 
-### Build a structural Agent stub
+### 构造结构化 Agent 桩
 
-Use `createInboxStub()` when the test subject needs mutable pending lists but does not exercise durability, projection validation, live Inbox notifications, or the driver's claim policy. The stub implements the public queue operations with two process-local arrays and never writes to a Session. Use `unsupportedInbox()` when the test subject must not touch pending input; every mutation throws at the first unexpected dependency.
+当测试对象需要可变的待处理列表，但不测试持久性、投影校验、实时 Inbox 通知或驱动的认领策略时，使用 `createInboxStub()`。该桩通过两个进程内数组实现公开队列操作，且绝不会写入 Session。当测试对象不应访问待处理输入时，使用 `unsupportedInbox()`；每次变更都会在首个意外依赖处抛错。
 
 ```ts
 import { createInboxStub } from '@deepseek-ai/dsh-agent-loop-testkit'
@@ -68,71 +68,71 @@ const agent = {
 }
 ```
 
-### When to use it
+### 何时使用
 
-Use the dependency and loop helpers for tests whose subject is production loop or durable Inbox behavior. Use the structural stub for consumer-domain tests that only need queue editing. Mount dependencies directly when a test probes service injection failures or partial topologies, because the helper hides exactly the wiring those tests must control.
+当测试对象是生产 loop 或持久 Inbox 行为时，使用依赖与 loop 辅助函数。只需要编辑队列的消费方领域测试使用结构化桩。当测试探测服务注入失败或部分拓扑时，请直接挂载依赖，因为辅助函数隐藏的正是这类测试必须控制的接线。
 
-### What can go wrong
+### 可能出什么问题
 
-The harness mounts no LLM adapter. Register an adapter before sending work that would start a model request. Dispose the owning context after every test so Agents reach quiescence and their scoped registrations unwind.
+harness 不会挂载任何 LLM（大语言模型）适配器。若测试发送的任务会启动模型请求，请先注册被测路由的适配器。每个测试结束后都应 dispose（资源释放）所属上下文，使 Agent 完全停稳，并解除其作用域注册。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design of the test utilities; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释测试辅助工具的设计；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design
+### 设计
 
-`mountAgentLoopTestDependencies` mounts six service plugins in a fixed dependency order — LLM, session, session-projection registry, system-prompt registry, tool registry, then agent registry — and stops before `AgentLoop`, so the caller controls loop load order. `mountAgentLoopTestHarness` mounts the public production plugin, creates Agents through its service, and exposes the production driver's claim operation without exporting the loop's concrete Inbox class or projection definition. [`src/inbox.ts`](src/inbox.ts) contains only the process-local mutable stub and the fail-fast unsupported placeholder; it owns no projection or durable event implementation. The mounting and driver implementation lives in [`src/index.ts`](src/index.ts).
+`mountAgentLoopTestDependencies` 按固定依赖顺序——LLM、会话、会话投影注册表、系统提示词注册表、工具注册表、agent 注册表——挂载六个服务插件，并在 `AgentLoop` 之前停下，使调用方控制 loop 加载顺序。`mountAgentLoopTestHarness` 挂载公开的生产插件，通过其服务创建 Agent，并公开生产驱动的认领操作，而不导出 loop 的具体 Inbox 类或投影定义。[`src/inbox.ts`](src/inbox.ts) 仅包含进程内可变桩和快速失败且不支持操作的占位值；它不持有投影或持久事件实现。挂载与驱动实现位于 [`src/index.ts`](src/index.ts)。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level behavior is not enough. They move from the loop to the services the helper mounts and the tests that use it.
+当包级行为不够用时阅读以下页面。它们从 loop 逐步进入辅助函数挂载的服务以及使用它的测试。
 
-- [Agent loop package](../../core/agent-loop/README.md) — the concrete loop this helper mounts for production behavior.
-- [Session package](../../core/session/README.md) — the durable event log used by production Inbox behavior.
-- [LLM package](../../llm/llm/README.md) — the LLM runtime and adapter interface the helper prepares.
-- [Testing policy](../../../docs/testing.md) — the coverage tiers these tests serve.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [Agent loop 包](../../core/agent-loop/README.zh.md)——本辅助函数为生产行为挂载的具体 loop。
+- [会话包](../../core/session/README.zh.md)——生产 Inbox 行为使用的持久事件日志。
+- [LLM 包](../../llm/llm/README.zh.md)——本辅助函数准备的 LLM 运行时与适配器接口。
+- [测试策略](../../../docs/testing.zh.md)——这些测试对应的覆盖层级。
+- [test-support 组索引](../README.zh.md)——兄弟 harness 与支持包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as these test-only utilities neither assemble nor modify model requests.
+无。这些测试专用辅助工具既不组装也不修改模型请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; the package itself sends no provider request.
+无；本包自身不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-These limits define what the utilities do not share. They are current package constraints, not a task backlog.
+这些限制说明辅助工具不共享什么。它们是当前包约束，不是任务积压。
 
-- **Only the mandatory prerequisite spine is shared** — adapters, optional plugins, scenario-specific load order, and context teardown remain caller-owned.
-- **The production harness has no adapter default** — tests that start the loop must register the route they exercise.
-- **The mutable Inbox stub is process-local only** — use a harness-created Agent whenever durable events, projection recovery or validation, live notifications, or claim policy matter.
-- **The unsupported Inbox accepts no mutations** — use the mutable stub or a harness-created Agent whenever pending input is part of the test subject.
+- **只共享必需的先决主干**——适配器、可选插件、场景特定的加载顺序与上下文清理仍由调用方负责。
+- **生产 harness 没有适配器默认值**——启动 loop 的测试必须注册其实际使用的路由。
+- **可变 Inbox 桩仅存在于进程内**——只要持久事件、投影恢复或校验、实时通知或认领策略属于测试对象，就应使用 harness 创建的 Agent。
+- **不支持操作的 Inbox 不接受变更**——只要待处理输入属于测试对象，就应使用可变桩或 harness 创建的 Agent。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

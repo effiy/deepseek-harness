@@ -1,35 +1,35 @@
 ---
-description: "Pure adjacent Session format planning, lossless JSON value checks, header-only migration, and physical codec dispatch."
+description: "纯函数式相邻会话格式规划、无损 JSON 值检查、仅标头迁移与物理编解码分派。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-session-format
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-session-format` lets persistence code restore a current Session directly or compose a unique sequence of adjacent migrations while consuming physical rows once. A restore transfers caller-owned parsed values through stateful stages without intermediate artifact copies or freezing. Physical framing, compression, immutable generation naming, exclusive publication, and Cordis lifecycle behavior remain outside this library.
+`dsh-session-format` 让持久化代码可以直接还原当前会话，或在只消费一次物理行的同时组合唯一的相邻迁移序列。一次还原会让调用方拥有的已解析值流经有状态 Stage，不复制或冻结中间产物。物理分帧、压缩、不可变 generation 命名、排他发布和 Cordis 生命周期行为不属于本库。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-### When to use it
+### 何时使用
 
-Use this library from persistence or format-catalog code that must classify a physical Session header, restore current logical values, or compose released adjacent migrations. It is not a Cordis plugin and has no profile mount row.
+当持久化或格式目录代码需要分类物理会话 header、还原当前逻辑值或组合已发布相邻迁移时，使用本库。它不是 Cordis 插件，也没有 profile 挂载行。
 
-### Entry point
+### 入口
 
 ```text
 const catalog = createSessionFormatCatalog({ currentVersion, codecs, currentEncoder, migrations, restoreCurrent, restoreTransformedCurrent, restoreCurrentHeader })
@@ -41,72 +41,72 @@ const headerRecord = catalog.encodeCurrentHeader(current.header, current.inherit
 const eventRecords = current.events.map(catalog.encodeCurrentEvent)
 ```
 
-`createSessionFormatCatalog()` accepts one codec for each version's supported representations, the current record encoder, one migration per adjacent version pair, and current artifact and header restorers. `readHeader()` returns a `current`, `migration-required`, `unsupported`, or `malformed` descriptor without reading events. Body readers create one restore, push each parsed physical row through `decodeRow()`, and call `finish()` once for a current artifact. Writers encode its header and events record by record. Established record meanings remain stable; [compatibility review](../../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md) governs same-version additions.
+`createSessionFormatCatalog()` 为每个版本所支持的表示接收一个 codec、当前格式的逐记录 encoder、每组相邻版本的一个迁移，以及当前产物与 header 还原器。`readHeader()` 在不读取事件的情况下返回 `current`、`migration-required`、`unsupported` 或 `malformed` 描述符。正文读取方创建一次 restore，把每个已解析物理行传给 `decodeRow()`，再调用一次 `finish()` 获得当前产物。写入方逐条编码其 header 与事件。已确立的记录含义保持稳定；[兼容性评审](../../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.zh.md)约束同版本新增。
 
-The `recovery` option selects strict row failure or recoverable suffix handling. `validation: 'current'` applies all installed current-format validation. `validation: 'transformed'` applies released current-format validation after historical migration, while already-current input receives only its codec's physical validation.
+`recovery` 选项决定严格拒绝故障行，还是执行可恢复后缀处理。`validation: 'current'` 会执行所有已安装的 current 格式校验。`validation: 'transformed'` 会在历史迁移后执行已发布的 current 格式校验；已经是 current 的输入则只接受其 codec 的物理校验。
 
-The recoverable decoder returns the accepted logical prefix. A codec may drop one malformed or sequence-gapped row and its uncommitted suffix, but a later decoded `turn/end` makes the original issue fatal.
+可恢复解码器返回已接受的逻辑前缀。编解码器可以丢弃一个格式错误或序号不连续的行及其未提交后缀，但后续成功解码的 `turn/end` 会使原始问题成为致命错误。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The chain validates unique gap-free ordering at construction. A source cut may be unknown until EOF; stages that require a header cut reject its absence, while marker-based stages derive it from emitted events. Each stage returns its exact target cut at finish, and any predeclared cut must agree. The catalog composes one row decoder with stateful adjacent event transformers, retains only their bounded state and the final current events, and performs target validation at `finish()`; only the caller decides whether and how to publish that result.
+迁移链在构造时校验唯一且无缺口的顺序。源切点可以在 EOF 前保持未知；依赖头部切点的 Stage 拒绝缺失值，而基于标记的 Stage 从已发出的事件推导切点。每个 Stage 在完成时返回精确的目标切点，且必须与预声明切点一致。Catalog 把一个行 decoder 与有状态的相邻事件 transformer 组合起来，只保留其有界状态与最终当前事件，并在 `finish()` 时执行目标校验；只有调用方决定是否发布该结果以及如何发布。
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/chain.ts`](src/chain.ts) | Adjacent plan construction and current bypass |
-| [`src/catalog.ts`](src/catalog.ts) | Physical version dispatch and header classification |
-| [`src/json.ts`](src/json.ts) | Detached lossless JSON snapshots and common coordinate checks |
-| [`src/filename.ts`](src/filename.ts) | Canonical `session[.vN].jsonl` basename shared by persistence, export, and fixtures |
+| [`src/chain.ts`](src/chain.ts) | 相邻计划构造与当前格式绕过 |
+| [`src/catalog.ts`](src/catalog.ts) | 物理版本分派与标头分类 |
+| [`src/json.ts`](src/json.ts) | 分离的无损 JSON 快照与通用坐标校验 |
+| [`src/filename.ts`](src/filename.ts) | 持久化、导出与 fixture（测试前置数据）共用的规范 `session[.vN].jsonl` 文件名 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [Released v0 to v1 edge](../session-format-v0-to-v1/README.md) — frozen historical decoding and identity conversion.
-- [Static catalog](../session-format-catalog/README.md) — first-party codec and migration assembly.
-- [JSONL persistence](../session-persistence-jsonl/README.md) — durable framing and generation publication.
+- [已发布 v0 到 v1 迁移边](../session-format-v0-to-v1/README.zh.md)——冻结的历史解码与恒等转换。
+- [静态目录](../session-format-catalog/README.zh.md)——第一方编解码器与迁移装配。
+- [JSONL 持久化](../session-persistence-jsonl/README.zh.md)——持久化分帧与代际发布。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Session restoration
+### 会话还原
 
-#### What the model sees
+#### 模型看到什么
 
-Nothing directly. Consumers reconstruct model history from the validated current artifact through `deriveMessages()`.
+没有直接内容。消费方通过 `deriveMessages()` 从经过校验的当前产物重建模型历史。
 
-#### Token effect
+#### Token 影响
 
-Zero direct tokens.
+不直接产生 token。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct effect. A migration that changes current history can change the cache identity owned by request reconstruction.
+没有直接影响。迁移若改变当前历史，可能改变由请求重建逻辑拥有的缓存身份。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Final current history remains resident** — streaming retains only bounded intermediate state, but the returned current event array and any required sequence-remap table remain O(event count).
-- **Adjacent integer versions only** — the library does not expose spans, stable event identities, or a general reference-rewrite algebra.
+- **最终当前历史仍常驻内存**——流式处理只保留有界中间状态，但返回的当前事件数组和必需的序号重映射表仍为 O(事件数)。
+- **仅支持相邻整数版本**——本库不暴露 span、稳定事件身份或通用引用重写代数。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

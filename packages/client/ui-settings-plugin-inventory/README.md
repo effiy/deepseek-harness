@@ -1,109 +1,109 @@
 ---
-description: "Scope-grouped read-only plugin inventory tab in Web Plugins settings for the dsh web client: agent-preset compositions first, the global plane behind a disclosure, search across both."
+description: "dsh Web 客户端设置中按作用域分组的只读插件清单标签页：Agent 预设组合在前，全局平面收在折叠分组里，搜索跨两组。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-settings-plugin-inventory
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The **Plugin list** tab lets Web users inspect plugins without changing their configuration. It lists agent presets, open by default, then the collapsed global inventory; a search opens both. Cards show localized titles and descriptions when available, identify instances by stable entry id, and expose enablement, source details, runtime status, disabled conditions, and discovery failures; preset-provided global entries name their presets. Search covers both groups and points to matches in other presets. The tab handles loading, empty, no-match, failure, and retry states without exposing transport details, and still shows the global inventory without a preset roster.
+**插件列表**标签页让 Web 用户查看插件，而不改变其配置。它先列 agent（智能体）预设分组，再列全局清单；预设分组默认展开，全局分组默认收起，搜索期间两组都展开。卡片显示可用的本地化标题与描述，以稳定的条目 id 标识实例，并展示启停状态、出处、运行状态、禁用条件与发现失败；由预设提供的全局条目会列出对应预设。搜索覆盖两个分组，并指出其他预设中的匹配。标签页处理加载、空结果、无匹配、失败与重试状态，且不暴露传输细节；没有预设 roster 时仍会展示全局清单。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Open the Plugins section in Settings and select the **Plugin list** tab to inspect the Host's plugin inventory. The tab reads no Remote during plugin activation — selecting it for the first time mounts the component and lazily calls `ctx.remote.pluginInventory.list()` through `api-remotes`.
+打开设置中的「插件」分区并选择**插件列表**标签页，即可查看宿主的插件清单。插件激活期间不会读取 Remote——首次选择该标签页时才挂载组件，并通过 `api-remotes` 懒调用 `ctx.remote.pluginInventory.list()`。
 
-A failed installation with pending pnpm build permissions offers **Allow these scripts and retry**. The action displays the exact package names and persistent permission scope, then retries the original package spec and activation choice. One click approves the entire displayed group, which can include pending packages from earlier attempts. Closing the page grants no permission.
+安装失败且存在待审批的 pnpm 构建权限时，页面提供“允许这些脚本并重试”。该操作展示准确包名和持久授权范围，再使用原来的包规格及启用选项重试。一次点击批准整个列表，其中可能包括此前安装留下的待审批包。关闭页面不会授予权限。
 
-### Reading a card
+### 阅读卡片
 
-Each collapsed card uses the plugin's localized title and description when available; a description shows at most two lines until its card is expanded. Settings shortens literal package-name or module-name fallbacks by removing the npm scope and the `cordis:`, `cordis-plugin-`, or `dsh-`/`dsh-host-`/`dsh-client-` prefix; locale titles remain unchanged. The Host supplies locale and package-field fallbacks in `meta`; the Client selects the current language. Full module specifiers remain available in details and search. Missing descriptions are omitted, and metadata diagnostics appear with the card. This compact naming applies only to Settings, not the sidebar's Plugins page.
+每张收起的卡片使用插件可用的本地化标题与描述；描述最多显示两行，展开卡片后显示全文。设置页会缩短字面的包名或模块名回退值，移除 npm scope 以及 `cordis:`、`cordis-plugin-` 或 `dsh-`/`dsh-host-`/`dsh-client-` 前缀；locale 标题保持原样。Host 在 `meta` 中提供 locale 与包字段的回退结果，Client 选择当前语言。详情与搜索仍保留完整模块标识。缺失的描述不显示，元信息诊断随卡片展示。这种短名显示仅用于设置页，不影响侧栏的插件页。
 
-A small enablement tag marks only the states that differ from plainly enabled: disabled, conditional, provided by presets, and failed; a plainly enabled row carries no tag. A colored root-fiber status dot marks the live phases no tag states: `pending` maps to idle, while `loading` and `unloading` map to ongoing; an `active` or `failed` fiber shows no dot. The stable entry id appears in a code chip at the card's bottom-left, in line with the title, only when it differs from the title: a composition-generated id drops its leading `include:` marker there, and an id that then repeats the title is omitted. Whenever the chip shows, its hover text and the card's accessible name carry the complete id; search and expanded details always retain it. Long entry ids truncate in the chip and remain available on hover. Expanding one card reveals its full description, the declared entry id, the full module specifier, and the state facts: a preset row names the preset it comes from, its runtime status when the composition is live, and its disable condition when it carries one; a preset-provided global row explains that agent presets provide it per session, names the presets that enable it, and offers a jump into the preset group. Preset names resolve through the shared `presetDisplayText` fold (`dsh-agent-preset-registry/display`) over [`ui-agent-preset`](../ui-agent-preset/README.md)'s dictionaries: shipped presets follow the active locale while user-authored ones keep their own metadata, so an English surface never echoes the preset declarations' Chinese names. Search filters both groups by localized title and description, module name, and entry id.
+表示启停状态的小标签只标记与普通启用不同的状态：已停用、条件启用、由预设提供与启动失败；普通启用的行不带标签。彩色根 fiber 状态圆点标记没有标签表达的存活阶段：`pending` 映射为 idle，`loading` 与 `unloading` 映射为 ongoing；`active` 或 `failed` fiber 不显示圆点。稳定的条目 id 仅在与标题不同时显示，位于卡片左下角的代码标签中，与标题左对齐：组合生成的 id 在此省略开头的 `include:` 标记，省略后与标题相同的 id 不再重复显示。显示代码标签时，其悬停提示与卡片的无障碍名称带完整 id；搜索与展开详情始终保留完整 id。长条目 id 会在代码标签内截断，悬停时仍可查看完整值。展开卡片后会显示完整描述、声明的条目 id、完整模块标识与状态事实：预设行说明它来自哪个预设、组合存活时的运行状态，以及它携带的禁用条件；被预设提供的全局行说明它由 Agent 预设按会话提供、列出启用它的预设，并提供跳转到预设组的入口。预设名经共享的 `presetDisplayText` 纯函数（`dsh-agent-preset-registry/display`）叠在 [`ui-agent-preset`](../ui-agent-preset/README.zh.md) 的字典上解析：内置预设走当前语言，用户自建预设保留自己的元数据，因此英文界面不会回显预设声明里的中文名。搜索按本地化标题与描述、模块名称及条目 id 过滤两组。
 
-### The preset switcher
+### 预设切换器
 
-The switcher is the same selector-pill-plus-menu control the General settings rows use. It lists every roster preset — the default suffixed as such, broken ones marked — and changes only what the list shows: it writes no settings, and selecting a broken preset shows the discovery-reported reason in place of rows. Choosing the default preset or a session's preset stays where it was: the Agent presets section and the new-session screen.
+切换器与通用设置各行使用同一种「选择胶囊 + 菜单」控件。它列出 roster 的每个预设——默认项带后缀、坏预设带标记——并且只改变列表显示什么：它不写任何设置，选中坏预设时在行的位置展示 discovery 报告的原因。选择默认预设或会话预设的入口仍在原处：Agent 预设分区与新会话页。
 
-### Retrying a failed read
+### 重试失败的读取
 
-A failed read renders the shared error marker inside the tab. Loading shows skeleton cards in the card grid, and current-page synchronization uses the shared ongoing loader. Retrying re-runs the lazy `list()` call without exposing transport details.
+读取失败会在标签页内渲染共享 error 标记。加载时在卡片网格中显示骨架卡片，当前页面同步使用共享 ongoing loading。重试会重新执行懒 `list()` 调用，且不会暴露传输细节。
 
-The Plugin list also shows synchronization failures on the current page. Its retry reapplies the latest client graph without changing Host enablement or refreshing the page.
+插件列表还显示当前页面的同步失败。重试会重新应用最新客户端图，不改变 Host 启用状态，也不刷新页面。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The tab is a read-only projection of a Host-owned snapshot; it performs no Remote read during plugin activation and takes the snapshot on first selection.
+该标签页是宿主拥有快照的只读投影；插件激活期间不执行任何 Remote 读取，首次选择时才取快照。
 
-### Registration
+### 注册
 
-The browser plugin registers one localized `settings.plugins.tab` contribution with id `all`; the Plugins section owns the navigation entry and tab chrome. Registration uses `ctx.slots.inject()`, so it follows late tab declaration, redeclaration, locale changes, and teardown without importing the section owner.
+浏览器插件注册一个 id 为 `all` 的本地化 `settings.plugins.tab` 贡献；「插件」分区拥有导航入口与标签栏。注册使用 `ctx.slots.inject()`，因此能跟随标签 slot 的延迟声明、重新声明、本地化变化与 teardown，而无需 import 分区拥有方。
 
-### Rendering
+### 渲染
 
-Row keys are scope-qualified (`global:`, `preset:<id>:<index>`), so one module appearing in both scopes keeps distinct disclosure state; a declared entry id appears in expanded details and, after removal of a leading composition `include:` marker, supplies the collapsed id chip when the result differs from the title, while a row without one stays unlabeled. The preset-provided marking is derived client-side: a global entry carries it when it is disabled there while at least one preset row for the same module specifier is actually enabled, so a module every preset gates off (or declares only conditionally) stays plainly disabled rather than over-claiming provision.
+行 key 按作用域限定（`global:`、`preset:<id>:<index>`），因此同一模块出现在两个作用域时保持各自的展开状态；声明的条目 id 出现在展开详情中；去掉开头的组合 `include:` 标记后若与标题不同，则作为收起卡片的 id 代码标签，没有 id 的行不显示次级标签。预设提供标记在客户端推导：一个全局条目在全局被停用、且至少一个预设行对同一模块标识实际启用时才携带它，因此被所有预设关掉（或仅条件声明）的模块保持单纯的已停用，而不是夸大提供关系。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-These pages cover the settings section, the remote call, and the Host-side projection.
+以下页面覆盖设置分区、Remote 调用与宿主侧投影。
 
-- [ui-settings-plugins](../ui-settings-plugins/README.md) — the Plugins section this tab registers into.
-- [ui-settings](../ui-settings/README.md) — the domain base declaring `settings.plugins.tab`.
-- [api-remotes](../../api/remotes/README.md) — the Remote BFF surface behind `pluginInventory.list()`.
-- [plugin-inventory](../../host/plugin-inventory/README.md) — the Host-side read-only Loader projection this tab renders.
+- [ui-settings-plugins](../ui-settings-plugins/README.zh.md)——本标签页注册进的「插件」分区。
+- [ui-settings](../ui-settings/README.zh.md)——声明 `settings.plugins.tab` 的领域底座。
+- [api-remotes](../../api/remotes/README.zh.md)——`pluginInventory.list()` 背后的 Remote BFF 表面。
+- [plugin-inventory](../../host/plugin-inventory/README.zh.md)——本标签页所渲染的宿主侧只读 Loader 投影。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the package is a browser-side inventory projection that registers nothing model-facing.
+无。该包是浏览器端清单投影，不注册任何面向模型的内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；该包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the freshness and reach of the inventory view; they are current package constraints.
+这些限制定义清单视图的新鲜度与触达范围；它们是当前包约束。
 
-- **One snapshot per Settings mount or retry** — the tab does not subscribe to Loader changes or automatically refetch after reconnect; switching tabs preserves the current snapshot, while reopening Settings obtains a new one.
-- **Read-only in both planes** — the tab shows global and preset enablement but mutates neither; enable/disable controls that write a custom preset's own composition file are deliberate follow-up work.
+- **每次 Settings 挂载或重试只读取一份快照**：标签页不订阅 Loader 变化，也不会在重连后自动重新读取；切换标签页会保留当前快照，重新打开 Settings 则会取得新快照。
+- **两个平面都只读**：标签页展示全局与预设的启停状态但都不修改；写回自定义预设组合文件的启停控件是刻意留作后续的工作。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

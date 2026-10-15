@@ -1,59 +1,59 @@
 ---
-description: "Official DeepSeek request-extension registry for provider plugins contributing lifecycle-owned top-level API fields."
+description: "面向提供方插件的官方 DeepSeek 请求扩展注册表，用于贡献具有生命周期归属的顶层 API 字段。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-deepseek-llm-api-extensions
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Provider-specific registry for additive top-level fields on official DeepSeek LLM API requests. `DeepSeekLlmApiExtensionRegistry` registers `ctx.deepseekLlmApiExtensions`; contributor plugins claim one declaration-merged field, and `dsh-llm-deepseek` prepares the current contributions after serializing its base request. Use it when a plugin must add a validated provider-specific field without changing the base adapter.
+用于向 DeepSeek 官方 LLM（大语言模型）API 请求添加顶层字段的提供方特定注册表。`DeepSeekLlmApiExtensionRegistry` 注册 `ctx.deepseekLlmApiExtensions`；贡献插件分别认领一个经声明合并的字段，`dsh-llm-deepseek` 则在序列化基础请求后准备当前贡献。当插件必须添加经过验证的提供方特定字段且不能修改基础适配器时，请使用它。
 
-## Table of Contents
+## 目录
 
-- [Service](#service)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [服务](#service)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="service"></a>
-## Service
+## 服务
 
-- `register(field, provider)` reserves one field for the calling fiber. Duplicate or malformed names fail synchronously; disposing the registration releases it for a later provider.
-- `prepare(request)` snapshots the registered providers, prepares them concurrently, clones and freezes returned JSON values, and returns `{ fields, accept }`. A provider whose preparation throws is omitted while the other fields are returned, and only its first failure is logged; request cancellation rejects and stops awaiting providers even when one ignores its signal.
-- `accept()` runs every captured post-2xx callback once. Concurrent calls join the same settlement, every callback settles before failures are reported, and several failures become one `AggregateError`.
+- `register(field, provider)` 为调用 fiber 保留一个字段。重复或格式错误的名称会同步失败；dispose（资源释放）该注册后，后续提供方可以再次认领。
+- `prepare(request)` 对已注册提供方取快照，并发准备贡献，克隆并冻结返回的 JSON 值，然后返回 `{ fields, accept }`。某个提供方准备时抛错，注册表会省略其字段，其余字段照常返回，且只记录该字段的首次失败；请求取消会使 `prepare` 拒绝，即使某个提供方忽略信号，注册表也会停止等待。
+- `accept()` 对每个捕获的 2xx 后回调只运行一次。并发调用会等待同一次结算，所有回调都在报告失败前完成，多个失败会合并为一个 `AggregateError`。
 
-Each provider sees the exact serialized Messages body, the request `AbortSignal`, plus optional `sessionId` and auxiliary-call `purpose`. It must stop its own work promptly after cancellation and returns `undefined` when its field does not apply to that request. A prepared operation retains the providers it captured even if HMR removes their registrations before HTTP acceptance.
+每个提供方都会看到确切的已序列化 Messages 请求体、请求 `AbortSignal`，以及可选的 `sessionId` 与辅助调用 `purpose`。提供方必须在取消后迅速停止自身工作；字段不适用于当前请求时返回 `undefined`。即使 HMR（热模块替换）在 HTTP 接受前移除了注册，已准备的操作仍会保留其捕获的提供方。
 
-The registry owns addition and lifecycle, not field semantics. `@deepseek-ai/dsh-session-log-deepseek` owns `dsh_session_log`; `@deepseek-ai/dsh-plugin-package-inventory-deepseek` owns `dsh_plugin_packages`. The provider-neutral LLM seam and `llm-pi-ai` do not consume this registry.
+注册表拥有字段添加与生命周期，不拥有字段语义。`@deepseek-ai/dsh-session-log-deepseek` 拥有 `dsh_session_log`；`@deepseek-ai/dsh-plugin-package-inventory-deepseek` 拥有 `dsh_plugin_packages`。提供方无关的 LLM seam 与 `llm-pi-ai` 都不消费该注册表。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through `@deepseek-ai/dsh-llm-deepseek`, which sends registered fields outside the model's `messages`, system prompt, and tool schemas.
+通过 `@deepseek-ai/dsh-llm-deepseek` 间接生效；该包在模型的 `messages`、系统提示词与工具 schema 之外发送已注册字段。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; registry fields are model-hidden provider metadata and do not alter the serialized model-input prefix.
+无；注册表字段是模型不可见的提供方元数据，不改变已序列化的模型输入前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Official DeepSeek requests only** — the registry intentionally has no provider-neutral routing or pi-ai adapter integration.
-- **No field ordering contract** — JSON object member order follows registration preparation but receivers address fields by name.
+- **仅限 DeepSeek 官方请求**——该注册表刻意不提供提供方无关的路由，也不集成 pi-ai 适配器。
+- **不约定字段顺序**——JSON 对象成员顺序取决于注册准备顺序，但接收方按名称寻址字段。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,39 +1,39 @@
 ---
-description: "The Windows write-restriction sandbox backend for users and maintainers choosing, configuring, or debugging restricted-token process confinement on Windows."
+description: "面向 Windows 上选择、配置或排查受限令牌进程隔离的用户与维护者的 Windows 写入限制沙箱后端。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-sandbox-windows-acl
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-On Windows, this package confines child-process writes and deletes to the workspace and a private temporary directory: `workspace-write` grants both, `read-only` grants neither. Mounting `dsh-sandbox-local` selects this for confined bash and PowerShell commands, or callers use the public `AclSandbox` API directly; any failed Win32 operation prevents an unrestricted spawn. Each grant combines a capability-SID allow ACE, a deny of the ambient parent-directory delete right, and a Low integrity label the lowered token must match, so one granted root cannot reach another. The guarantee stays partial: hard links alias file objects and files ACL'd by another AppContainer tool stay unreadable.
+在 Windows 上，本包将子进程的写入与删除限制在工作区和私有临时目录内：`workspace-write` 授予这两处，`read-only` 均不授予。挂载 `dsh-sandbox-local` 后，受限的 bash 与 PowerShell 命令即获得此行为；调用方也可以直接使用公开 `AclSandbox` API；任何 Win32 操作失败都会阻止不受限制的 spawn。每次授权同时写入能力 SID 允许 ACE、对父目录删除权限的环境性拒绝，以及被降级令牌必须匹配的 Low 完整性标签，因此一个授权根目录无法触及另一个。该保证仍为部分强制：硬链接是文件对象别名，而被其他 AppContainer 工具 ACL 过的文件不可读。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-On Windows, mounting the local sandbox provider makes this backend the runner behind `ctx.sandbox` — no extra configuration. Embed the `AclSandbox` API directly when you spawn confined children outside the harness.
+在 Windows 上，挂载本地沙箱提供方后，此后端就是 `ctx.sandbox` 背后的 runner——无需额外配置。要在 harness 之外 spawn 受限子进程时，直接嵌入 `AclSandbox` API。
 
-### When to choose it
+### 何时选择
 
-Choose it for Windows compositions that confine subprocess file effects under `read-only` or `workspace-write`. Choose a different mechanism when the child must also be read-confined or network-restricted: `WRITE_RESTRICTED` intersects write accesses only, so pair this backend with a read-side policy or an AppContainer capability token for stronger confinement.
+为在 `read-only` 或 `workspace-write` 下隔离子进程文件操作的 Windows 组合选择它。当子进程还需要读侧隔离或网络限制时请另选机制：`WRITE_RESTRICTED` 只交叉检查写访问，因此请把此后端与读侧策略或 AppContainer 能力令牌配对以获得更强隔离。
 
-### Direct API
+### 直接 API
 
-`AclSandbox` spawns a confined child with captured stdio (or inherited stdio for runner-style use). It requires an explicit private temp directory, or `tempDir: null` to disable temp writes — the ambient temp root is never an implicit grant.
+`AclSandbox` 以捕获 stdio 的方式 spawn 受限子进程（runner 风格使用可用继承 stdio）。它要求显式提供私有临时目录，或用 `tempDir: null` 禁用临时写入——环境临时根目录绝不会被隐式授权。
 
 ```ts
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -63,144 +63,146 @@ sandbox.dispose() // revokes the revocable (temp) grant and label, keeps the sta
 rmSync(tempDir, { recursive: true, force: true })
 ```
 
-The workspace security descriptor edits are granted standing — `dispose()` leaves them, because they are the cross-instance reuse cache — while the distinct temp SID is granted revocably. Each grant is one call carrying the capability-SID allow ACE, the ambient-delete deny, and the Low no-write-up label. The server-side counterpart is the `AclWriteGrant` class: `add(path, standing)` per directory, and `dispose()` revokes the revocable paths and frees the SIDs.
+工作区的安全描述符改动以常驻方式授予——`dispose()` 保留它们，因为它们是跨实例的复用缓存——而不同的临时 SID 以可回收方式授予。每次授权就是一次调用，同时携带能力 SID 允许 ACE、环境性删除拒绝与 Low 禁止上调标签。服务端对应实现是 `AclWriteGrant` 类：每个目录一次 `add(path, standing)`，`dispose()` 撤销可回收路径并释放各 SID。
 
-### What confinement gives you
+### 隔离给你带来什么
 
-Under `workspace-write`, the child may write into the workspace and its private temp directory; other ACL-addressable writes and deletes are denied except the documented hard-link and AppContainer-ACL boundaries. Under `read-only`, no explicit write grants exist, so writes and deletes are denied with the same documented boundaries.
+在 `workspace-write` 下，子进程可以写入工作区及其私有临时目录；受 ACL 管辖的其他写入与删除都会被拒绝，已记录的硬链接与 AppContainer ACL 边界除外。在 `read-only` 下不存在显式写入授权，因此写入与删除都会被拒绝，同样带有已记录的边界。
 
-Temp isolation is per live session/workspace pair: sessions sharing a workspace share its write authority but cannot write one another's temp directories. A fresh provider always chooses a new temp path and SID, so crash residue cannot block or authorize a resumed session.
+临时隔离按每个活跃的会话/工作区对进行：共享工作区的会话共享其写权限，但无法写入彼此的临时目录。新的提供方总会选择新的临时路径和 SID，因此崩溃残留既无法阻止恢复的会话，也无法向其授权。
 
-### Failures and recovery
+<a id="failures-and-recovery"></a>
 
-`init()` throws on any Win32 failure — the child is never spawned unrestricted. A runner that fails before executing the command prints `windows-acl-run: <detail>` to stderr and exits 127, which the seam's runner-failure rules classify as a broken sandbox rather than a denial. Cleanup is best-effort by design: `dispose()` attempts every temp revocation and aggregates failures into an `AggregateError`.
+### 失败与恢复
 
-A denial this backend cannot explain is diagnosed by the `diagnose-windows-sandbox-acl` skill bundled in `assets/`. `registerAclDiagnosisSkill` contributes it when `dsh-sandbox-local` uses its built-in Windows runner and a skill registry is available. Registration extracts resources for external PowerShell, including in ASAR and SEA deployments; fiber disposal unregisters the provider and removes its copy. Missing assets fail registration.
+`init()` 在任何 Win32 失败时抛出——子进程绝不会不受限制地 spawn。执行命令前失败的 runner 会向 stderr 打印 `windows-acl-run: <detail>` 并以 127 退出，seam 的 runner 失败规则将其归类为损坏的沙箱，而非拒绝。清理按设计尽力而为：`dispose()` 会尝试全部临时撤销并把失败聚合为 `AggregateError`。
 
-One run diagnoses and repairs. The script has no modes: it reads the requested path and every ancestor, adds the signed-in user's full-control allow ACE to chain directories that lack effective `WRITE_DAC` or `WRITE_OWNER`, and removes explicit package allow ACEs at their sources, ancestor first, verifying each change by re-reading it. Repairs preserve denies, owner, inheritance and SACL, and back up each changed DACL. An object is modified only when it is `-AllowRoot` or strictly inside it, so a workspace root can repair itself; reparse paths and managed application trees are refused, and a repair needs effective `WRITE_DAC`. Failed repairs restore attempted changes in reverse order and exit nonzero. Follow the [bundled skill](assets/diagnose-windows-sandbox-acl/SKILL.md) for the single command, original-operation verification and recovery.
+此后端无法解释的拒绝交给 `assets/` 中随包发布的 `diagnose-windows-sandbox-acl` 技能诊断。当 `dsh-sandbox-local` 使用内置 Windows runner 且技能注册表可用时，`registerAclDiagnosisSkill` 会注册它。注册时提取供外部 PowerShell 使用的资源，ASAR 和 SEA 部署也适用；fiber 释放时注销提供者并删除副本。缺少资源会导致注册失败。
 
-Every run prints `REPORT` JSON records of observations, actions, reasons and verification, then a final `RECAP` line carrying the verdicts, changes, verifications, refusals and scans, and a summary with the counts, recovery commands and `nextAction`; unknown observations remain unknown. The same run writes every record to `-Out\acl-report-*.jsonl`, because tool output keeps only its tail. `-Out` also receives two recovery files per change: the DACL the object owned before that change and the independent script that restores it. Action completion records API execution; verification records the observed result. The [recovery decisions](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md#acl-diagnosis-and-recovery) explain resource ownership and rollback limits.
+一次运行同时完成诊断与修复。脚本没有模式开关：它读取请求路径及每一级祖先，为链路上缺少有效 `WRITE_DAC` 或 `WRITE_OWNER` 的目录补上当前用户的完全控制允许 ACE，并从祖先开始在其来源移除显式包允许 ACE，每处改动都通过重新读取来验证。修复保留拒绝条目、所有者、继承和 SACL，并备份每个被修改的 DACL。仅当对象就是 `-AllowRoot` 或严格位于其内部时才会被修改，因此工作区根目录可以自我修复；重解析路径和受管理的应用目录会被拒绝，修复需要有效的 `WRITE_DAC`。修复失败时按相反顺序恢复尝试修改的内容，并以非零状态退出。单条命令、原始操作验证及恢复流程见[内置技能](assets/diagnose-windows-sandbox-acl/SKILL.md)。
 
-Inspection visits the requested object and each ancestor through the filesystem root. Each ACL observation's `path` identifies the inspected object; the classification's `details.packageObjects` lists objects carrying package allow ACEs without establishing the cause of the original failure. Each package removal is verified per object by comparing the recorded own ACEs with the re-read DACL, so a deny that shares the removed allow's SID remains visible in the verification details.
+每次执行都会打印包含观察、操作、原因和验证结果的 `REPORT` JSON 记录，最后给出一行 `RECAP`（判定、改动、验证、拒绝与扫描结果）以及含计数、恢复命令和 `nextAction` 的摘要；未知观察保持未知。同一次执行还会把全部记录写入 `-Out\acl-report-*.jsonl`，因为工具输出只保留末尾部分。`-Out` 同时为每次改动写入两个恢复文件：该对象在本次改动前拥有的 DACL，以及用于恢复它的独立脚本。操作完成记录 API 执行情况，验证记录实际观察到的结果。[恢复决策](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.zh.md#acl-diagnosis-and-recovery) 说明资源归属和回滚限制。
+
+检查会从请求对象逐级访问祖先，直到文件系统根目录。每条 ACL 观察的 `path` 标识实际检查的对象；分类结果的 `details.packageObjects` 列出包含包允许 ACE 的对象，但不能据此确认原始失败的原因。每次包 ACE 移除都按对象验证：把记录下来的自身 ACE 与重新读取的 DACL 比对，因此与被移除允许项共用 SID 的拒绝条目仍会出现在验证详情中。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the restricted-token mechanism, the token lists, the runner contract, and the verified boundaries; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释受限令牌机制、令牌列表、runner 约定与已验证边界；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Mechanism
+### 机制
 
-The caller's token is duplicated into a `WRITE_RESTRICTED` token whose restricting SIDs carry separate workspace and private-temp capabilities, and that token is lowered to Low integrity. Windows performs the access check twice — once against the normal SIDs, once against the restricting SIDs — and grants write-class access only where both checks pass; separately, the kernel's mandatory-integrity check denies write-class access to every object that is not labeled Low. The write-SID intersection covers only the object's OWN access check: Windows can also authorize a write or a delete from the parent directory's `FILE_DELETE_CHILD` right, which no restricting SID has to co-sign, so a token holding only the intersection could still delete anything its ambient user SIDs control — including files inside ANOTHER granted root, whose Low label clears the integrity check. Each grant therefore also denies `FILE_DELETE_CHILD` to the world SID, leaving the capability ACE's DELETE bit as the only delete authority inside the granted roots, and labels the same directory Low in the one `SetNamedSecurityInfoW` call that applies all three edits. The workspace SID is derived deterministically from the canonical workspace path (`workspaceWriteSid`), so the workspace-root security descriptor edit materializes once per workspace per machine and every later session, call, or restart hits the exact-ACE/exact-deny/exact-label skip. Each live session/workspace pair instead receives a random private temp directory and a SID derived from that path (`tempWriteSid`), so sessions share the intended workspace authority without inheriting one another's temp authority. Every policy-specific Win32 call and every process primitive from [`dsh-win32-process`](../../subprocess/win32-process/README.md) is checked; failures throw `Win32Error` carrying the API name, exact code, system text, and failing context — fail-closed by construction.
+调用者令牌被复制为 `WRITE_RESTRICTED` 受限令牌，其 restricting SIDs 携带彼此独立的工作区与私有临时目录能力，该令牌还会被降级为 Low 完整性。Windows 执行两次访问检查——先对正常 SID，再对 restricting SID——并且只在两次检查都通过时才授予写类访问；与此同时，内核的强制完整性检查会拒绝对任何未标记为 Low 的对象进行写类访问。写 SID 交叉检查只覆盖对象自身的那次访问检查：Windows 也可以依据父目录的 `FILE_DELETE_CHILD` 权限批准写入或删除，而这项权限不需要任何 restricting SID 副署，因此只带交叉检查的令牌不仅能删除其环境用户 SID 所控制的任何文件，还能删除**另一个授权根目录**内的文件——那里的 Low 标签恰好能通过完整性检查。所以每次授权还会向 world SID 拒绝 `FILE_DELETE_CHILD`，使能力 ACE 的 DELETE 位成为授权根目录内唯一的删除授权来源，并在同一次 `SetNamedSecurityInfoW` 调用中把该目录标记为 Low。工作区 SID 由规范工作区路径确定性派生（`workspaceWriteSid`），因此工作区根目录的安全描述符改动每台机器每个工作区只物化一次，之后每次会话、调用或重启都命中精确 ACE／精确拒绝／精确标签跳过。每个活跃的会话/工作区对则获得一个随机私有临时目录，以及一个从该路径派生的 SID（`tempWriteSid`），因此各会话共享预期的工作区权限，却不会继承彼此的临时目录权限。每个策略专用 Win32 调用和 [`dsh-win32-process`](../../subprocess/win32-process/README.zh.md) 提供的进程原语都有检查；失败抛出携带 API 名、精确错误码、系统文本与失败上下文的 `Win32Error`——从构造上 fail-closed。
 
-### Modes and token lists
+### 模式与令牌列表
 
-`workspace-write` (logon SID, Everyone, workspace SID, temp SID) grants the workspace and the session's private temp subdirectory separate Write grants; `read-only` (logon SID, Everyone — no write SID) grants none. Both modes spawn a Low-integrity token, and only labeled directories stay writable for it. The keep-alive group (logon SID + Everyone) is present in both modes: without it, early DLL initialization dies with `0xC0000142` and CNG crashes pwsh with `0xE0434352`. The write SID stays out of the read-only list on purpose: the standing workspace grant from an earlier workspace-write period remains inert because the write-restricted pass-2 check grants only what the restricting list carries, while the standing security descriptor edit keeps a re-upgrade free of re-propagation.
+`workspace-write`（登录 SID、Everyone、工作区 SID、临时 SID）为工作区与会话的私有临时子目录分别授予 Write；`read-only`（登录 SID、Everyone——不含写入 SID）不授予任何内容。两种模式都 spawn 降级为 Low 完整性的令牌，对它而言只有被标记 Low 的目录保持可写。保活组（登录 SID + Everyone）在两种模式下都存在：没有它，早期 DLL 初始化会以 `0xC0000142` 死亡、CNG 会让 pwsh 以 `0xE0434352` 崩溃。写入 SID 有意留在 read-only 列表之外：先前 workspace-write 时期留下的常驻授权 ACE 仍然失效，因为 write-restricted 的 pass-2 检查只授予 restricting 列表所携带的内容，而常驻安全描述符改动让重新升级免于重新传播。
 
-NUL writes are ambient, not granted: the device DACL grants Everyone read+write+execute (`0x1201BF`), so openers whose mask fits it (cmd `> NUL`, node `\\.\NUL`) can write it in both modes. `Set-Content NUL` fails in both modes (a PowerShell/.NET-layer effect, not the device DACL), while PowerShell's `> $null` redirection keeps working.
+NUL 写入是环境性的、不是被授权的：设备 DACL 授予 Everyone 读+写+执行（`0x1201BF`），因此访问掩码落在其内的打开者（cmd 的 `> NUL`、node 的 `\\.\NUL`）在两种模式下都能写。`Set-Content NUL` 在两种模式下都失败（PowerShell/.NET 层效应，非设备 DACL 所致），而 PowerShell 的 `> $null` 重定向不受影响。
 
-Authenticated Users is absent from both lists — the WMI namespace security check fails (`0x80041003`), so CIM cmdlets and `Get-ComputerInfo` are unavailable in every confined mode, and the C:\-root tree-creation escape is closed. INTERACTIVE/LOCAL are absent too: the host's Public tree grants write to INTERACTIVE, so Public writes are denied.
+Authenticated Users 在两种列表中都不存在——WMI 命名空间安全检查失败（`0x80041003`），因此 CIM cmdlet 与 `Get-ComputerInfo` 在所有受限模式下都不可用，且 C:\-root 树创建逃逸被关闭。INTERACTIVE/LOCAL 同样不存在：宿主的 Public 树向 INTERACTIVE 授予写权限，因此 Public 写入被拒绝。
 
-### The confinement runner
+### 隔离 runner
 
-The seam-facing shape is the runner entry (`./runner`): an argv-prefix wrapper `dsh-sandbox-local` spawns in place of the caller's command, with the same architecture as bwrap/landlock-run/sandbox-exec. The runner creates the restricted token, spawns the wrapped argv under it with the caller's stdio passed straight through, wraps the child in a `KILL_ON_JOB_CLOSE` job, mirrors the child's exit code, and revokes its self-managed temp grant on exit. Every runner-side failure prints `windows-acl-run: <detail>` to stderr and exits 127 — the seam's runner-failure rules match that signature.
+面向 seam 的形态是 runner 入口（`./runner`）：`dsh-sandbox-local` 在调用者命令的位置 spawn 的 argv 前缀包装——与 bwrap/landlock-run/sandbox-exec 同一架构。runner 创建受限令牌，在它之下 spawn 包装后的 argv，调用者的 stdio 直接透传，把子进程包进 `KILL_ON_JOB_CLOSE` job，镜像子进程的退出码，并在退出时撤销其自行管理的临时授权。每个 runner 侧失败都会向 stderr 打印 `windows-acl-run: <detail>` 并以 127 退出——seam 的 runner 失败规则匹配该签名。
 
 ```sh
 node runner.js --workspace <dir> --temp <dir> --mode <read-only|workspace-write> [--write-sid <S-1-4-…> --temp-write-sid <S-1-4-…>] -- <argv...>
 ```
 
-The seam materializes the deterministic workspace SID's ACE standing (once per workspace per server lifetime — the reuse cache), then creates a random private temp directory and a distinct revocable SID for each live session/workspace pair, passing both as the required `--write-sid`/`--temp-write-sid` pair; the runner verifies each against its owning path and neither grants nor revokes (`manageDacls: false`). A fork receives a different temp capability, and a fresh provider gives even the same resumed session a new path and SID, so crash residue is inert litter. Without the pair, `--temp` names a root: an agentless workspace-write runner creates a random private child, self-manages its temp SID, rewrites TMP/TEMP, and removes the child on exit. Re-granting the standing workspace ACE after a restart is idempotent: `grantWrite` reads the current DACL and skips the re-propagation when the exact ACE already stands. A workspace equal to or containing the temp root is rejected before any grant.
+seam 先把确定性工作区 SID 的 ACE 常驻物化（每个工作区每服务器生命周期一次——复用缓存），再为每个活跃的会话/工作区对创建随机私有临时目录和不同的可回收 SID，把两种身份作为必须成对出现的 `--write-sid`/`--temp-write-sid` 传入；runner 对照各自所属路径验证二者，既不授权也不撤销（`manageDacls: false`）。fork 获得不同的临时能力；即使恢复的是同一会话，新的提供方也会给出新的路径和 SID，因此崩溃残留只是失效垃圾。如果不带这一对标志，`--temp` 指定的是根目录：无 agent（智能体）/独立的 workspace-write runner 会创建随机私有子目录，自行管理其临时 SID，重写 TMP/TEMP，并在退出时移除该子目录。重启后重新授权常驻工作区 ACE 是幂等的：`grantWrite` 读取当前 DACL，当完全相同的 ACE 已存在时跳过重新传播。工作区若等于或包含临时根目录，会在任何授权前被拒绝。
 
-When launched with the subprocess control marker, the runner forwards fd 7 through the restricted child's CRT startup table and closes its own copy immediately after spawn. The optional `controlFileDescriptor: 7` input requires `stdio: 'inherit'`; requesting it with piped stdio fails before process creation.
+启动时若带有 subprocess 控制标记，runner 会通过受限子进程的 CRT 启动表转发 fd 7，并在 spawn 后立即关闭自身副本。可选的 `controlFileDescriptor: 7` 输入要求 `stdio: 'inherit'`；在管道 stdio 下请求它会在进程创建前失败。
 
-### Verified boundaries
+### 已验证边界
 
-- **Everyone stays in both restricting lists, but no longer confers write authority** — the keep-alive group is required for early DLL initialization and CNG; the Low label now denies an Everyone-granted write outside the labeled roots, so that former gap is closed.
-- **Inside a granted root, the capability ACE's DELETE bit is the only delete authority** — the grant denies `FILE_DELETE_CHILD` to the world SID, which also removes the ambient default: a file whose own DACL grants no DELETE is no longer deletable through its parent's rights, by the confined child or by the user's own processes. The user's ordinary deletes keep working because the workspace DACL grants them DELETE directly.
-- **The deny inherits to subdirectories only, and a FullControl open of one is denied** — `FILE_DELETE_CHILD` is evaluated on directories, so the deny carries `CONTAINER_INHERIT_ACE` and never reaches files (its bit, `0x40`, is part of `FILE_ALL_ACCESS`, so a file-level copy would refuse every `GENERIC_ALL`/`FullControl` open by the user, Administrators, SYSTEM, or the DSH host). Directories inside a granted root keep the deny and therefore refuse those opens; `DELETE`-based deletes, `MAXIMUM_ALLOWED`, and ordinary read/write opens are unaffected, and both outcomes are pinned by the runner suite.
-- **Writes and deletes are restricted; reads, network, and process visibility are not** — neither layer intersects reads, so a confined child can read any caller-readable file (including files in another workspace) and open sockets; `read-only` therefore needs a read-side policy to be expressed.
-- **Hard links are file-object aliases, not path aliases** — an inheritable workspace grant propagated onto an existing hard link labels and grants the one underlying file security descriptor, so the same object is writable through an external alias; rejecting multiply-linked files is not viable for ordinary pnpm installations.
-- **Console isolation is unavailable** — children created with `CREATE_NO_WINDOW` / `CREATE_NEW_CONSOLE` die during DLL initialization with `STATUS_DLL_INIT_FAILED` (`0xC0000142`); children share the host console, and pipe-based stdio redirection is unaffected.
-- **Security descriptor edits are standing directory mutations** — workspace ACEs, denies, and labels stand by design (the reuse cache, never revoked); temp edits are revoked by `dispose()`, except that a revoke keeps the shared label while another capability grant remains on the directory, and the deny it leaves behind disappears with the temp directory itself; manual `icacls` cleanup cannot revoke them on this platform (`ERROR_NONE_MAPPED`, 1332), so revoke through this module.
-- **A standing Low label outlives DSH and widens the tree for other Low-integrity processes** — the workspace's inheritable label survives the session (and same-volume moves), so any other process running at Low integrity as the same user — another product's Low-IL sandbox, a Protected Mode reader — can write and delete inside the workspace, where a Medium label would have denied it. The label is the price of the write boundary: without it the confined child cannot write at all, and revoking it per session would re-propagate the whole tree on every provision.
-- **Granted directories must be caller-owned and grant `WRITE_OWNER`** — the owner's implicit rights cover only `READ_CONTROL` and `WRITE_DAC`; the label lives in the SACL, so the combined apply additionally needs `WRITE_OWNER` (a Full-control directory, the normal workspace case, has it). A directory whose DACL grants only Modify now fails the grant loudly instead of silently skipping the confinement.
-- **The ambient temp root is never granted implicitly** — direct callers must supply an existing private `tempDir` plus its distinct `tempWriteSid`, or disable temp writes with `tempDir: null`; the actual temp directory must be disjoint from every writable root.
-- **The confined child's temp capability is private per live session/workspace pair** — the runner rewrites TMP/TEMP to that private directory before the spawn; two tokens sharing the same workspace SID cannot write one another's temp directories.
-- **`whoami` and token-inspection cmdlets may fail under the restricted token** — `GetTokenInformation` on the duplicate is partially unavailable to the child, so whether a reporting cmdlet works is host-dependent; it is diagnostic noise rather than an operational failure.
+- **Everyone 仍留在两种 restricting 列表中，但不再带来写权限。** 保活组是早期 DLL 初始化与 CNG 所必需的；如今 Low 标签会拒绝对被标记根目录之外、由 Everyone 授权的写入，因此这一旧缺口已关闭。
+- **在授权根目录内，能力 ACE 的 DELETE 位是唯一的删除授权来源。** 授权会向 world SID 拒绝 `FILE_DELETE_CHILD`，这同时移除了环境性默认行为：自身 DACL 未授予 DELETE 的文件不再能凭父目录权限删除——受限子进程与用户自身进程皆然。用户日常删除仍然可用，因为工作区 DACL 直接向其授予 DELETE。
+- **拒绝项只继承到子目录，且子目录的 FullControl 打开会被拒。** `FILE_DELETE_CHILD` 只在目录上被评估，因此该 ACE 带 `CONTAINER_INHERIT_ACE`、绝不落到文件上（它的位 `0x40` 属于 `FILE_ALL_ACCESS`，若落到文件上会让用户、Administrators、SYSTEM 或 DSH host 的每次 `GENERIC_ALL`／`FullControl` 打开都被拒绝）。授权根内的目录保留该拒绝项，因而会拒绝这类打开；基于 `DELETE` 的删除、`MAXIMUM_ALLOWED` 与常规读写打开不受影响——两种结果都已被 runner 套件钉住。
+- **写入与删除受限；读取、网络与进程可见性不受限。** 两层都不交叉检查读取，因此受限子进程可以读取调用者可读的任何文件（包括其他工作区中的文件）并打开套接字；`read-only` 因而需要读侧策略才能表达。
+- **硬链接是文件对象别名，而非路径别名。** 传播到已有硬链接上的可继承工作区授权会标记并授权底层同一文件的安全描述符，因此同一对象也可通过外部别名写入；拒绝工作区中的所有多链接文件不具可行性，因为普通 pnpm 安装会使用硬链接。
+- **控制台隔离不可用。** 以 `CREATE_NO_WINDOW` / `CREATE_NEW_CONSOLE` 创建的子进程在 DLL 初始化期间以 `STATUS_DLL_INIT_FAILED`（`0xC0000142`）死亡；子进程共享宿主控制台，基于管道的 stdio 重定向不受影响。
+- **安全描述符改动是对真实目录的驻留改动。** 工作区 ACE、拒绝项与标签按设计常驻（复用缓存，绝不撤销）；临时改动由 `dispose()` 撤销——但若该目录上仍留有其他能力授权，撤销会保留共享的 Low 标签——撤销后残留的那条拒绝项会随临时目录本身一并消失；手工 `icacls` 清理无法在本平台回收它们（`ERROR_NONE_MAPPED` 1332），请通过本模块回收。
+- **常驻 Low 标签的生命期长于 DSH，并会向其他 Low 完整性的进程放宽该目录树。** 工作区的可继承标签在会话结束后（以及同卷移动后）依然存在，因此任何以同一用户身份运行在 Low 完整性的其他进程——别家产品的 Low-IL 沙箱、受保护模式阅读器——都能写入与删除工作区内的内容，而在 Medium 标签下这会被拒绝。这个标签是写边界的代价：没有它受限子进程根本无法写入，而按会话回收会导致每次供给都要重新传播整棵树。
+- **被授权目录必须由调用者拥有并授予 `WRITE_OWNER`。** 所有者隐式获得的只有 `READ_CONTROL` 与 `WRITE_DAC`；标签位于 SACL，因此合并应用还需要 `WRITE_OWNER`（完全控制目录——即正常工作区情形——本就具备）。DACL 只授予 Modify 的目录现在会大声失败，而不是静默跳过隔离。
+- **环境临时根目录绝不会被隐式授权。** 直接调用方必须提供已存在的私有 `tempDir` 及其不同的 `tempWriteSid`，或用 `tempDir: null` 禁用临时写入；实际临时目录不得与任何可写根目录重叠。
+- **受限子进程的临时能力按每个活跃的会话/工作区对私有。** runner 在 spawn 之前把 TMP/TEMP 改写为该私有目录；共享同一工作区 SID 的两个令牌无法写入彼此的临时目录。
+- **受限令牌下 `whoami` 与令牌检查 cmdlet 可能失败。** 子进程对复制令牌的 `GetTokenInformation` 部分不可用，因此这类报告型 cmdlet 是否可用取决于宿主环境；这是诊断噪音而非运行故障。
 
-### Header verification and source map
+### 头文件验证与源码索引
 
-The sandbox-owned SID, ACL, token, file, and lock declarations are checked against Windows headers by [`verify/abi-probe.cpp`](verify/abi-probe.cpp). The shared process, stdio, and Job ABI is owned and verified by [`@deepseek-ai/dsh-win32-process`](../../subprocess/win32-process/README.md#header-verification).
+沙箱拥有的 SID、ACL、令牌、文件与锁声明由 [`verify/abi-probe.cpp`](verify/abi-probe.cpp) 对照 Windows 头文件检查。共享进程、stdio 与 Job ABI 由 [`@deepseek-ai/dsh-win32-process`](../../subprocess/win32-process/README.zh.md#header-verification) 归属并验证。
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | `AclSandbox`: restricted-token policy, DACL and label grants, fail-closed spawn and dispose |
-| [`src/runner.ts`](src/runner.ts) | The runner entry over shared Win32 process primitives |
-| [`src/grant.ts`](src/grant.ts) | `AclWriteGrant`: server-side grant materialization and revocation |
-| [`src/token.ts`](src/token.ts) + [`src/acl.ts`](src/acl.ts) | Win32 token, DACL, and mandatory-label primitives behind the sandbox |
+| [`src/index.ts`](src/index.ts) | `AclSandbox`：受限令牌策略、DACL 授权、fail-closed 的 spawn 与 dispose |
+| [`src/runner.ts`](src/runner.ts) | 基于共享 Win32 进程原语的 runner 入口 |
+| [`src/grant.ts`](src/grant.ts) | `AclWriteGrant`：服务端授权物化与撤销 |
+| [`src/token.ts`](src/token.ts) + [`src/acl.ts`](src/acl.ts) | 沙箱背后的 Win32 令牌与 DACL 原语 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Start with the subsystem reference for the shared vocabulary, then the provider that mounts this rung, its consumers, and the design decision.
+先从子系统参考文档了解共享词汇，再看挂载此档的提供方、其消费方与设计决策。
 
-- [Process sandbox subsystem](../../../docs/subsystems/sandbox.md) — modes, per-call policy, and enforcement semantics.
-- [Local sandbox backends](../sandbox-local/README.md) — the provider that mounts this backend as the win32 rung.
-- [Sandbox seam package](../sandbox/README.md) — the service contract this backend implements.
-- [Win32 process library](../../subprocess/win32-process/README.md) — shared restricted-process, stdio, Job, wait, and handle-cleanup primitives.
-- [Bash sandbox executor](../../shell/bash-sandbox/README.md) and [pwsh sandbox executor](../../shell/pwsh-sandbox/README.md) — the confined executors that consume it.
-- [Windows ACL restricted-token sandbox decision](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.md) — why raw ACL restricted tokens over mxc and AppContainer.
+- [进程沙箱子系统](../../../docs/subsystems/sandbox.zh.md)——模式、逐调用策略与强制执行语义。
+- [本地沙箱后端](../sandbox-local/README.zh.md)——把此后端挂载为 win32 档的提供方。
+- [沙箱 seam 包](../sandbox/README.zh.md)——此后端实现的服务约定。
+- [Win32 进程库](../../subprocess/win32-process/README.zh.md)——共享的受限进程、stdio、Job、等待与句柄清理原语。
+- [Bash 沙箱执行器](../../shell/bash-sandbox/README.zh.md)与[pwsh 沙箱执行器](../../shell/pwsh-sandbox/README.zh.md)——消费它的受限执行器。
+- [Windows ACL 受限令牌沙箱决策](../../../.agents/notes/implemented/feature/2026-08-08-windows-acl-restricted-token-sandbox.zh.md)——为何选择原始 ACL 受限令牌而非 mxc 与 AppContainer。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.md), [`dsh-pwsh-sandbox`](../../shell/pwsh-sandbox/README.md), and their tools, which render this backend's partial-enforcement and denial facts (the confined stderr the tool layer classifies through `denialSignatures`) while the [`dsh-sandbox`](../sandbox/README.md) seam owns the `SANDBOX_UNAVAILABLE` text and `sandbox-local` owns runner selection. On Windows this package also contributes one catalog entry, the bundled `diagnose-windows-sandbox-acl` skill, which is where the model learns to diagnose a denial the tool layer can only report.
+间接地通过 [`dsh-bash-sandbox`](../../shell/bash-sandbox/README.zh.md)、[`dsh-pwsh-sandbox`](../../shell/pwsh-sandbox/README.zh.md) 及其工具呈现；它们渲染此后端的部分强制执行与拒绝事实（工具层通过 `denialSignatures` 分类的受限 stderr），而 [`dsh-sandbox`](../sandbox/README.zh.md) seam 拥有 `SANDBOX_UNAVAILABLE` 文本、`sandbox-local` 拥有 runner 选择。在 Windows 上本包还贡献一个目录条目——随包发布的 `diagnose-windows-sandbox-acl` 技能，模型正是从它学会诊断工具层只能上报的拒绝。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-One extra catalog entry on Windows: the skill's description enters context with the catalog, and the body enters only when invoked. Resource extraction happens at registration and does not add script contents to model context. The denial surface itself stays in the tool layer.
+Windows 上多一个目录条目：技能描述随目录进入上下文，正文只在调用时进入。资源在注册时提取，不会把脚本内容加入模型上下文。拒绝面本身仍属于工具层。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
-- **Diagnosis preserves integrity labels** — it cannot fix Low-labeled executables affecting programs launched outside DSH. It also cannot repair a caller's missing `WRITE_DAC`; extracted and recovery scripts are user-writable and are not supported elevated entrypoints. Resource directories can remain after an unclean shutdown.
+- **诊断保留完整性标签**——它无法修复 Low 标签的可执行文件影响用户在 DSH 外启动程序的问题，也无法修复调用者缺少 `WRITE_DAC` 的情况；提取的脚本和恢复脚本均可由用户写入，不支持作为提权入口。非正常退出后可能残留资源目录。
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the backend is a poor fit or needs special operational care. They are current package constraints, not a general Windows comparison or a task backlog.
+这些限制说明后端何时不合适，或何时需要特别运维。它们是当前包约束，不是通用 Windows 对比或任务积压。
 
-- **One write allowlist per workspace** — the write SID is the unit of the allowlist and IS the workspace identity; reusing one sandbox instance across two workspaces widens both grants to both roots. Create one instance per workspace root — the seam does exactly this, keyed by the workspace path.
-- **Cleanup is best-effort by design** — `dispose()` attempts every temp revocation and aggregates failures into an `AggregateError`; a cleanup failure can leave the random directory and its temp-SID-only ACE behind. Once the process exits no future token carries that SID, so the residue is inert until OS temp hygiene or manual removal reclaims it.
-- **Standing workspace ACEs are invisible residue** — renaming a workspace derives a new SID; the old ACEs on the old path stay (inert, write-SID-only), and a future cleanup command may reap them.
-- **NULL-DACL directories are not identity-preserving under grant+revoke** — a directory with a NULL DACL means "everyone full control"; `grantWrite` builds the new ACL from that null, and the revoke round-trip leaves an empty (deny-all) DACL rather than the original NULL DACL. Real workspace and temp directories carry real DACLs, so this stays a documented edge.
-- **Piped stdio capture is impossible for confined grandchildren** — libuv's pipe stdio uses named pipes, whose client-end open requests write access no restricting SID is granted (the Win32 layer's default SD template, not the token default DACL), so `spawn(..., { stdio: 'pipe' })` inside a confined process fails with EPERM; inherited and ignored stdio spawns work, and anonymous pipes (PowerShell pipelines) work because the restricted token's default DACL carries a full-access restricting-SID ACE.
-- **Grant materialization is an eager full-tree propagation** — `SetNamedSecurityInfoW` on a directory with inheritable ACEs walks every descendant immediately (tens of seconds on large workspace trees); the per-workspace identity pays it once per workspace per machine, and the exact-ACE skip makes every later provision cheap.
-- **Read-side confinement and network policy are out of scope** — `WRITE_RESTRICTED` intersects write accesses only; pair this backend with a read-side policy for stronger confinement.
-- **Reads stop at objects another AppContainer-based tool has ACL'd with a package SID** — a file whose DACL carries an ACE for a package SID (`S-1-15-2-…`) is inaccessible to a Low-integrity token on this host, even when the same DACL grants the user full control and Everyone read (observed: adding that single ACE to a fresh file reproduces the denial, granting Everyone read does not lift it, and the same bytes copied elsewhere stay readable). The kernel rule behind it is unconfirmed and not this package's to change; tools that sandbox themselves with AppContainers stamp such ACEs, so a tree they touched becomes unreadable to this backend's child. Removing the foreign ACE (or re-installing the affected tree) restores access.
-- **Wide-directory and FAT-volume warnings are deferred; the FAT-class residue is unverified** — the UI-side warnings are not implemented, a FAT volume as a grant root fails loudly, and a FAT-class target outside the granted roots stores no security descriptor; its effective integrity label is assigned by the system rather than recorded on the object, so the label layer's behavior there is untested. FAT stays legacy residue.
-- **The bundled diagnosis skill needs an unconfined caller** — both the classification and the repairs read or write security descriptors a confined child cannot reach, so the session must escalate that one call; with no approval channel the escalation fails closed and the path stays undiagnosed.
-- **PowerShell language mode differs by confined mode** — under `read-only`, PowerShell cannot create its AppLocker probe files in temp and conservatively starts in ConstrainedLanguage (`Add-Type`, non-core .NET static calls, COM, and reflection fail); the shipped `workspace-write` path lets the probe complete, so pwsh stays in FullLanguage unless host-wide WDAC/AppLocker policy says otherwise, while a direct `AclSandbox` with `tempDir: null` has no such guarantee. This split is PowerShell startup behavior, not part of the ACL write boundary.
+- **每个工作区一个写入白名单**——写入 SID 是白名单的基本单位，且就是工作区身份；同一沙盒实例跨两个工作区复用时，两个根目录会互相扩大授权面。请按工作区根目录各建一个实例——seam 正是这样做的，以工作区路径为键。
+- **清理按设计尽力而为**——`dispose()` 会尝试全部临时撤销并把失败聚合为 `AggregateError`；清理失败可能留下随机目录及其仅含临时 SID 的 ACE。进程退出后，不会再有令牌携带该 SID，因此残留保持失效，直到 OS 临时目录卫生或手动移除目录将其回收。
+- **常驻工作区 ACE 是不可见残留。** 工作区改名会派生新的 SID；旧路径上的旧 ACE 留在原地（失效、仅含写入 SID），未来的清理命令可以回收它们。
+- **NULL-DACL 目录在 grant+revoke 往返下不保持身份。** 带 NULL DACL 的目录意味着「所有人完全控制」；`grantWrite` 从该 null 构建新 ACL，撤销往返后留下的是 EMPTY（全部拒绝）DACL 而非原始 NULL DACL。真实工作区与临时目录都带真实 DACL，因此这仍是记录在案的边界情形。
+- **受限孙进程的管道 stdio 捕获不可用。** libuv 的管道 stdio 用的是 NAMED pipe，其 client 端打开所请求的写访问没有任何 restricting SID 被授予（是 Win32 层的默认 SD 模板，而非令牌默认 DACL），因此受限进程内 `spawn(..., { stdio: 'pipe' })` 以 EPERM 失败；继承与忽略 stdio 的 spawn 可用，匿名管道（PowerShell 的管道）因受限令牌默认 DACL 携带 restricting SID 全权 ACE 而可用。
+- **授权物化是急切的全树传播。** 在带可继承 ACE 的目录上调用 `SetNamedSecurityInfoW` 会立即遍历每个后代（大型工作区树上以数十秒计）；按工作区身份每台机器每个工作区只付一次，精确 ACE 跳过让后续每次供给都很便宜。
+- **读侧隔离与网络策略不在范围内**——`WRITE_RESTRICTED` 只交叉检查写访问；将此后端与读侧策略配对以获得更强隔离。
+- **读取会被其他基于 AppContainer 的工具以包 SID 授权过的对象挡住。** 在本机上，当文件的 DACL 携带针对包 SID（`S-1-15-2-…`）的 ACE 时，Low 完整性的令牌无法访问它——即使同一份 DACL 同时向用户授予完全控制、向 Everyone 授予读取（已观测：只给新文件加这一条 ACE 即可复现拒绝，补授 Everyone 读取无法解除，而同样内容复制到别处仍可读）。其背后的内核规则尚未确证，也不由本包掌控；以 AppContainer 自我隔离的工具正是会写入这类 ACE，因此被它们标记过的目录树对本后端的子进程将不可读。移除外来 ACE（或重新安装受影响的目录树）即可恢复访问。
+- **宽目录与 FAT 卷警告已推迟；FAT 类残留未经验证。** UI 侧警告尚未实现，FAT 卷作为授权根会大声失败，而授权根之外的 FAT 类目标不存储安全描述符；其有效完整性标签由系统分配而非记录在对象上，因此标签层在该处的行为未经测试。FAT 仍被视为遗留残留。
+- **随包发布的诊断技能需要不受限的调用者。** 无论分类还是修复，都要读写受限子进程够不到的安全描述符，因此会话必须为那一次调用升权；没有审批通道时升权 fail-closed，该路径保持未诊断。
+- **PowerShell 语言模式因受限模式而异。** 在 `read-only` 下，PowerShell 无法在临时目录中创建 AppLocker 探针文件，因此会保守地以 ConstrainedLanguage 启动（`Add-Type`、非核心 .NET 静态调用、COM 与反射失败）；交付的 `workspace-write` 路径可让探针完成，因此除非主机范围的 WDAC/AppLocker 策略另有规定，否则 pwsh 保持 FullLanguage，而直接使用 `AclSandbox` 并配置 `tempDir: null` 时则没有这一保证。这一区别属于 PowerShell 启动行为，不是 ACL 写入边界的一部分。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: undecided directions and open questions. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+本开发备注是维护者的工作上下文：未决方向与开放问题。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-#### Future: warnings and cleanup surfaces
+#### 未来：警告与清理表面
 
-The warn-only posture for unusually wide directories and FAT-class volumes is documented in the limitations above but not implemented, and a cleanup command that reaps standing workspace ACEs from renamed workspaces is undecided. Both are open directions, not shipped behavior.
+对异常宽的目录与 FAT 类卷的仅警告立场已记录在上方限制中但尚未实现，回收改名工作区常驻 ACE 的清理命令也尚未决定。两者都是开放方向，不是已交付行为。
 
 </details>

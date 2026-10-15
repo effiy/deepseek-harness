@@ -1,51 +1,51 @@
 ---
-description: "The out-of-process ACP subagent backend for users and maintainers choosing a delegation provider, configuring a child ACP agent command, or debugging remote child runs."
+description: "面向用户与维护者的进程外 ACP（Agent Client Protocol）subagent 后端，用于选择委派提供方、配置子 ACP agent（智能体）命令或排查远程子 agent 运行问题。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subagent-acp
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use this package to delegate a task to an ACP-compatible agent running in a fresh subprocess with its own runtime, session, model, and tools. Each run shares only the selected working directory, sends the task over ACP, and returns the child's final answer or a safe error; intermediate messages and tool traffic stay outside the parent conversation. Permission prompts are answered by configured policy without human interaction. Choose it when delegation needs process isolation or a non-Harness ACP agent, and choose an in-process backend when the child must share parent capabilities.
+使用本包可将任务委派给运行在全新子进程中的 ACP 兼容 agent；子 agent 拥有独立的运行时、会话、模型和工具。每次运行只共享选定的工作目录，通过 ACP 发送任务，并返回子 agent 的最终答案或安全错误；中间消息和工具流量不会进入父级对话。权限提示由配置的策略自动应答，无需人工介入。当委派需要进程隔离或需要使用非 Harness ACP agent 时选择本包；当子 agent 必须共享父级能力时，选择进程内后端。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this provider when a composition needs a fully isolated, out-of-process child that speaks the Agent Client Protocol. The common path is explicit: mount the seam, mount this provider, and give it a command that starts an ACP agent.
+当组合需要一个支持 Agent Client Protocol、完全隔离且在进程外运行的子 agent 时，挂载本提供方。常用路径是显式的：挂载 seam、挂载本提供方，并给出一个启动 ACP agent 的命令。
 
-### When to choose it
+### 何时选择
 
-Choose this backend when the child must run with its own runtime, model, and tools in a separate process — for example an ACP agent from another project — or when you want delegation that cannot touch the parent harness. Choose an in-process backend when the child must share the parent's composition or honor parent-enforced capabilities: this provider advertises no optional start-time capabilities, so the seam rejects requests for `agentOptions`, structured output, depth caps, tool filters, or personas rather than silently omitting them.
+当子 agent 必须在独立进程中运行、拥有自己的运行时、模型和工具时选择此后端——例如来自其他项目的 ACP agent——或者你希望委派完全无法触及父 harness 时。当子 agent 必须共享父级组合或遵守父级强制执行的能力约束时，请选择进程内后端：本提供方不声明任何可选启动时能力，因此 seam 会拒绝要求 `agentOptions`、结构化输出、深度上限、工具过滤或 persona 的请求，而不是静默省略。
 
-### Configuration
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `providerName` | `acp` | Registry name on `ctx.subagents` |
-| `command` | required | Executable spawned for each run (the child ACP agent) |
-| `args` | `[]` | Command arguments |
-| `permission` | `reject` | Auto-answer permission requests by rejecting, or choosing the first `allow_once` or `allow_always` option (`allow`) |
-| `env` | `{}` | Explicit child environment layered over the credential-scrubbed parent environment |
-| `disposeEofGraceMs` | `6000` | Grace after stdin EOF before platform termination |
-| `disposeGraceMs` | `3000` | Bound for observing structured process facts after failure and, on POSIX, the SIGTERM-to-SIGKILL grace |
+| `providerName` | `acp` | `ctx.subagents` 上的注册表名称 |
+| `command` | 必填 | 每次运行时 spawn 的可执行文件（子 ACP agent） |
+| `args` | `[]` | 命令参数 |
+| `permission` | `reject` | 自动应答权限请求：拒绝，或选择第一个 `allow_once` 或 `allow_always` 选项（`allow`） |
+| `env` | `{}` | 叠加在已清理凭据的父环境之上的显式子环境 |
+| `disposeEofGraceMs` | `6000` | stdin EOF 之后、平台终止之前的宽限 |
+| `disposeGraceMs` | `3000` | 失败后观察结构化进程事实的时限；在 POSIX 上也是 SIGTERM 到 SIGKILL 的宽限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-acp) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-subagent-acp)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-A DeepSeek Harness child uses the product launcher and an explicit absolute `DSH_HOME`. The isolated home prevents a nested runtime from discovering the launching person's profiles or credentials; the generic ACP provider does not impose this requirement on non-DSH agents.
+DeepSeek Harness 子进程使用产品启动器和一个显式的绝对路径 `DSH_HOME`。隔离的 home 可防止嵌套运行时发现启动者个人的 profile 或凭据；通用 ACP 提供方不会把这一要求强加给非 DSH agent。
 
 ```yaml
 - id: subagent-acp
@@ -60,117 +60,117 @@ A DeepSeek Harness child uses the product launcher and an explicit absolute `DSH
       DEEPSEEK_API_KEY: !!js process.env.DEEPSEEK_API_KEY
 ```
 
-### What you get
+### 你会得到什么
 
-A successful run returns the child's final streamed assistant text as the result output. The child's session, model, and tools come from the child process itself — the parent supplies only the task and the working directory. The stop reason maps `end_turn` to `completed`, `max_tokens` to `max-tokens`, `refusal` to `refusal`, `cancelled` to `aborted`, and every other value to `error`. A failed published run preserves partial assistant text in `output` and returns safe structured detail separately in `diagnostic`.
+成功的运行会把子 agent 最终的流式 assistant 文本作为结果输出返回。子 agent 的会话、模型与工具来自子进程自身——父级只提供任务与工作目录。停止原因把 `end_turn` 映射为 `completed`、`max_tokens` 映射为 `max-tokens`、`refusal` 映射为 `refusal`、`cancelled` 映射为 `aborted`，其余值映射为 `error`。已发布运行失败时，部分 assistant 文本保留在 `output`，安全的结构化详情则单独放在 `diagnostic`。
 
-### Failure and recovery
+### 失败与恢复
 
-A spawn, initialization, or new-session failure rejects before publication, ordinarily after the managed range is proven quiescent. If cleanup also fails, the rejection preserves ordered safe startup and teardown facts without claiming whole-range quiescence. Non-cancellation errors expose only fixed provider, stage, and category facts; the original failure stays on the internal cause chain and in Host diagnostics. After publication, a prompt, transport, or early-process failure resolves as `error` with a safe diagnostic, while local cancellation resolves as `aborted` without failure detail.
+spawn、初始化或新建会话失败会在发布前拒绝，通常先证明 managed range 已经完全停稳。如果清理也失败，拒绝会保留有序、安全的启动与拆卸事实，但不会声称整个 range 已经停稳。非取消错误只暴露固定的提供方、阶段与类别事实；原始失败保留在内部 cause 链与 Host 诊断中。发布后，提示词、传输或进程提前退出会以携带安全诊断的 `error` 结算；本地取消则以不带失败详情的 `aborted` 结算。
 
-### Safe diagnostics
+### 安全诊断
 
-A generic diagnostic uses one fixed line: `Subagent failure (provider: ACP; stage: <stage>; category: <category>; ...)`. Optional stop reason, exit code, and signal come only from closed protocol or managed-process facts. Stderr, exception text, task content, tool input, paths, environment values, credentials, and protocol payloads never enter the diagnostic; the shared result boundary limits it to 4096 UTF-8 bytes. A non-completed run that requested permission can add one fixed policy, tool-kind, and decision line. Successful runs and local cancellation omit it.
+通用诊断使用固定的一行：`Subagent failure (provider: ACP; stage: <stage>; category: <category>; ...)`。可选的停止原因、退出码与信号只来自封闭协议或受管进程事实。stderr、异常文本、任务内容、工具输入、路径、环境值、凭据与协议载荷绝不会进入诊断；共享结果边界把诊断限制在 4096 个 UTF-8 字节内。请求过权限且未完成的运行可以增加一行固定的策略、工具种类与决定。成功运行和本地取消不包含该行。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains how the backend drives a child over ACP and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+本节解释后端如何经 ACP 驱动子 agent，以及可观察行为从何而来；完整约定见[使用本包](#use-this-package)。
 
-### Design concept
+### 设计理念
 
-- **Full process isolation.** Each child runs in a fresh subprocess with its own session, model, and tools; only the resolved working directory crosses from the parent.
-- **One process per run.** Every run spawns a new process; there is no process pooling.
-- **The ACP wire is the serialization boundary.** Same-process subagent values are not defensively cloned; the protocol is where hostile input is validated.
+- **完全进程隔离。** 每个子 agent 在全新子进程中运行，拥有自己的会话、模型与工具；只有解析后的工作目录来自父级。
+- **每次运行一个进程。** 每次运行都 spawn 新进程；没有进程池。
+- **ACP 协议格式（wire format）是序列化边界。** 同进程 subagent 值不会为防御目的克隆；协议才是校验不可信输入的地方。
 
-### Start and ownership flow
+### 启动与所有权流程
 
-Startup uses the manager-resolved child directory (the request override, else the parent's current effective directory), spawns the command through the subprocess seam, performs the ACP `initialize` and `newSession` handshake, and only then publishes the run. Fulfillment transfers the external run to the activation manager. The startup signal detaches after acceptance; the activation receipt cancels execution and awaits cleanup. Each activation runs one task and cannot receive follow-up input. Disposal is idempotent: it closes stdin and waits a configured grace for cooperative quiescence, then escalates through SIGTERM to SIGKILL and awaits whole-range exit. Cleanup failures remain observable as ordered safe facts and never claim quiescence.
+一次启动使用管理器解析的子 agent 工作目录（请求覆盖值，否则取父级当前有效目录），经子进程 seam spawn 命令，完成 ACP `initialize` 与 `newSession` 握手，然后才发布运行。兑现后，外部运行由 activation 管理器接管。任务接受后会解除启动信号的绑定；activation 凭据用于取消执行并等待清理。每个 activation 只运行一个任务，不能接收追加输入。dispose（资源释放）是幂等的：先关闭 stdin 并按配置的宽限等待协作式完全停稳，再经 SIGTERM 升级到 SIGKILL，并等待整个 managed range 退出。清理失败会作为有序的安全事实保持可观察，且绝不声称已经完全停稳。
 
-### Stop-reason mapping
+### 停止原因映射
 
-The run outcome maps the ACP terminal into the shared stop-reason vocabulary (`completed`, `max-tokens`, `refusal`, `aborted`, or `error`) in [`src/run.ts`](src/run.ts).
+运行结果会把 ACP 终态映射进共享的停止原因词汇（`completed`、`max-tokens`、`refusal`、`aborted` 或 `error`），实现见 [`src/run.ts`](src/run.ts)。
 
-### Process boundary
+### 进程边界
 
-The child spawns through the subprocess seam: credential-shaped ambient variables are scrubbed, then explicit `config.env` values merge after the scrub. Stderr is inherited to the parent's stream, and disposal applies this provider's EOF window before the shared termination escalation.
+子进程经子进程 seam spawn：先清除疑似凭据的环境变量，再合并显式 `config.env` 值。stderr 继承到父级流，dispose 先应用本提供方的 EOF 窗口，再执行共享的逐级终止。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from this backend to the seam it plugs into and the protocol it drives.
+当包级约定不够用时阅读以下页面。它们从本后端逐步进入它接入的 seam 与它驱动的协议。
 
-- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
-- [dsh-subagent seam](../subagent/README.md) — the registry and start API this provider registers on.
-- [Agent Client Protocol automation server](../../acp/acp/README.md) — the automation-only server this provider drives as a client.
-- [dsh-subprocess seam](../../subprocess/subprocess/README.md) — the process-spawn and teardown machinery behind each run.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-acp) — every accepted config field and its source declaration.
+- [Subagent 子系统](../../../docs/subsystems/subagent.zh.md)——服务约定、提供方约定与终态结果语义。
+- [dsh-subagent seam](../subagent/README.zh.md)——本提供方注册于其上的注册表与启动 API。
+- [Agent Client Protocol 自动化服务器](../../acp/acp/README.zh.md)——本提供方作为客户端驱动的仅自动化服务器。
+- [dsh-subprocess seam](../../subprocess/subprocess/README.zh.md)——每次运行背后的进程 spawn 与清理机制。
+- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-subagent-acp)——每个受支持配置字段及其源声明。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Child-agent request
+### 子 agent 请求
 
-#### What the model sees
+#### 模型看到什么
 
-The remote child receives the standalone task content through ACP plus its own process's configured system prompt, tools, and fresh session. It receives no parent conversation. This provider advertises no optional start-time capabilities, so the local service rejects requests for `agentOptions`, persona, tool filtering, depth enforcement, or structured output instead of silently omitting them.
+远程子 agent 通过 ACP 接收独立任务内容，并使用其自身进程配置的系统提示词、工具和全新会话。它不接收父级对话。本提供方不声明可选启动时能力，因此本地服务会拒绝要求 `agentOptions`、persona、工具过滤、深度强制或结构化输出的请求，而不是静默省略。
 
-#### Token effect
+#### Token 影响
 
-The child pays for an independent full context and its own multi-step history. These tokens never enter the parent's context.
+子 agent 为独立的完整上下文及其多步骤历史支付 token 成本。这些 token 绝不会进入父级上下文。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Independent of the parent request cache. Each ACP child can reuse only prefixes identical under its own provider, model, composition, and history; child steps otherwise grow append-only.
+与父级请求缓存相互独立。每个 ACP 子 agent 只能在其自身提供方、模型、组合和历史均相同时复用前缀；其余情况下，子 agent 步骤仅追加增长。
 
-### Parent tool result, indirectly
+### 父级工具结果（间接）
 
-#### What the model sees
+#### 模型看到什么
 
-Through `dsh-tool-subagent`, the parent model first receives a child id, then a completion notice containing final or partial assistant text, the stop reason, and safe diagnostic. The parent Session independently retains the external task identity and complete terminal result. Intermediate messages and tool traffic do not enter the parent Session.
+通过 `dsh-tool-subagent`，父模型先收到 child id，随后收到含最终或部分 assistant 文本、停止原因与安全诊断的完成通知。父会话独立保存外部任务身份和完整终态结果。中间消息与工具通信不进入父会话。
 
-#### Token effect
+#### Token 影响
 
-Parent input grows by the start acknowledgement and completion notice, whose size depends on the result data and persists until compaction. This provider adds no parent schema by itself.
+父级输入增加启动确认与完成通知，内容大小取决于数据，并保留到压缩（compaction）为止。本提供方自身不会向父级添加任何 schema。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+仅追加；新增可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a general ACP comparison or a task backlog.
+这些限制说明本后端何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是通用 ACP 对比或任务积压。
 
-- **A fresh process per run** — there is no process pooling; each delegation pays the full spawn and ACP handshake cost.
-- **Local workspaces only** — the resolved working directory is a local path handed to a child on the same machine; remote workspace mapping is not designed.
-- **No optional start-time capabilities** — this provider cannot apply `agentOptions`, `outputSchema`, a depth cap, a tool filter, or a persona inside the remote process, so the seam rejects requests that require them.
-- **Only committed `agent_message_chunk` text is collected** — the automation server keeps reasoning, tool activity, plans, and other trace data in the child session log rather than emitting them on ACP.
-- **Permission prompts are auto-answered** (`permission: allow | reject`) — no human is surfaced a child's `session/request_permission`.
+- **每次运行使用全新进程**——没有进程池；每次委派都要付出完整的 spawn 与 ACP 握手成本。
+- **仅支持本地工作区**——解析后的工作目录是交给同一台机器上子进程的本地路径；远程工作区映射尚未设计。
+- **不支持可选启动时能力**——本提供方无法在远程进程内应用 `agentOptions`、`outputSchema`、深度上限、工具过滤器或 persona，因此 seam 会拒绝需要它们的请求。
+- **只收集已提交的 `agent_message_chunk` 文本**——自动化服务器把推理（reasoning）、工具活动、计划和其他 trace 数据保留在子 agent 会话日志中，不通过 ACP 发出。
+- **权限提示自动应答**（`permission: allow | reject`）——不会把子 agent 的 `session/request_permission` 呈现给人。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为与限制以上文和包代码为准。
 
-- **Process pooling** — persistent-process reuse is a possible future optimization but changes the per-run isolation model.
-- **Remote workspaces** — mapping a remote ACP agent's workspace would need its own backend capability.
-- **Continuable ACP children** — would require persisting the remote session id and a per-child continuation advertisement.
+- **进程池**——持久进程复用是可能的未来优化，但会改变每次运行的隔离模型。
+- **远程工作区**——映射远程 ACP agent 的工作区需要独立的后端能力。
+- **可继续执行的 ACP 子 agent**——需要持久化远程会话 id，并为每个子 agent 声明继续执行能力。
 
 </details>

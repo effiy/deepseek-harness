@@ -1,35 +1,35 @@
 ---
-description: "The shared dsh core: model access, tools, durable sessions, and safety defaults for every dsh --profile surface, for users composing or customizing a profile."
+description: "共享的 dsh 核心：为每个 dsh --profile 表层提供模型访问、工具、持久会话与安全默认值，供用户组合或定制 profile。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-base
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Every base-backed `dsh --profile` surface runs on `dsh-base`, so those surfaces share a model connection, the full tool set, durable session history, and workspace safety defaults. The shipped `sdk-minimal` profile deliberately uses a complete standalone tree instead. You rarely touch this bundle directly — shipped base-backed profiles already include it, and a custom base-backed profile names it first. When you need different defaults, change your profile patch or add a later bundle; this package is not a library you import.
+每个基于 base 的 `dsh --profile` 表层都运行在 `dsh-base` 上，因此这些表层共享模型连接、完整工具集、持久会话历史和 workspace 安全默认值。随附的 `sdk-minimal` profile 刻意改用完整的独立配置树。你通常不直接操作本组合包——随发行版交付的基于 base 的 profile 已经包含它，自定义的基于 base 的 profile 则把它放在第一位。需要其他默认值时，应修改自己的 profile patch 或添加后续组合包；本包不是供导入的库。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-You get the dsh core automatically: the shipped `web`, `headless`, `sdk`, and `acp` profiles already include it, and a custom profile names it as its first bundle. After that, everything works with no further configuration.
+你会自动获得 dsh 核心：随发行版交付的 `web`、`headless`、`sdk` 与 `acp` profile 已包含它，自定义 profile 则把它列为第一个组合包。之后一切无需任何额外配置即可工作。
 
-### A minimal custom profile
+### 最小自定义 profile
 
-To build a profile on the shared core, create a profile with a `package.json` that names `@deepseek-ai/dsh-base` first:
+要在共享核心之上构建 profile，请创建一个 profile，其 `package.json` 把 `@deepseek-ai/dsh-base` 列在首位：
 
 ```json
 {
@@ -43,15 +43,15 @@ To build a profile on the shared core, create a profile with a `package.json` th
 }
 ```
 
-Run `dsh --profile my-profile "your task"` and you get a working agent with model access, tools, persistence, and the default permission policy. The shipped `web`, `headless`, `sdk`, and `acp` profiles are created for you on first use. To add more bundles, run `dsh plugin --profile <name> add <package>`; in-box bundles resolve from the dsh installation. The profile contract is documented in the [app-boot profile section](../../boot/app-boot/README.md).
+运行 `dsh --profile my-profile "your task"`，你就得到一个可用的 agent（智能体），带模型访问、工具、持久化与默认权限策略。随发行版交付的 `web`、`headless`、`sdk` 与 `acp` profile 会在首次使用时为你创建。要添加更多组合包，运行 `dsh plugin --profile <name> add <package>`；内置组合包从 dsh 安装目录解析。profile 约定见 [app-boot 的 profile 章节](../../boot/app-boot/README.zh.md)。
 
-### What you get
+### 你得到什么
 
-Out of the box, every profile built on this core provides: a DeepSeek model connection (the provider and model are configurable, and you can enable extra providers from your settings), the full tool set — file editing, shell commands, web search, public HTTP(S) fetch, subagents, task and goal tracking — durable sessions that survive restarts, and the default permission policy that confines file writes to your workspace and asks before risky actions. Web fetch runs without per-call approval; its provider rejects non-public destinations. Feedback stays in the Session log. [OTel session upload](../../session/session-telemetry-otel/README.md) defaults to `FEEDBACK_ONLY` for all users, including `deepseek-official`: new text feedback, message ratings, edits, and withdrawals release the complete canonical prefix through that event, including context. Later records wait for the next explicit feedback; sending an authorized batch needs no further interaction or model call. `DISABLED` prevents OTel capture. The default-on [DeepSeek session-log contributor](../../session/session-log-deepseek/README.md) remains a separate request path.
+开箱即用，基于本核心构建的每个 profile 都提供：DeepSeek 模型连接（提供方与模型可配置，你还可以在设置中启用额外提供方）、完整工具集——文件编辑、shell 命令、web 搜索、公开 HTTP(S) 抓取、subagent、任务与目标跟踪——可跨重启存活的持久会话，以及默认权限策略：把文件写入限制在工作区内，危险操作前征询许可。Web 抓取无需逐次审批，其提供方会拒绝非公开目的地址。反馈保存在会话日志中。[OTel 会话上传](../../session/session-telemetry-otel/README.zh.md)对所有用户默认使用 `FEEDBACK_ONLY`，包括 `deepseek-official`：新的文本反馈、消息评分、编辑与撤回会释放截至该事件的完整规范会话日志前缀，包含上下文。后续记录等待下一次显式反馈；发送已授权批次无需进一步交互或模型调用。`DISABLED` 阻止 OTel 捕获。默认开启的 [DeepSeek 会话日志贡献器](../../session/session-log-deepseek/README.zh.md)仍是独立的请求路径。
 
-Both `subagent` and `subagent_fork` create managed children and return a child id immediately. Use `send_message` to steer active children or continue their conversations after completion. [Delegation-tool behavior](../../subagent/tool-subagent/README.md) describes result delivery and backend capabilities.
+`subagent` 与 `subagent_fork` 都创建受管理的子任务，并立即返回 child id。使用 `send_message` 可引导活跃子任务，或在完成后继续其对话。[委派工具行为](../../subagent/tool-subagent/README.zh.md)说明了结果交付和后端能力。
 
-The built-in `working_directory` tool changes the directory for subsequent operations while existing processes and write permissions remain independent. Current directory information appears in user context. Default file editing uses `read`, `write`, and `edit`. The `str_replace_editor` tool remains available as an explicit opt-in. To add it to a base-backed profile, put this entry in the profile, home, or invocation patch:
+内置 `working_directory` 工具改变后续操作使用的目录，已有进程与写权限保持独立。当前目录信息出现在用户上下文中。默认文件编辑使用 `read`、`write` 和 `edit`。`str_replace_editor` 工具仍可显式启用。要将它加入基于 base 的 profile，请在 profile、home 或逐次调用 patch 中添加以下条目：
 
 ```yaml
 - insert:
@@ -61,88 +61,88 @@ The built-in `working_directory` tool changes the directory for subsequent opera
         maxOutputChars: 16000
 ```
 
-The bundle mounts [MCP resources](../../mcp/mcp-resources/README.md) once. Configure only [MCP client entries](../../mcp/mcp-client/README.md) for the servers you need. Clients mounted by another provider also count as configured in their scope. Callers with no configured server in scope receive no MCP tools or prompt text.
+本 bundle 统一挂载 [MCP 资源](../../mcp/mcp-resources/README.zh.md)一次。只需为所需服务器配置 [MCP 客户端条目](../../mcp/mcp-client/README.zh.md)。其他提供方挂载的客户端在所属作用域中也属于已配置状态。调用方作用域中没有已配置服务器时，不会获得 MCP 工具或提示词文本。
 
-### Shell tools per platform
+### 各平台的 shell 工具
 
-On macOS and Linux you get the bash shell tools; on Windows you get the PowerShell twins instead, so exactly one shell stack is available per machine. The safety behavior is identical on every platform. A Windows host that prefers the unconfined PowerShell executor can switch the shell rows in its profile patch — the switch must disable both PowerShell rows and re-enable both bash rows, otherwise the profile fails to load.
+在 macOS 与 Linux 上你获得 bash shell 工具；在 Windows 上则获得对应的 PowerShell 孪生工具，因此每台机器恰好有一套 shell 栈。各平台的安全行为完全一致。偏好不受沙盒约束的 PowerShell 执行器的 Windows 主机可以在其 profile patch 中切换 shell 行——切换必须同时禁用两个 PowerShell 行并重新启用两个 bash 行，否则 profile 无法加载。
 
-### Changing the defaults
+### 更改默认值
 
-To change what a profile built on this core provides — a different default model, a stricter permission mode, extra or fewer tools — edit your profile's `cordis.patch.yml` or add a later bundle. Each patch entry replaces the target's whole configuration, so restate every setting you want to keep. Keep the sandboxed filesystem provider as the single file-write path: adding the plain filesystem provider on top of it makes the profile fail to load.
+要改变基于本核心构建的 profile 提供的内容——不同的默认模型、更严格的权限模式、更多或更少的工具——请编辑 profile 的 `cordis.patch.yml` 或添加后面的组合包。每个 patch 条目会替换目标的整个配置，因此请重述每个想保留的设置。保持沙箱化文件系统提供方作为唯一的文件写入路径：在其之上再添加普通文件系统提供方会导致 profile 加载失败。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The bundle is a static patch document: one `insert` list applied over the empty profile root. It mounts no service, emits no events, and holds no mutable state; each inserted row's package owns that row's behavior and invariants.
+本组合包是一份静态 patch 文档：一个应用到空 profile 根之上的 `insert` 列表。它不挂载任何服务、不发出任何事件、也不持有任何可变状态；每条插入行所属的包负责该行的行为与不变式。
 
-### Composition mechanics
+### 组合机制
 
-A patch replaces the targeted row's whole `config` rather than merging into it. Later bundle layers and the user's profile `cordis.patch.yml` override rows by id, with the last write winning per row. Rows whose value differs by mode do not live here: each mode bundle restates its complete configuration, keeping any single row down to one bundle layer plus the user's. The full row set and its rationale are documented inline in [`cordis.patch.yml`](cordis.patch.yml); the [generated composition graph](../../../apps/cli/composition.md) renders it.
+patch 会替换目标行的整个 `config`，而不是合并进它。后续组合包层与用户的 profile `cordis.patch.yml` 按 id 覆盖行，每行最后一次写入生效。按模式取值不同的行不属于这里：每个模式组合包重述自己的完整配置，让任何单一行最多只属于一个组合包层加用户层。完整行集合及其设计依据以行内注释写在 [`cordis.patch.yml`](cordis.patch.yml) 里；[生成的组合图](../../../apps/cli/composition.md)负责渲染它。
 
-### Platform gating
+### 平台门控
 
-The patch gates the two shell stacks by platform on its own rows: `bash-sandbox` and `tool-bash` carry `disabled: !!js process.platform === 'win32'`, and their twins `pwsh-sandbox` and `tool-pwsh` mount on win32 only with the inverted expression. The permission surface stays identical to POSIX: the sandbox policy executes the same file-effect policy through the Windows ACL restricted-token runner (`dsh-sandbox-local` → `@deepseek-ai/dsh-sandbox-windows-acl`), and `fs-sandbox` keeps fencing `ctx.fs` writes — mounting `dsh-fs-local` alongside it would double-register `ctx.fs` and fail the load.
+patch 在自身上按平台门控两个 shell 栈：`bash-sandbox` 与 `tool-bash` 携带 `disabled: !!js process.platform === 'win32'`，孪生行 `pwsh-sandbox` 与 `tool-pwsh` 以取反的表达式仅在 win32 挂载。权限面与 POSIX 完全一致：沙箱策略通过 Windows ACL 受限令牌 runner（`dsh-sandbox-local` → `@deepseek-ai/dsh-sandbox-windows-acl`）执行相同的文件效果策略，`fs-sandbox` 继续围栏 `ctx.fs` 写入——在其旁再挂载 `dsh-fs-local` 会重复注册 `ctx.fs` 并在加载时失败。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`cordis.patch.yml`](cordis.patch.yml) | The bundle substance: the base plugin rows, with per-row rationale as inline comments |
-| [`src/index.ts`](src/index.ts) | Package entry; carries no runtime API |
-| [`tests/base.spec.ts`](tests/base.spec.ts) | Manifest declaration and platform-gating checks |
+| [`cordis.patch.yml`](cordis.patch.yml) | 组合包的实体：基础插件行，附以行内注释说明各行依据 |
+| [`src/index.ts`](src/index.ts) | 包入口；不携带任何运行时 API |
+| [`tests/base.spec.ts`](tests/base.spec.ts) | manifest（元数据清单）声明与平台门控检查 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when you want to go deeper into profiles, the surfaces built on this core, or the exact composition.
+当你想深入了解 profile、基于本核心构建的表层或确切组合时，阅读以下页面。
 
-- [app-boot profile section](../../boot/app-boot/README.md) — how profiles are resolved, layered, and customized.
-- [Bundle package map](../README.md) — the surfaces built on this core.
-- [Generated composition graph](../../../apps/cli/composition.md) — the exact plugin set each shipped profile uses.
-- [Profile plugin bundles note](../../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.md) — the profile and bundle composition design.
-- [Codex and Claude Code provider bundles](../../subagent/README.md) — optional provider bundles you can install on top.
+- [app-boot 的 profile 章节](../../boot/app-boot/README.zh.md)——profile 如何解析、分层与定制。
+- [组合包索引](../README.zh.md)——基于本核心构建的表层。
+- [生成组合图](../../../apps/cli/composition.md)——随发行版交付的每个 profile 使用的确切插件集合。
+- [Profile 组合包设计笔记](../../../.agents/notes/implemented/architecture/2026-08-05-profile-plugin-bundles.zh.md)——profile 与组合包的组合设计。
+- [Codex 与 Claude Code 提供方组合包](../../subagent/README.zh.md)——可叠加安装的可选提供方组合包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through each inserted row's package, which owns that row's model-facing behavior.
+通过每条插入行所属的包间接产生影响，由各包负责其行的模型可见行为。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-The bundle itself adds no request prefix; each inserted row's package owns any cache effect.
+组合包本身不添加任何请求前缀；每条插入行所属的包负责各自的缓存影响。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits tell you when the core needs extra care or where an override must go. They are current package constraints, not a general comparison or a task backlog.
+这些限制告诉你核心何时需要额外注意、覆盖应放在哪里。它们是当前包约束，不是通用对比或任务积压。
 
-- **Overrides replace whole settings blocks** — a patch entry replaces the target's entire configuration, so your override must restate every setting you want to keep; nothing merges automatically.
-- **Per-surface settings belong to the surface's bundle** — a default that differs between the web GUI and headless mode lives in that surface's bundle, not in the shared core.
-- **Windows temp grants are private per-session subdirectories** — `workspace-write` confines writes to the workspace plus the session's own temp subdirectory (`<temp>\dsh-<hash>`, TMP/TEMP rewritten for confined children); `read-only` grants nothing. See `@deepseek-ai/dsh-sandbox-windows-acl`.
-- **Adding the plain filesystem provider on top of the sandboxed one fails the profile** — the two register the same service, so the profile refuses to load; use one or the other.
+- **覆盖会替换整个设置块**——patch 条目会替换目标的整个配置，因此你的覆盖必须重述每个想保留的设置；不会自动合并。
+- **按表层的设置属于该表层的组合包**——web GUI 与 headless 模式取值不同的默认值放在对应表层的组合包里，而不是共享核心。
+- **Windows 的临时目录授权是按会话的私有子目录**——`workspace-write` 把写入限制在工作区与会话自己的 temp 子目录（`<temp>\dsh-<hash>`，受限子进程的 TMP/TEMP 被改写）；`read-only` 不授予任何临时目录写入权限。见 `@deepseek-ai/dsh-sandbox-windows-acl`。
+- **在沙箱化文件系统提供方之上添加普通提供方会导致 profile 失败**——两者注册同一个服务，profile 因此拒绝加载；二选一。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>
 
-The base composition mounts authorization and the platform account provider alongside credentials. The provider opens a callback listener only during an explicit login attempt.
+基础组合在凭证服务旁挂载授权服务和平台账号提供者。提供者只在显式登录尝试期间打开回调监听器。

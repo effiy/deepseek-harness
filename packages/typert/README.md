@@ -1,52 +1,52 @@
 ---
-description: "The Typert group map: the build-time type-graph generator, runtime registry, Loader integration, and shared Remote protocol that enable typed Host-to-Client calls."
+description: "Typert 组地图：构建时类型图生成器、运行时注册表、Loader 集成与共享 Remote 协议，它们共同支撑类型化的 Host 到 Client 调用。"
 kind: "package-group"
 ---
 
 # packages/typert
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-With the Typert group, Client environments can call Host capabilities as typed methods and share generated schemas and reflection without hand-written wire code. A build-time generator turns source type declarations into compiler-independent models and runtime artifacts, a runtime registry stores those artifacts, and a Loader integration registers them automatically in Loader compositions. A shared protocol package supplies the Remote-call declarations — decorators, wire descriptors, codecs, and provider contracts — that business packages, generated artifacts, the Host Gateway, and the Client API all consume. This page maps the four packages; each package README owns its configuration, usage, and limits.
+借助 Typert 组，Client 环境能以类型化方法调用 Host 能力，并在无需手写协议代码的情况下共享生成的 schema 与反射信息。构建时生成器把源代码类型声明转换为与编译器无关的模型与运行时产物，运行时注册表保存这些产物，Loader 集成则在 Loader 组合中自动注册它们。共享的协议包提供 Remote 调用声明——装饰器、wire 描述符、编解码器与提供方约定——供业务包、生成产物、Host Gateway 与 Client API 共同消费。本页是四个包的索引；每个包的 README 负责各自的配置、用法与限制。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Role | ctx key |
+| 包 | 职责 | ctx 键 |
 |---|---|---|
-| [`generator/`](generator/README.md) | Analyzes source types at build time and generates the reflection, schemas, and Remote descriptors that runtimes load | — |
-| [`loader/`](loader/README.md) | Auto-registers generated Typert artifacts from Loader compositions into the runtime registry | consumes `ctx.loader` and `ctx.typert` |
-| [`protocol/`](protocol/README.md) | Declares the Remote decorators, wire descriptors, codecs, and provider contracts shared by Host and Client | — |
-| [`registry/`](registry/README.md) | Stores generated package reflection and live Zod schemas at runtime, plus lookup and Context provider registries | `ctx.typert` |
+| [`generator/`](generator/README.zh.md) | 在构建时分析源代码类型，并生成运行时加载所需的反射、schema 与 Remote 描述符 | — |
+| [`loader/`](loader/README.zh.md) | 把 Loader 组合中已生成的 Typert 产物自动注册到运行时注册表 | 消费 `ctx.loader` 与 `ctx.typert` |
+| [`protocol/`](protocol/README.zh.md) | 声明 Host 与 Client 共享的 Remote 装饰器、wire 描述符、编解码器与提供方约定 | — |
+| [`registry/`](registry/README.zh.md) | 在运行时保存生成的包反射与实时 Zod schema，并提供 lookup 与 Context 提供方注册表 | `ctx.typert` |
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [Typert subsystem reference](../../docs/subsystems/typert.md) — the literal public contracts recorded from protocol and registry types.
-- [API Gateway reference](../../docs/api-gateway.md) — how the generated Remote descriptors become running Host-to-Client calls.
-- [Remote-call Agent Note](../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.md) — the architecture and transport decisions behind Remote calls.
-- [Package workspace map](../README.md) — every group in the workspace and what each owns.
+- [Typert 子系统参考](../../docs/subsystems/typert.zh.md)——从协议与注册表类型中原样记录的公共约定。
+- [API Gateway 参考](../../docs/api-gateway.zh.md)——生成的 Remote 描述符如何成为实际的 Host 到 Client 调用。
+- [Remote 调用 Agent Note](../../.agents/notes/implemented/architecture/2026-08-02-typert-remote-method-calls.zh.md)——Remote 调用背后的架构与传输决策。
+- [包工作区地图](../README.zh.md)——工作区中的每个组及其职责。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,90 +1,90 @@
 ---
-description: "Review and maintain recorded Session persistence-type changes, their schema snapshots, and compatibility decisions."
+description: "审阅和维护已记录的会话持久化类型变更、对应 schema 快照以及兼容性决策。"
 ---
 
-# Persistence-type change records
+# 持久化类型变更记录
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use this reference to inspect an acknowledged Session persistence-type change and its predecessor. Each record binds a compatibility decision to exact generated schemas. Local checks compare the current source with the recorded history using only files in the checkout. Start with the [review cookbook](../cookbook/reviewing-persistence-type-changes.md) when changing a persisted type.
+本参考文档用于检查已确认的会话持久化类型变更及其前驱。每条记录把兼容性决策绑定到精确的生成 schema。本地检查仅使用当前检出目录中的文件，将当前源码与记录历史比较。修改持久化类型时，从[审阅实操手册](../cookbook/reviewing-persistence-type-changes.zh.md)开始。
 
-For older tagged versions, use the [prerelease archive](releases/README.md). It reconstructs alpha/RC type differences for historical reading and format validation; its observations do not serve as current compatibility acknowledgements.
+较早的 tag 参见[预发行版本归档](releases/README.zh.md)。它重建 alpha/RC 类型差异，供历史阅读和格式校验使用；这些观察记录不作为当前兼容性确认。
 
-For complete schemas grouped by Session format, use the [format references](historical-formats/README.md). Their coverage follows the writer constant, including intermediate formats without a release tag.
+按 Session 格式查看完整 schema 时，使用[格式参考](historical-formats/README.zh.md)。其覆盖范围由写入器常量决定，包括没有发布 tag 的中间格式。
 
-## Table of Contents
+## 目录
 
-- [Files and ownership](#files-and-ownership)
-- [Compatibility rules](#compatibility-rules)
-- [History and limitations](#history-and-limitations)
-- [Dev Note](#dev-note)
+- [文件与职责](#files-and-ownership)
+- [兼容性规则](#compatibility-rules)
+- [历史与限制](#history-and-limitations)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="files-and-ownership"></a>
-## Files and ownership
+## 文件与职责
 
-The generated [catalog](../persistence-catalog.md) provides readable declarations and digests; the [schema inventory](../persistence-schema.json) contains the normalized types. Roots cover the logical Session header, the physical JSONL header line, the event envelope, and every repository-declared event. Referenced types contribute transitively to each affected root's digest.
+生成的[目录](../persistence-catalog.zh.md)提供可读声明和摘要；[schema 清单](../persistence-schema.json)包含规范化类型。根覆盖逻辑会话头、物理 JSONL 头行、事件封装以及每个仓库内声明的事件。被引用类型的变更会传递到每个受影响根的摘要。
 
-Each dated record has four sibling files:
+每条带日期的记录有四个同目录文件：
 
-| File | Owner |
+| 文件 | 职责 |
 |---|---|
-| `YYYY-MM-DD-slug.md` | English acknowledgement with `kind: persistence-change`, one machine declaration, compatibility reasoning, and verification evidence |
-| `YYYY-MM-DD-slug.zh.md` | Chinese counterpart with the identical machine declaration |
-| `YYYY-MM-DD-slug.i18n.yaml` | Generated bilingual consistency record |
-| `YYYY-MM-DD-slug.schema.json` | Generated complete after schemas for the affected roots that remain present |
+| `YYYY-MM-DD-slug.md` | 英文确认文档，包含 `kind: persistence-change`、一份机器声明、兼容性说明和验证证据 |
+| `YYYY-MM-DD-slug.zh.md` | 中文对侧文件，包含相同的机器声明 |
+| `YYYY-MM-DD-slug.i18n.yaml` | 生成的双语一致性记录 |
+| `YYYY-MM-DD-slug.schema.json` | 生成的完整变更后 schema，覆盖受影响且仍然存在的根 |
 
-`finalized/vN.json` records the complete root classifications/digests of an accepted compatibility baseline and semantic hashes of its accepted records. The [finalization record](../session-format-status.md#finalization-record) requires its checkpoint. Current V4 schemas may evolve compatibly; the checkpoint protects accepted machine declarations and after schemas even after the writer advances, while excluding prose, aliases, and source locations from record hashes.
+`finalized/vN.json` 记录已接受兼容性基线的完整根分类／摘要，以及对应已接受记录的语义哈希。[定稿记录](../session-format-status.zh.md#finalization-record)要求检查点存在。当前 V4 schema 可以兼容演进；即使写入器已推进，检查点仍保护已接受的机器声明和变更后 schema，而记录哈希不包含说明文字、别名和源码位置。
 
-A maintainer captures an agreed format with [`createPersistenceFinalizationCheckpoint`](../../scripts/persistence-finalization.ts), writes a new version-named checkpoint without replacing an earlier one, and advances the paired `latestFinalizedVersion`. The helper requires current schemas to match complete acknowledged history. Run the ordinary verifier before committing.
+维护者通过 [`createPersistenceFinalizationCheckpoint`](../../scripts/persistence-finalization.ts) 捕获已确认格式，写入按版本命名的新检查点而不替换旧文件，并推进双语 `latestFinalizedVersion`。该函数要求当前 schema 与完整确认历史一致。提交前运行常规验证器。
 
-The [record template](../../.agents/skills/dsh-doc/templates/persistence-change.md) defines the authored format. Record creation accepts a bilingual prose input and generates the machine declaration, snapshots, catalog pair, and consistency records. The verifier reads the machine declaration once from the English file and checks the Chinese declaration for equality. A declaration names each affected root, its predecessor record, its after digest, and its compatibility decision. A new root has no predecessor; a deletion has no after schema and retains an explicit tombstone.
+[记录模板](../../.agents/skills/dsh-doc/templates/persistence-change.md)定义人工编写的格式。创建记录时可以提供双语说明输入，由命令生成机器声明、快照、目录对和一致性记录。验证器从英文文件读取一次机器声明，并检查中文声明是否相同。声明列出每个受影响的根、其前驱记录、变更后摘要和兼容性决策。新根没有前驱；删除操作没有变更后 schema，并保留显式删除标记。
 
 <a id="compatibility-rules"></a>
-## Compatibility rules
+## 兼容性规则
 
-Every detected structural change requires an acknowledgement. Keep the Session version when older readers preserve the required meaning of accepted data, safely ignore optional features while retaining opaque records, or refuse unsupported required data before execution, mutation, or recovery truncation. New readers must preserve historical meaning and readability. Bump only when unsafe interpretation cannot be prevented by an effective discriminator. Unknown fields or values count only when existing readers actually handle them safely; type differences alone cannot establish that behavior. See the [reader-compatibility decision](../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.md).
+每个检测到的结构变更都需要确认。当旧读取器保留所接受数据的必要含义、安全忽略可选功能并保留不透明记录，或在执行、修改及恢复截断前拒绝不受支持的必要数据时，可以保留 Session 版本。新读取器必须保留历史含义和可读性。只有有效判别信息无法阻止不安全解释时，才提升版本。未知字段或值只有在已有读取器实际安全处理它们时才有效；类型差异本身无法证明这种行为。参见[读取器兼容性决策](../../.agents/notes/implemented/process/2026-10-08-session-reader-compatibility-review.zh.md)。
 
-| Detected change | Recording requirement |
+| 检测到的变更 | 记录要求 |
 |---|---|
-| Add an optional event-body property, including its complete subtree | `same-version` |
-| Make a required event-body property optional | `same-version` |
-| Add an ordinary event type | `same-version` |
-| Add a higher numeric `data.version` to an ordinary event while retaining every old payload alternative under the existing compatibility rules | `same-version` |
-| Add an explicitly qualified attribution kind to a user/developer source slot whose before and after schemas carry the same supported policy | `same-version` |
-| Make an optional property required, add a required property, change an existing type, or remove/rename a property or event | Compatibility review for `same-version`, or explicit `version-bump` |
-| Change the Session header or event envelope | Compatibility review for `same-version`; a header version change requires `version-bump` |
+| 添加可选事件体属性，包括其完整子树 | `same-version` |
+| 将必选事件体属性改为可选 | `same-version` |
+| 添加普通事件类型 | `same-version` |
+| 为普通事件增加更高的数字 `data.version`，并按现有兼容性规则保留所有旧载荷分支 | `same-version` |
+| 在前后 schema 均带有相同受支持策略的 user/developer 消息源字段中，添加显式声明为归属信息的 kind | `same-version` |
+| 将可选属性改为必选、添加必选属性、更改已有类型，或删除／重命名属性或事件 | `same-version` 需兼容性评审，或显式 `version-bump` |
+| 更改会话头或事件封装 | `same-version` 需兼容性评审；头版本变化要求 `version-bump` |
 
-The classifier identifies established same-version cases and changes requiring compatibility review; it cannot decide semantic safety. The latter require an explicit `--decision same-version` when recording or updating without a version increase. The acknowledgement’s Compatibility section explains actual reader behavior in both directions, and Verification records the executed checks. Review the complete transition, including simultaneous changes. An explicit `version-bump` instead requires its own increasing `SessionHeader.version` transition; a same-version decision cannot waive a header version change. Finalized records remain immutable, so a later record cannot reuse the accepted 3→4 transition.
+分类器识别已明确允许的同版本情形及需要兼容性评审的变更，不能判定语义安全性。后者在不升版本的记录或更新操作中要求显式提供 `--decision same-version`。确认记录的兼容性部分说明两个方向上的实际读取器行为，验证部分记录已执行的检查。评审覆盖整个转换，包括同时发生的其他变更。显式 `version-bump` 则要求自身包含 `SessionHeader.version` 递增转换；同版本决策不能豁免头版本变化。定稿记录保持不可变，因此后续记录不能复用已接受的 3→4 转换。
 
-The CLI requires that explicit choice before generating a flagged same-version record. CI reads the recorded `decision: same-version` and accepts it when the ordinary history, schema, and header-version constraints hold, whether the record was generated or edited manually. Verification cannot establish how the record was authored or whether a human reviewed it. Reviewers compare base and head inventories with [`persistence-review`](../cookbook/reviewing-persistence-type-changes.md#generate); `--check` validates current-tree consistency and cannot reveal a transition already covered by an acknowledgement.
+CLI 在生成被标记的同版本记录前要求该显式选择。CI 读取所记录的 `decision: same-version`；只要通常的历史、schema 与头版本约束成立，无论记录由工具生成还是手工编辑，都会接受。验证无法确定记录的编写方式，也无法证明人类已评审。评审者使用 [`persistence-review`](../cookbook/reviewing-persistence-type-changes.zh.md#generate) 比较 base 与 head 清单；`--check` 验证当前目录一致性，无法显示已被确认记录覆盖的转换。
 
-An ordinary event may add payload alternatives with a required, nonnegative integer `data.version` greater than every existing payload version, provided every existing alternative remains readable under the established same-version rules above. Optional property additions and required-to-optional changes may accompany the new version; each retained alternative is compared separately. Other payload changes require compatibility review. Older readers may reject the new payload version. The [catalog acknowledgement](2026-09-20-unknown-child-catalog.md) records one such transition.
+普通事件可增加具有必选、非负整数 `data.version` 的载荷分支，新版本必须高于所有已有载荷版本，且所有已有分支按上述明确允许的同版本规则保持可读。可选属性新增和必选改可选可以与新版本一同引入；每个保留分支均独立比较。其他载荷变更需要兼容性评审。旧读取器可能拒绝新载荷版本。[Catalog 确认记录](2026-09-20-unknown-child-catalog.zh.md)记录了此类演进。
 
-The extractor accepts an explicit `@persistenceSource` binding for a core-owned source property on a literal user or developer role; it does not infer a binding from an unannotated type. A producer qualifies its `MessageSourceMap` entry with `@persistenceAttribution`. Qualification promises that an unknown kind and its JSON metadata survive reading without the producer, and that the kind imposes no validation, replay, or authority requirement. A producer may inspect its own kind to resume duplicate suppression; other readers must preserve and derive the recorded messages without that projection. The recorded schema retains the binding, policy version, literal `kind` discriminator, preservation promise, and qualified kind set. Inventory format 2 stores those promises; extraction without a bound policy retains format 1. Session format versions are independent. Both compared snapshots must carry compatible policy state. Existing kind groups still receive ordinary structural comparison; removals, unmarked additions, policy changes, and unrelated structural changes require compatibility review. Multiple context-form alternatives with the same wire kind form one group.
+提取器接受核心拥有的 source 属性上针对 user 或 developer 字面量角色的显式 `@persistenceSource` 绑定，不会从未标记类型中推断绑定。生产者用 `@persistenceAttribution` 标记其 `MessageSourceMap` 成员。该标记承诺：读取器无需生产者即可保留未知 kind 及其 JSON 元数据，且该 kind 不引入校验、回放或权限要求。生产者可以检查自身 kind 来恢复去重状态；其他读取器必须无需该投影也能保留并派生已记录的消息。记录的 schema 保存绑定、策略版本、字面量 `kind` 判别字段、保留承诺及符合条件的 kind 集合。Inventory format 2 保存这些承诺；没有绑定策略的提取仍使用 format 1。Session 格式版本独立于此。比较双方的快照必须带有兼容的策略状态。已有 kind 分组仍进行常规结构比较；删除、未标记的添加、策略更改及无关结构变更需要兼容性评审。同一 wire kind 的多个上下文形式分支归为一组。
 
-Every same-version explanation states how old records remain readable and how older readers handle new records, including established cases that need no explicit CLI decision. A feature absent from a log must retain the old behavior; dispensable features must be safe to ignore; required features need an effective refusal signal. Unsupported-feature refusal must not become corruption recovery or tail truncation. For required-to-optional changes, explain how readers handle an absent value. Reviewers assess behavior and evidence; the checker validates the declaration and type classification. A version-bump record follows the [Session-format procedure](../cookbook/adding-a-session-format-version.md).
+每项同版本说明都须解释旧记录如何保持可读，以及旧读取器如何处理新记录，包括无需显式 CLI 决策的明确允许情形。日志未使用某功能时必须保留旧行为；可舍弃功能必须能安全忽略；必要功能需要有效的拒绝信号。不受支持功能的拒绝不能变成损坏恢复或尾部截断。对于必选改可选的变更，说明读取器如何处理缺失值。审阅者判断行为和证据；检查器校验声明及类型分类。升版本记录遵循[会话格式流程](../cookbook/adding-a-session-format-version.zh.md)。
 
-When a reader rejects a JSON property by name, declare the property as optional `never` and mark it with argument-free `@persistenceReserved`. The extractor retains the forbidden field, so allowing a JSON value later requires an existing-field type change. Required or JSON-valued properties cannot carry this marker. Unmarked optional `never` and `undefined` properties retain their existing omission behavior.
+当读取器按属性名拒绝 JSON 字段时，将该属性声明为可选 `never`，并添加无参数的 `@persistenceReserved` 标记。提取器保留这一禁止字段，因此后续允许 JSON 值属于已有字段类型变更。必选属性或允许 JSON 值的属性不能携带该标记。未标记的可选 `never` 和 `undefined` 属性保留现有省略行为。
 
 <a id="history-and-limitations"></a>
-## History and limitations
+## 历史与限制
 
-One baseline records the complete initial inventory. Later records use their predecessor's after schema as the before schema. The verifier rejects missing predecessors, cycles, duplicate successors for one root, digest mismatches, and current roots that disagree with their latest records. Independent roots can advance independently. Two changes to the same predecessor require a single ordered history after integration.
+一条基线记录完整的初始清单。后续记录使用前驱的变更后 schema 作为变更前 schema。验证器拒绝缺失前驱、环、同一根的重复后继、摘要不匹配，以及当前根与最新记录不一致的情况。独立的根可以独立演进。同一前驱上的两个变更在集成后需要形成一条有序历史。
 
-Accepted records describe historical transitions; preserve their machine declarations and schema snapshots when adding a successor. An unaccepted terminal record can be refreshed explicitly; the command rejects baselines, records with dependants, and checkpoint-locked records before producing artifacts. Verification checks retained checkpoint hashes; it does not prove that the checkpoints and their authority record were never edited together. No Git ref, remote service, or released checkout supplies the baseline.
+已接受记录描述历史转换；添加后继时须保留其机器声明和 schema 快照。尚未接受的末端记录可以显式刷新；命令在生成产物前拒绝基线、被依赖的记录和被检查点锁定的记录。验证检查所保留检查点的哈希，但不证明检查点及其真源记录从未被一起修改。基线不依赖 Git 引用、远端服务或已发布版本的检出目录。
 
-Digests describe declared persistence types, not runtime validation or behavior. Ordinary comments, source locations, alias names, and harmless declaration reordering do not affect them. Compatibility annotations are recorded policy data and do affect digests. Unannotated version-1 snapshots retain their original normalization and fingerprints; policy-bearing graphs use a separate fingerprint domain. Object fields, union alternatives, intersection operands, and index signatures can be reordered when their resolved types stay the same; tuple positions and numeric enum values remain significant. Catalog text and source locations may still change, so regenerate stale artifacts without adding an acknowledgement for an unchanged digest. Opaque types such as `unknown` expose no hidden structure to compare. Behavior-only changes and structures hidden inside opaque values are outside this mechanism's scope. The [decision](../../.agents/notes/implemented/process/2026-09-11-persistence-type-history.md) records these trade-offs.
+摘要描述声明的持久化类型，不描述运行时验证或行为。普通注释、源码位置、别名名称和无语义变化的声明重排不影响摘要。兼容性标记是记录的策略数据，会影响摘要。不带标记的版本 1 快照保留原有规范化和指纹；包含策略的图使用独立的指纹域。对象字段、联合类型分支、交叉类型操作数和索引签名可以在解析类型不变时重排；元组位置和数字枚举值仍然影响摘要。目录文本和源码位置仍可能变化，因此应重新生成陈旧产物，无需为未变的摘要添加确认记录。`unknown` 等不透明类型不提供可比较的内部结构。纯行为变更以及不透明值中隐藏的结构不在本机制范围内。[决策记录](../../.agents/notes/implemented/process/2026-09-11-persistence-type-history.zh.md)说明这些取舍。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

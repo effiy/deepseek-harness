@@ -1,86 +1,86 @@
 ---
-description: "Webhook rule runtime for maintainers registering trusted external-event policies that create Workspace Sessions."
+description: "面向注册可信外部事件策略并创建 Workspace 会话的维护者，说明 webhook 规则运行时。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-webhook
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-webhook` provides the Host `ctx.webhookRuntime`: a registry for trusted programmatic webhook rules plus the one built-in action, creating an ordinary root Session inside a Web Workspace. The interface stays at `register(rule)` and `dispatch(delivery)`; provider authentication belongs to adapter packages. Use it when a trusted rule must turn an external event into a new agent Session.
+`dsh-webhook` 提供 Host 侧的 `ctx.webhookRuntime`：它既是受信任程序化 webhook 规则的注册表，也拥有唯一内置动作——在 Web Workspace 中创建普通根会话。接口只包含 `register(rule)` 和 `dispatch(delivery)`；提供方身份验证属于适配器包。当受信任规则必须把外部事件变成新的 agent（智能体）会话时，请使用它。
 
-## Table of Contents
+## 目录
 
-- [Rule interface](#rule-interface)
-- [Session request](#session-request)
-- [Composition](#composition)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [规则接口](#rule-interface)
+- [会话请求](#session-request)
+- [组合](#composition)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="rule-interface"></a>
-## Rule interface
+## 规则接口
 
-`WebhookRule<K>` has a branded unique `id`, a provider `kind`, and `run(delivery, signal)`. A callback may execute arbitrary trusted code and returns either `null` or one `WebhookSessionRequest`. Rules of the same kind start independently, and one throw or rejection is logged without starving siblings.
+`WebhookRule<K>` 具有带 brand 类型的唯一 `id`、提供方 `kind` 与 `run(delivery, signal)`。回调可以执行任意受信任代码，并返回 `null` 或一个 `WebhookSessionRequest`。同类规则彼此独立启动；某个回调抛出异常或其返回的 Promise 被拒绝时，只会记录日志，不会阻止同级规则。
 
-`VerifiedWebhookDelivery` carries provider kind, configured source id, provider delivery id, normalized lossless JSON, and receipt time. The runtime snapshots and freezes the complete value before sharing it. `deliveryId` records the provider's identifier only; repeated delivery runs the rules again.
+`VerifiedWebhookDelivery` 携带提供方种类、已配置来源 id、提供方交付 id、规范化的无损 JSON 与接收时间。运行时会在共享前快照并冻结完整值。`deliveryId` 仅是来源信息；重复交付会再次运行规则。
 
-Registration is an effect. Its awaitable disposer first hides the rule, then aborts and drains active callbacks. Callbacks must observe the supplied signal; same-process code that ignores cancellation cannot be forcibly stopped safely.
+注册是一项 effect。它的可等待 disposer 会先隐藏规则，再中止并排空活动回调。回调必须观察所提供的 signal；忽略取消的同进程代码无法被安全强制停止。
 
 <a id="session-request"></a>
-## Session request
+## 会话请求
 
-`WebhookSessionRequest` requires `workspacePath`, `title`, `prompt`, `agentPreset`, and `permissionPreset`; optional `model` names an explicit provider/model route plus an output-token cap. An explicit route uses its adapter's reasoning default. Omission snapshots the complete current deployment selection, including reasoning effort, until the first request records its durable header; later Web model changes retain the ordinary session behavior.
+`WebhookSessionRequest` 要求 `workspacePath`、`title`、`prompt`、`agentPreset` 与 `permissionPreset`；可选 `model` 会指定明确的提供方／模型路由与输出 token 上限。明确路由使用其适配器的默认推理（reasoning）强度。省略时会快照包含推理强度的完整当前部署选择，直到首个请求记录持久 header；之后的 Web 模型变更保留普通会话行为。
 
-The runtime validates presets before mutation, resolves or creates the canonical Workspace, creates an Agent with that Workspace path as `SessionHeader.cwd`, mounts the agent preset before publication, and attaches the Session before applying permissions, title, and prompt. Failed attachment disposes the unpublished action. A later pre-prompt failure detaches the Workspace and disposes the Agent on a best-effort rollback.
+运行时会在变更状态前验证 preset，解析或创建规范 Workspace，以该 Workspace 路径作为 `SessionHeader.cwd` 创建 Agent，在发布前挂载 agent preset，并在应用权限、标题与提示词前附加会话。附加失败会对尚未发布的动作执行 dispose（资源释放）。之后若在提示词前失败，则以尽力而为方式脱离 Workspace 并对 Agent 执行 dispose。
 
-Successful `Agent.followup()` is the webhook operation's commit point. The message uses `source.kind: "webhook"` and records the provider, source, delivery, and rule identifiers. The runtime does not wait for idle, flush specially, inspect the reply, or publish completion state; ordinary Agent and Session behavior owns everything afterward.
+成功的 `Agent.followup()` 是 webhook 操作的提交点。消息使用 `source.kind: "webhook"`，并携带提供方、来源、交付与规则来源信息。运行时不等待 idle、不执行特殊 flush、不检查回复，也不发布完成状态；之后完全由普通 Agent 与会话行为接管。
 
 <a id="composition"></a>
-## Composition
+## 组合
 
-Load the runtime on the Web Host plane after Agents, model defaults, agent presets, permission presets, titles, and the Workspace registry. User-authored rule plugins inject `webhookRuntime` and yield the disposer returned by `register()` through their own effect.
+在 Web Host plane 上，于 Agents、模型默认值、agent presets、permission presets、标题与 Workspace 注册表之后加载运行时。用户编写的规则插件注入 `webhookRuntime`，并通过自己的 effect 交出 `register()` 返回的 disposer。
 
-The [GitHub review guide](../../../docs/user/guide/github-review.md) shows a rule module, dedicated ingress port, secret setup, and Workspace routing.
+[GitHub 评审指南](../../../docs/user/guide/github-review.zh.md)展示了规则模块、专用入口端口、密钥设置与 Workspace 路由。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Rule-authored initial prompt
+### 规则编写的初始提示词
 
-#### What the model sees
+#### 模型看到的内容
 
-For each matching rule, the model sees exactly the non-empty text returned as `WebhookSessionRequest.prompt`. The generic runtime adds no private framing; a rule incorporating external text owns its trust labeling. The shipped GitHub example labels selected PR fields as untrusted JSON metadata.
+每个匹配规则都会让模型看到 `WebhookSessionRequest.prompt` 返回的非空文本原文。通用运行时不增加私有框架；若规则包含外部文本，则由规则负责标明其信任属性。随附 GitHub 示例会把选定 PR 字段标为不受信任的 JSON 元数据。
 
-#### Token effect
+#### Token 影响
 
-One data-dependent user-role message is retained in the new Session and contributes tokens until ordinary compaction replaces or removes that history.
+一条依赖数据的 user-role 消息保留在新会话中，并持续贡献 token，直到普通压缩（compaction）替换或移除该历史。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-The initial prompt begins a new Session, so it establishes rather than invalidates that Session's reusable request prefix.
+初始提示词开启一个新会话，因此它建立而不是使该会话的可复用请求前缀失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Process-local fire-and-forget only** — a crash loses rule calls that have not admitted a prompt; there is no queue, replay, or retry.
-- **No built-in deduplication** — repeated provider deliveries may create repeated Sessions; rules that need idempotency own it.
-- **No completion result** — HTTP acceptance and rule settlement do not report Agent success, idle, or output.
-- **Trusted callbacks must cooperate with cancellation** — runtime teardown aborts and awaits them but cannot terminate arbitrary same-process code.
-- **Workspace creation may outlive a failed Session attempt** — an empty Workspace is retained because another concurrent caller may already use it.
+- **仅限进程内 fire-and-forget** — 崩溃会丢失尚未接纳提示词的规则调用；不存在队列、回放或重试。
+- **无内置去重** — 提供方重复交付可能创建重复会话；需要幂等性的规则自行负责。
+- **无完成结果** — HTTP 接受与规则结算都不报告 Agent 成功、idle 或输出。
+- **受信任回调必须配合取消** — 运行时 teardown 会中止并等待回调，但无法终止任意同进程代码。
+- **Workspace 创建可能比失败的会话尝试更长寿** — 空 Workspace 会保留，因为另一个并发调用者可能已经使用它。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

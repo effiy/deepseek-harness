@@ -1,157 +1,157 @@
 ---
-description: "Run Python model code in fresh CPython processes under the shared filesystem sandbox, with configured resource budgets and async host bindings."
+description: "在共享文件系统沙箱下以全新 CPython 进程运行 Python 模型代码，提供可配置的资源预算与异步宿主绑定。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-experimental-ptc-runtime-python
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Run model-generated Python in a fresh CPython 3.10+ process on macOS or Linux under the same file policy as TypeScript PTC. Programs can use top-level `await` and `return`, call configured bindings, and write normal stdout/stderr. Direct file operations follow the selected sandbox policy; resource budgets and process-group teardown bound execution. No state persists across runs, and no shipped profile enables this experimental runtime.
+在 macOS 或 Linux 上，以全新的 CPython 3.10+ 进程运行模型生成的 Python，并遵循与 TypeScript PTC 相同的文件策略。程序可以使用顶层 `await` 和 `return`、调用已配置的 binding，并正常写入 stdout/stderr。直接文件操作遵循所选沙箱策略；资源预算和进程组拆卸约束执行。运行之间不保留状态，且没有已发布 profile 启用这个实验性 runtime。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Choose this published experimental package only in an explicit composition. Register `PythonPtcRuntime` beside `dsh-tools`; `run(resolve(request))` executes each program in a fresh CPython 3.10+ subprocess, resolving with `result.value` on success and `result.error` on failure (the orthogonal `PtcRunFailure.kind` taxonomy classifies parse failures, thrown exceptions, invalid completions, output overflows, budget expiry, aborts, unavailable confinement, and substrate death). It rejects only for caller misuse, such as malformed bindings, unresolved execution options, or a call after disposal. Configuration is rejected at load: a non-Unix platform; an explicit `pythonBin` that is not an executable regular file or a bare name that does not resolve on `PATH`; a non-CPython, pre-3.10, or probe-failing interpreter; a non-positive or non-integer budget; a `maxLogBytes` below the truncation-marker floor (64); a timer value `setTimeout` would clamp; a budget larger than the effective fd-3 frame cap (lowered when the host heap cannot safely parse a near-cap frame); or an `addressSpaceMb`/output-budget pair whose worst-case peak would breach `RLIMIT_AS`.
+仅在显式组合中选择这个已发布的实验包。将 `PythonPtcRuntime` 与 `dsh-tools` 一起注册后，`run(resolve(request))` 会在全新的 CPython 3.10+ 子进程中执行每个程序；成功时以 `result.value` resolve，失败时以 `result.error` resolve（正交的 `PtcRunFailure.kind` 分类涵盖解析失败、抛出异常、无效完成值、输出溢出、预算到期、中止、约束不可用与执行基底终止）。仅有调用方误用会 reject，例如 binding 不合法、执行选项未解析，或在 dispose 后调用。配置在加载期拒绝：非 Unix 平台；不是可执行普通文件的显式 `pythonBin`，或无法在 `PATH` 上解析的裸名；非 CPython、低于 3.10 或探测失败的解释器；非正或非整数预算；低于截断标记下限（64）的 `maxLogBytes`；会被 `setTimeout` 截断的定时器值；超过有效 fd-3 帧上限的预算（宿主堆无法安全解析接近上限的帧时，该上限会降低）；或最坏峰值会突破 `RLIMIT_AS` 的 `addressSpaceMb`／输出预算组合。
 
-The composition must supply `sandbox` and `sandboxPolicy` for this local execution host. `resolve(request)` accepts an explicit `sandboxPolicy` or resolves the shared deployment policy, and defaults `cwd` to that policy's workspace root. PTC mode supplies the calling Session's policy and directory. The configured `maxWallMs` remains the execution deadline; explicit `timeoutMs` overrides are unsupported.
+组合必须为此本地执行宿主提供 `sandbox` 和 `sandboxPolicy`。`resolve(request)` 接受显式 `sandboxPolicy`，或解析共享部署策略，并将 `cwd` 默认设为该策略的工作区根目录。PTC mode 提供调用 Session 的策略和目录。配置的 `maxWallMs` 仍是执行截止时间；不支持显式 `timeoutMs` 覆盖。
 
-`read-only` and `workspace-write` execute through the configured sandbox provider; `danger-full-access` explicitly bypasses confinement. `result.sandbox` reports the mode, observed denial, and the backend's full or partial enforcement separately from the program outcome. The [sandbox service](../../sandbox/sandbox/README.md) defines the file restrictions and backend limits; these modes do not restrict network access or arbitrary file reads.
+`read-only` 和 `workspace-write` 通过配置的沙箱提供方执行；`danger-full-access` 显式绕过约束。`result.sandbox` 独立于程序结果报告模式、观察到的拒绝，以及后端的完整或部分强制能力。[沙箱服务](../../sandbox/sandbox/README.zh.md)定义文件限制与后端局限；这些模式不限制网络访问或任意文件读取。
 
-The runtime advertises file confinement so `run_code` exposes `sandbox_permissions` and `justification`. Approval widens access for that complete program once; nested tools retain their own policies and approvals. Programs are never replayed automatically after a denial. See [PTC mode](../../core/tools/README.md#ptc-mode) for the consumer's escalation instructions.
+运行时声明文件约束，因此 `run_code` 暴露 `sandbox_permissions` 和 `justification`。审批只为完整程序的一次执行扩大访问权限；嵌套工具保留各自的策略与审批。程序在拒绝后绝不自动重放。消费方的升级权限指引见 [PTC mode](../../core/tools/README.zh.md#ptc-mode)。
 
-The runtime supplies these execution instructions:
+运行时提供以下执行指引：
 
 ```text
 Each call runs in a fresh Python process. Relative paths use the supplied working directory; only TMPDIR is set in the environment. Direct filesystem access follows this execution's sandbox policy.
 ```
 
-### What you get
+### 你得到什么
 
-The package's default export is the `PythonPtcRuntime` plugin. Its public surface also re-exports the host-side protocol vocabulary: `validateChildFrame` (rebuilds every inbound frame), the lossless-JSON codec and meters (`encodeJsonPlain`, `checkDoneValue`, `hasUnsafeIntegerToken`, `hasNonLosslessNumber`), `logTruncationMarker` (the shared truncation-marker text), plus `resolvePythonBin` (interpreter lookup against the current `PATH`), `readProcessStart` (process-start statistics for tests), `detachResidual` (a test seam for the settled run's resource cleanup), and `hostFrameParseCeiling` (the heap-derived frame parse cap a given heap limit admits). Every cap is a validated `Config` field with a default: `cpuSeconds` (60), `maxWallMs` (600000), `addressSpaceMb` (512, not applied on Darwin), `maxLogBytes` (65536), `maxValueBytes` (32768), `graceMs` (3000), and `pythonBin` (`python3`, resolved, executable-checked, version-probed under a five-second force-kill deadline, and frozen at load). Each child receives only `TMPDIR`; ambient credentials, `PATH`, `HOME`, and other host state stay unavailable.
+包的默认导出是 `PythonPtcRuntime` 插件。其公开面还重新导出宿主侧协议词汇：`validateChildFrame`（重建每条入站帧）、无损 JSON codec 与计量器（`encodeJsonPlain`、`checkDoneValue`、`hasUnsafeIntegerToken`、`hasNonLosslessNumber`）、`logTruncationMarker`（共享截断标记文本），以及 `resolvePythonBin`（对照当前 `PATH` 的解释器查找）、`readProcessStart`（供测试用的进程启动统计）、`detachResidual`（已结算运行的资源清理测试 seam）与 `hostFrameParseCeiling`（给定堆上限可容纳的堆推导帧解析上限）。每个上限都是带默认值并经校验的 `Config` 字段：`cpuSeconds`（60）、`maxWallMs`（600000）、`addressSpaceMb`（512，Darwin 上不生效）、`maxLogBytes`（65536）、`maxValueBytes`（32768）、`graceMs`（3000）与 `pythonBin`（`python3`，在加载期解析、检查可执行性，在五秒强制终止期限内探测版本并固定）。每个子进程只接收 `TMPDIR`；环境中的凭证、`PATH`、`HOME` 与其他宿主状态均不可见。
 
-### The wire
+### wire
 
-Frames travel on the child's fd 3 as JSON-lines — one object per line — so stdout/stderr stay clear for the program's own output. Child → host: `boot-ack`, `call`, `log`, `done`. Host → child: `boot` (first frame, carrying every cap and the namespace declarations), `run` (after `boot-ack`, carrying only the program body), and one `reply` per `call`. A forged frame can carry both `value` and `error` on `done`, so a consumer must check `error` first and ignore `value` when it is set. A `log` frame's `open` flag marks an unterminated line committed by an explicit flush: the host appends the next log frame to the same entry, so `print('a', end='', flush=True); print('b')` reads back as one `'ab'` entry rather than a fake newline (the split-billing arithmetic lives in the fd-3 protocol Agent Note's wire-contract section). The one exception to merging is truncation: when a later over-budget frame trips the ledger, the already-billed prefix is committed as its own entry and the truncation marker follows it (the marker stays last, with no re-charge).
+帧在子进程 fd 3 上以 JSON-lines 传输——每行一个对象——因此 stdout/stderr 留给程序自己的输出。子进程 → 宿主：`boot-ack`、`call`、`log`、`done`。宿主 → 子进程：`boot`（首帧，携带全部上限与命名空间声明）、`run`（`boot-ack` 之后，只携带程序体）与每个 `call` 一个 `reply`。伪造帧可在 `done` 上同时携带 `value` 与 `error`，因此消费方必须先检查 `error`，在它存在时忽略 `value`。`log` 帧的 `open` 标志标记由显式 flush 提交的未结束行：宿主把下一个 log 帧追加到同一条目，因此 `print('a', end='', flush=True); print('b')` 读回为一条 `'ab'` 条目而不是假换行（拆分计费算术见 fd-3 协议 Agent Note 的 wire-contract 一节）。合并的唯一例外是截断：当后续超预算帧触发账本时，已计费的前缀作为独立条目先提交，截断 marker 跟在后面（marker 保持末位，无重复计费）。
 
-### What can go wrong
+### 可能出错的地方
 
-Required confinement that cannot be established returns `sandbox-unavailable`; the runtime never retries unconfined. An operation denied by a working sandbox remains a program failure with `sandbox.denied` set when its diagnostic matches the selected backend. A caught denial need not appear in this diagnostic flag.
+无法建立所需约束时返回 `sandbox-unavailable`；运行时绝不在无约束状态下重试。工作正常的沙箱拒绝某个操作时，它仍属于程序失败；当诊断与所选后端匹配时，设置 `sandbox.denied`。被程序捕获的拒绝不一定体现在这个诊断标志中。
 
-Host-side validation drops junk without throwing, so a malformed or forged frame never crashes the host process: `validateChildFrame` returns `undefined` for anything that does not rebuild cleanly, a non-number call id can never be echoed into a reply, and forged extra fields never ride along. A completion value that is not lossless JSON, or that exceeds the configured byte budget, is rejected explicitly (`non-lossless` / `over-budget`) rather than silently rounded or truncated. An fd-3 frame whose raw length exceeds the effective frame parse cap (64 MiB, or lower when the host's configured heap cannot safely parse a near-cap frame — see `hostFrameParseCeiling`) settles the run as a `worker-exit` (the receive path caps raw frames before `toString`/`JSON.parse` so a compact wide frame cannot decode to far more host memory than its wire bytes admitted).
+宿主侧校验在不抛异常的情况下丢弃垃圾，因此畸形或伪造帧永远不会让宿主进程崩溃：`validateChildFrame` 对任何不能干净重建的内容返回 `undefined`，非数字的 call id 永远不会被回显进 reply，伪造的额外字段永远不会被带走。非无损 JSON 或超过配置字节预算的完成值会被显式拒绝（`non-lossless`／`over-budget`），而不是被静默取整或截断。原始长度超过有效帧解析上限（64 MiB，或当宿主的配置堆无法安全解析接近上限的帧时更低——见 `hostFrameParseCeiling`）的 fd-3 帧会让本次运行以 `worker-exit` 结算（接收路径在 `toString`/`JSON.parse` 之前限制原始帧，紧凑宽帧不能解码出远超其线上字节的宿主内存）。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现内部——点击展开</summary>
 
-This section explains the design behind the backend; observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释后端背后的设计；可观察行为在[使用本包](#use-this-package)中完整覆盖。
 
-### Design concept
+### 设计概念
 
-One direction of trust: the host treats every inbound frame as hostile (model code can forge anything on fd 3) and REBUILDS it field by field before reading; the Python side trusts host replies. The bootstrap (`py/bootstrap.py`) runs the program as the body of an async function, so top-level `await` and `return` work; binding calls travel over fd 3 as JSON-lines and replies are paced across the pump so a flood of large replies cannot pin the host's fd-3 write buffer.
+单向信任：宿主把每条入站帧都视为敌意（模型代码可以在 fd 3 上伪造任何内容）并逐字段重建后才读取；Python 侧信任宿主回复。bootstrap（`py/bootstrap.py`）把程序作为 async 函数体执行，因此顶层 `await` 与 `return` 都可用；binding 调用经 fd 3 以 JSON-lines 往返，回复在 pump 中限速，以免大量大回复钉住宿主的 fd-3 可写缓冲。
 
-The shipped bootstrap and protocol sources reach the interpreter as UTF-8 JSON on trusted binary stdin, independently of sandbox temporary-directory mounts and locale text encoding. Model programs and binding traffic use fd 3. The host resolves the sandbox runner before spawning with only `TMPDIR` in the child environment. The wall deadline includes sandbox setup. The configured interpreter's load-time version probe runs outside confinement and executes no model code.
+已发布的 bootstrap 与 protocol 源码以 UTF-8 JSON 通过可信二进制 stdin 传入解释器，不依赖沙箱中的临时目录挂载或 locale 文本编码。模型程序与 binding 通信使用 fd 3。宿主在启动前解析沙箱 runner，子进程环境中只保留 `TMPDIR`。经过时间截止包含沙箱准备。所配置解释器的加载期版本探测在约束之外运行，不执行模型代码。
 
-### Wire contract
+### wire 契约
 
-The frames are `boot` / `run` (host → child) and `boot-ack` / `call` / `log` / `done` plus one `reply` per call (child → host). The `log` frame's `truncated` flag marks the frame that IS the child ledger's truncation marker, so the host stops capturing at the same point the child did instead of inferring it from its own budget. The `log` frame's `open` flag marks an unterminated line committed by an explicit flush: the host merges the next log frame into the same entry, so `print('a', end='', flush=True); print('b')` reads back as one `'ab'` entry rather than a fake newline (the split-billing arithmetic lives in the fd-3 protocol Agent Note's wire-contract section). The one exception to merging is truncation: the already-billed prefix is committed as its own entry and the truncation marker follows it (marker last, no re-charge). `done.error.kind` is one of `exception`, `invalid-output`, `output-limit`, or `timeout` from the CPU check after model code returns; wall deadlines, aborts, and substrate death are observed host-side.
+帧为 `boot`／`run`（宿主 → 子进程）与 `boot-ack`／`call`／`log`／`done` （子进程 → 宿主），以及每个 `call` 对应一个 `reply`（宿主 → 子进程）。`log` 帧的 `truncated` 标志标记的就是子进程账本自己的截断标记帧，因此宿主在与子进程相同的点停止捕获，而不是从自己的预算推断。`log` 帧的 `open` 标志标记由显式 flush 提交的未结束行：宿主把下一个 log 帧合并进同一条目，因此 `print('a', end='', flush=True); print('b')` 读回为一条 `'ab'` 条目而不是假换行（拆分计费算术在 fd-3 协议 Agent Note 的 wire-contract 段）。合并的唯一例外是截断：当后续超预算帧触发账本时，已计费的前缀作为独立条目先提交，截断 marker 跟在后面（marker 保持末位，无重复计费）。`done.error.kind` 为 `exception`、`invalid-output`、`output-limit` 或模型代码返回后 CPU 检查产生的 `timeout` 之一；墙钟截止、中止与基底死亡在宿主侧观察。
 
-### Lossless JSON crossing
+### 无损 JSON 跨越
 
-Completion values and binding arguments cross as exact JSON: values serialize without recursion, so a deep payload below the byte budget survives instead of dying on `JSON.stringify`'s stack limit, and integral doubles beyond the safe range cross as exact digits rather than silently rounded tokens; the meters in `src/protocol.ts` enforce byte budgets and number losslessness before anything else reads the payload.
+完成值与 binding 实参以精确 JSON 跨越：值无递归序列化，因此低于字节预算的深层载荷存活，而不会死在 `JSON.stringify` 的栈上限；超出安全范围的整型 double 以精确数字跨越，而不是被静默取整的 token；`src/protocol.ts` 中的计量器在任何其他代码读取载荷之前强制字节预算与数字无损性。
 
-### Mirror alignment
+### 镜像对齐
 
-`tests/protocol-mirror.e2e.ts` spawns a real `python3` and asserts, against `src/protocol.ts`, both `PROTOCOL_FD` / the truncation-marker text and each `TypedDict`'s required/optional wire field set in `py/protocol.py`, so a renamed or dropped field — or one side making a field optional the other requires — fails the test. Field *types* are not compared across the language boundary; that residue stays with review plus the backend's real-subprocess suite (`tests/runtime.spec.ts`).
+`tests/protocol-mirror.e2e.ts` 启动真实 `python3`，对照 `src/protocol.ts` 断言 `PROTOCOL_FD`／截断标记文本以及 `py/protocol.py` 中每个 `TypedDict` 的必填／可选 wire 字段集，因此字段改名、删除或一侧把另一侧必填的字段变成可选都会使测试失败。字段*类型*不跨语言边界比较；该残留由评审加后端的真实子进程套件（`tests/runtime.spec.ts`）负责。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `PythonPtcRuntime` — spawn, frame pump, budgets, containment, teardown; re-exports the protocol vocabulary |
-| [`src/protocol.ts`](src/protocol.ts) | Host side: frame codec, hostile-frame validators, lossless-JSON meters, shared marker text |
-| [`py/bootstrap.py`](py/bootstrap.py) | Child side: fd-3 channel, program execution, binding dispatch, ledger and settlement |
-| [`py/protocol.py`](py/protocol.py) | Python side: `PROTOCOL_FD`, `TypedDict` frame mirrors, `log_truncation_marker` |
-| [`tests/runtime.spec.ts`](tests/runtime.spec.ts) | Real-subprocess suite: budgets, containment, hostile frames, name rebinding |
-| [`tests/protocol-mirror.e2e.ts`](tests/protocol-mirror.e2e.ts) | Cross-language mirror test against a real `python3` |
+| [`src/index.ts`](src/index.ts) | 插件入口：`PythonPtcRuntime`——spawn、帧 pump、预算、隔离、拆卸；重新导出协议词汇 |
+| [`src/protocol.ts`](src/protocol.ts) | 宿主侧：帧 codec、不可信帧校验器、无损 JSON 计量器、共享标记文本 |
+| [`py/bootstrap.py`](py/bootstrap.py) | 子进程侧：fd-3 通道、程序执行、binding 分发、账本与结算 |
+| [`py/protocol.py`](py/protocol.py) | Python 侧：`PROTOCOL_FD`、`TypedDict` 帧镜像、`log_truncation_marker` |
+| [`tests/runtime.spec.ts`](tests/runtime.spec.ts) | 真实子进程套件：预算、隔离、敌意帧、名称重绑 |
+| [`tests/protocol-mirror.e2e.ts`](tests/protocol-mirror.e2e.ts) | 对照真实 `python3` 的跨语言镜像测试 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these when the runtime contract is not enough. They move from the seam definition to the design record and the companion backend.
+当 runtime 契约不够时阅读这些。它们从 seam 定义走向设计记录与配套后端。
 
-- [PTC runtime seam](../../ptc-runtime/ptc-runtime/README.md) — the abstract contract this backend implements.
-- [fd-3 protocol Agent Note](../../../.agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.md) — design rationale and wire contract.
-- [Settlement-fixes Agent Note](../../../.agents/notes/archived/bug-fix/2026-07-31-code-runtime-python-settlement-fixes.md) — settlement, metering, and containment fixes and their regression cases.
-- [Node process backend](../../ptc-runtime/ptc-runtime-node/README.md) — the released TypeScript sibling.
-- [PTC runtime subsystem reference](../../../docs/subsystems/ptc-runtime.md) — request/result vocabulary, bindings, and failure taxonomy.
+- [PTC 运行时 seam](../../ptc-runtime/ptc-runtime/README.zh.md) — 本后端实现的抽象契约。
+- [fd-3 协议 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-31-ptc-runtime-python-fd3-protocol.zh.md) — 设计理由与 wire 契约。
+- [结算修复 Agent Note](../../../.agents/notes/archived/bug-fix/2026-07-31-code-runtime-python-settlement-fixes.md) — 结算、计量与隔离修复及其回归用例。
+- [Node 进程后端](../../ptc-runtime/ptc-runtime-node/README.zh.md) — 已发布的 TypeScript 兄弟。
+- [PTC 运行时子系统参考](../../../docs/subsystems/ptc-runtime.zh.md) — 请求／结果词汇、binding 与失败分类。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through PTC mode in `dsh-tools` when an explicit composition mounts this provider; it renders the program's completion value or failure into a retained `run_code` result, and no shipped profile mounts this experimental package.
+间接地，通过 `dsh-tools` 中的 PTC mode；当显式组合挂载本提供方时，它会把程序的完成值或失败渲染成保留的 `run_code` 结果，且已发布 profile 均不挂载这个实验包。
 
-#### KV Cache effect
+#### KV Cache 效应
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+无直接失效；指定的消费方拥有任何请求前缀变化。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the package does and does not cover; they are current package constraints, not a task backlog.
+这些限制定义本包覆盖与不覆盖的内容；它们是当前包约束，不是任务积压。
 
-- **The cross-language guard covers the executed surfaces and the frame field shapes, not the field types** — the mirror e2e compares required/optional field sets, not that `cpuSeconds` is an `int` on both sides; a type-level drift is caught by review plus the backend's real-subprocess suite.
-- **A descendant that escapes the child's process group with `setsid()` is not reaped by the group teardown** — `kill(-pid)` cannot reach it; the run still settles on the value the done frame decided, and the close-deadline backstop forces settlement if the orphan holds the pipes open, but the orphan itself outlives the fiber until it exits on its own.
-- **A `log` frame that arrives after settlement is dropped** — once the run has settled, host-side capture is closed; a late fd-3 `log` frame (from a thread that outlived the done frame) is discarded rather than appended to `logs`.
-- **A binding REPLY value has no seam-level byte or depth cap** — `maxValueBytes` meters only the done frame's completion value; a wide binding reply is rebuilt host-side (`snapshotJsonValue` traversal) and encoded whole, bounded on both sides only by process memory (like a binding argument, which has no child-side budget either).
-- **No shipped profile mounts this provider** — the keyless `ptc-python-turn` snapshot replaces the headless PTC runtime through the real Loader; released profiles use the sandboxed Node process backend.
-- **Workflow execution requires Node** — compositions using this Python provider disable `workflow-ptc`, `tool-workflow`, and `tool-ralph`; the workflow provider rejects an incompatible runtime when loaded.
-- **Cross-channel log interleaving is backend-dependent** — Python stdout, stderr, and fd-3 log frames travel independently; each channel preserves its own order, while their total order in `result.logs` may differ.
-- **CPython 3.10 or newer is required** — the configured executable is resolved and version-probed at load; unsupported interpreters fail before `ctx.ptcRuntime` is registered.
-- **Execution is local and Unix-only** — the interpreter, working directory, and sandbox runner must belong to the host running this plugin. The provider uses POSIX resource limits and process-group signals; it does not support Windows or remote execution providers.
-- **Sandbox enforcement inherits backend limits** — a successful program can report partial enforcement, and file confinement does not establish multi-tenant isolation or complete descendant cleanup.
-- **Diagnostic prefixes omit the package's experimental qualifier** — the marker `[dsh-ptc-runtime-python] log capture truncated at <N> bytes` identifies this provider independently of its npm package name. The protocol mirror verifies identical marker bytes in TypeScript and Python.
-- **`run()` is one-shot** — `logs` become available only after `PtcRunResult` resolves; there is no streaming-log or progress interface for output produced by a running program.
-- **No state persists across runs** — every request executes in a fresh subprocess; a persistent REPL-style kernel stays deferred until a backend brings its own logging scheme.
-- **An fd-3 frame whose raw length exceeds the effective frame parse cap settles the run as a worker-exit** — the cap is 64 MiB, or lower when the host's configured heap cannot safely parse a near-cap frame (`hostFrameParseCeiling`); `maxLogBytes`/`maxValueBytes` are load-bounded to the same cap so an honest child's frames always fit; a model-constructed binding ARGUMENT above the cap (a value with no seam-level budget) trips it too — an accepted residual of the OOM guard.
-- **A child that stops reading its replies settles the run as a worker-exit once the reply backlog passes 1024 frames** — the host writes replies one at a time, waiting for `drain` when the pipe is full; a child that keeps sending calls without consuming replies would otherwise grow the retained backlog (and the binding results it pins) until the wall clock, so the backlog cap fails the run early. Binding results carry no seam-level byte cap, so this is a count bound, not a byte bound.
-- **A child that floods calls against a binding that never settles settles the run as a worker-exit once 1024 calls are in flight** — binding calls are counted before dispatch and released when the async body settles, so a binding whose promise never resolves would otherwise accumulate one async closure per call frame until the wall clock. Like the reply backlog, this is a count bound, not a byte bound.
-- **A combined log-and-value peak is not modelled by the load gate** — a model daemon thread that keeps writing while the completion value is metered and framed can add the two peaks in a way no gate admits or rejects; the run dies as `worker-exit`, containment holds, and only the failure classification is degraded.
-- **CPU signal classification depends on the launcher** — the soft limit retains default `SIGXCPU` termination, including during native calls. A launcher such as bwrap can convert that signal into an ambiguous exit code, reported as `worker-exit`; a directly observed `SIGXCPU` is `timeout`. Only the CPU check after model code returns attempts a `timeout` frame before termination, and a busy or backpressured control channel can prevent that report. Kernel limits and the wall deadline remain in force.
-- **A 1-second dual-limit `ulimit -t 1` CPU overrun is reported as `worker-exit`, not a timeout** — when the host starts under a hard CPU limit equal to the soft and that limit is 1, `_clamped` cannot lower the soft, so the kernel SIGKILLs the busy loop and SIGXCPU is never delivered; containment holds, only the classification is degraded.
-- **No byte cap on intermediate binding values** — the implementation remains bounded by the lossless-JSON serialization cost and process memory, and a provider or executor may apply its own fetch cap.
+- **跨语言 guard 覆盖执行的表面与帧字段形状，而非字段类型**——mirror e2e 比较必填／可选字段集，而非 `cpuSeconds` 在两侧是否都是 `int`；类型级漂移由评审加后端的真实子进程套件捕获。
+- **以 `setsid()` 逃出子进程组后代不被组拆卸回收**——`kill(-pid)` 够不到它；运行仍按 done 帧决定的值结算，若该孤儿持有管道，close 截止兜底会强制结算，但孤儿本身在自行退出前一直存活到 fiber 之外。
+- **结算后到达的 `log` 帧被丢弃**——运行一旦结算，宿主侧捕获即关闭；迟到的 fd-3 `log` 帧（来自比 done 帧存活更久的线程）会被丢弃，而不是追加到 `logs`。
+- **binding 回复值没有 seam 级字节或深度上限**——`maxValueBytes` 只计量 done 帧的完成值；宽 binding 回复在宿主侧重建（`snapshotJsonValue` 遍历）并整帧编码，两侧都只受进程内存约束（与没有子进程侧预算的 binding 实参一样）。
+- **已发布 profile 均不挂载本提供方**——keyless `ptc-python-turn` 快照通过真实 Loader 替换 headless PTC 运行时；已发布 profile 使用沙箱 Node 进程后端。
+- **工作流执行需要 Node**——使用本 Python 提供方的组合禁用 `workflow-ptc`、`tool-workflow` 和 `tool-ralph`；工作流提供方在加载时拒绝不兼容的运行时。
+- **跨通道日志交错由后端决定**——Python stdout、stderr 与 fd-3 日志帧彼此独立传输；每个通道保留自身顺序，但它们在 `result.logs` 中的总顺序可能不同。
+- **需要 CPython 3.10 或更高版本**——配置的可执行文件会在加载期完成解析与版本探测；不受支持的解释器会在 `ctx.ptcRuntime` 注册前失败。
+- **执行限于本地 Unix 宿主**——解释器、工作目录与沙箱 runner 必须位于运行本插件的宿主上。提供方使用 POSIX 资源限制和进程组信号；不支持 Windows 或远程执行提供方。
+- **沙箱强制能力继承后端限制**——成功的程序也可能报告部分强制能力，文件约束不构成多租户隔离或完整的后代清理保证。
+- **诊断前缀省略包名中的 experimental 限定词**——标记 `[dsh-ptc-runtime-python] log capture truncated at <N> bytes` 独立于 npm 包名来标识本提供方。协议镜像检查 TypeScript 与 Python 的标记字节完全相同。
+- **`run()` 是一次性的**——`logs` 只有在 `PtcRunResult` resolve 后才能获得；没有为运行中程序产生的输出提供流式日志或进度接口。
+- **运行之间不保留状态**——每次请求都在全新子进程中执行；持久 REPL 风格内核在某个后端带来自己的日志方案之前保持延期。
+- **原始长度超过有效帧解析上限的 fd-3 帧会让本次运行以 worker-exit 结算**——上限为 64 MiB，或当宿主的配置堆无法安全解析接近上限的帧时更低（`hostFrameParseCeiling`）；`maxLogBytes`/`maxValueBytes` 在加载期被限制到同一上限，因此诚实子进程的帧总能放得下；模型构造的超过该上限的 binding 实参（一个在 seam 层没有预算的值）会触发同一上限——这是该 OOM 防护的已接受残余。
+- **停止读取回复的子进程会在回复积压超过 1024 帧时以 worker-exit 结算运行**——宿主每次写一条回复，管道满时等待 `drain`；只持续发送调用而不消费回复的子进程会让保留的积压（及其钉住的 binding 结果）一直增长到墙钟，因此积压上限让运行提前失败。binding 结果在 seam 层没有字节上限，所以这是计数上限而非字节上限。
+- **向永不结算的 binding 洪泛调用的子进程会在 1024 个调用在途时以 worker-exit 结算运行**——binding 调用在分发前计数、异步体结算时释放，否则 promise 永不 resolve 的 binding 会让每个调用帧累积一个异步闭包直到墙钟。与回复积压一样，这是计数上限而非字节上限。
+- **组合日志与值的峰值不被加载门建模**——持续写入的模型 daemon 线程与完成值计量、分帧相加的峰值没有任何门会放行或拒绝；运行以 `worker-exit` 告终，隔离成立，只有失败分类降级。
+- **CPU 信号的分类取决于 launcher**——软限制保留默认的 `SIGXCPU` 终止行为，包括执行原生调用期间。bwrap 等 launcher 可能将该信号转换为有歧义的退出码，此时报告 `worker-exit`；直接观察到的 `SIGXCPU` 则为 `timeout`。仅模型代码返回后的 CPU 检查会在终止前尝试发送 `timeout` 帧，繁忙或反压中的控制通道可能阻止该报告。内核限制与墙钟截止仍然生效。
+- **1 秒双限 `ulimit -t 1` CPU 超限被报告为 `worker-exit` 而非 timeout**——当宿主在一个与软限相等的硬 CPU 限下启动且该限为 1 时，`_clamped` 无法下调软限，内核在同一 tick SIGKILL 忙循环，SIGXCPU 永远不会送达；隔离成立，只有分类降级。
+- **中间 binding 值没有字节上限**——实现仍受无损 JSON 序列化成本与进程内存约束，提供方或执行器可能应用自己的获取上限。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,78 +1,78 @@
 ---
-description: "Browser-worker harness hosting for maintainers building or debugging the experimental Web preview runtime."
+description: "面向构建或排查实验性 Web 预览运行时的维护者，说明浏览器 worker 中的 harness 托管。"
 kind: "package-library"
 ---
 
 # `@deepseek-ai/dsh-experimental-webworker-runtime`
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The browser worker host: the whole harness plugin tree runs inside one dedicated Web Worker, for preview deployments and packaging regressions ([experimental group](../README.md)). The worker inflates a packed VFS image off its download and mounts it in memory, loads its modules through a CommonJS wrapper loader, and serves the page over a postMessage tunnel that speaks plain HTTP. Use it when a preview must run the packaged harness without a Node host.
+浏览器 worker 宿主：整棵 harness 插件树跑在一个 dedicated Web Worker 里，用于预览部署与打包回归（[实验组](../README.zh.md)）。worker 边下载边解压打包好的 VFS 镜像并挂载进内存，经 CommonJS 包装加载器装载模块，并通过一条讲纯 HTTP 的 postMessage 隧道服务页面。当预览需要在没有 Node 宿主的环境中运行已打包 harness 时，请使用它。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-The public npm package exposes the runtime library at its root, the self-contained browser Worker at `./worker`, and the page connector at `./client`. Deployments supply and serve the VFS image separately through the [packer](../webworker-packer/README.md); installing this library does not add a profile layer. The root also exports the module-proxy and replacement tables used by the packer.
+公开 npm 包在根入口导出运行时库，通过 `./worker` 提供自包含的浏览器 Worker，通过 `./client` 提供页面连接器。部署方通过 [打包器](../webworker-packer/README.zh.md) 单独提供和托管 VFS 镜像；安装此库不会增加 profile 层。根入口还导出打包器所用的模块代理表与替换表。
 
-Three build artifacts and one source-owned process layer:
+一条 tsdown 管线产出三个构建产物；另有一层由源码维护的进程实现：
 
-- **`lib/index.js` (assembly library)** — `createWorkerHost`/`startWorkerHost` mount the base image and any ordered data overlays (`storage/`), install the module loader (`module-system/`) and the `process` shim, boot the tree through the image's own `dsh-app-boot`, and hand the tunnel its serving seams. Overlays may replace files only under `home/` and `workspace/`; they cannot replace the base manifest, configuration, or modules. The image layout contract (`image-layout.ts`: virtual root, config/manifest paths, empty directories, the `lowered` wrapper-contract gate) is shared with the packer. The Worker supplies `profileContext` for an editable profile at `home/profiles/preview/`: the packed rows seed its insertion patch, and ConfigEditor persists overrides in that VFS patch. ConfigEditor reconciles each write and Loader commits live values. The Worker commits `appReady` once the tunnel serves, so HMR loads and queues profile configuration changes; the `process` shim reports no entry script, so HMR performs no Node module-cache classification. Plugin management loads and edits the profile, and its package operations fail with the `execa` refusal. Deployment overlays keep JSONL session logs plaintext and preset roots at the image's `config/agent-presets`. Configuration edits last for the current Worker lifetime.
-- **`lib/worker.js` (worker bundle)** — the assembly plus this package's Node-compatibility layer as one self-contained ES module. The module proxy table (`module-proxies.ts`) is the only platform fork: `node:*` builtins over VFS/tunnel/browser primitives, structural stubs that fail loud on the console for what a browser cannot do, and native/binary package replacements. `node:module` supplies `createRequire().resolve` and `.resolve.paths()` over the image package root, so unchanged packages can discover manifests without evaluating their modules. The `node:util` JSON-data comparator compares own enumerable properties, preserving Node admission decisions for recorded fields such as `__proto__`. The global `process` shim carries Node detection fields including `title`, preventing Worker execution from entering DOM-only branches. The pack-time parser reports statically named module requests, including module-scope direct calls of the form `createRequire(import.meta.url)('pkg')` through a named `node:module` or `module` import, to the packer's reachability walk. Stored, CommonJS-obtained, and rebased `createRequire` calls require image entry seeds. VFS mutations drive `node:fs` callback, polling, and promise watchers; open descriptors retain file identity and access mode across rename, replacement, and unlink, `FileHandle.stat({ bigint: true })` reports the same device and inode identity as a path stat while the name still refers to that file, and `FileHandle.chmod()` updates the opened file identity; `readable-stream` supplies `node:stream/promises` completion and pipeline helpers and the stream state machine used by file streams and unchanged image packages such as Chokidar and readdirp. AsyncLocalStorage carries sync-stack causality across `await` through the snapshot/restore faces the pack-time lowering injects. The worker holds no compiler: an image the packer did not lower is refused at mount. The callback `fs.realpath.native` alias resolves within the mounted VFS and supports `util.promisify`.
-- **`src/shell/` (the worker's own process layer)** — a browser worker cannot fork, so `node:child_process` is not a stub but an implementation: `spawn` starts the command in its own Web Worker — this same bundle, told by its first frame to be a shell process — and reports it through the `ChildProcess` surface the subprocess service consumes. The command runs off the host's thread, `SIGKILL` terminates it whatever it is doing, and it reaches the VFS only by message (the host serves those frames). Worker platform executables preserve native-package protocols such as Landlock without replacing their JavaScript packages or coupling their implementations to `node:child_process`; `xdg-open` sends one VFS text file to the page's read-only viewer, so desktop-opener actions such as **Open configuration file** show the file in the page; ordinary commands use the package's evaluator and coreutils command table. The grammar is `@yarnpkg/parsers`' `parseShell`, while `execSync`/`fork` still refuse because they need a real process.
-- **`lib/client.js` (page half)** — startup has two independent stages. `chooseWorkerHostSource({ image?, fixtureManifest? })` optionally owns the boot barrier and fixture manifest: without `preview-fixture` it waits at the source chooser, while a valid query selects directly; either path returns ordered overlays. `connectWorkerHost(worker, { image?, overlays? })` remains the public base-runtime connector; callers that skip the chooser get an empty overlay list. `apps/web` invokes both and supplies its statically bundled Worker. The opening `init` frame carries the base and ordered overlay URLs, the boot payload delivers the structured index-injection table, and `applyIndexInjections` executes it before the shell entry runs. Script preload rows are advisory and skipped because `/plugins` resources resolve only through the tunnel; `loadBundle` fetches each combo on first demand, embeds its tunnel-only source map as a Base64 data URL, and executes the script as a Blob. The worker's unsolicited `view-text` frame opens the page's modal text viewer. The tunnel also exposes fetch-shaped transport, the independent file-upload carrier, and the API client. Request frames preserve Blob bodies through structured clone and transfer `ReadableStream<Uint8Array>` ownership. The Host Worker streams both forms into the route, so neither browser thread creates a complete byte array for a generic-file upload. A Remote stream's uplink crosses as `stream-uplink-item` / `stream-uplink-end` frames into an unbounded `TunnelUplink` that drops items arriving after `end`: the page and its worker are one trusted same-origin boundary, so the Host inbox cap does not apply.
+- **`lib/index.js`（装配库）**——`createWorkerHost`/`startWorkerHost` 挂载基础镜像和按序排列的数据 overlays（`storage/`）、安装模块加载器（`module-system/`）与 `process` shim、经镜像自带的 `dsh-app-boot` 启动插件树，并把服务 seam 交给隧道。Overlay 只能替换 `home/` 与 `workspace/` 下的文件，不能替换基础 manifest、配置或模块。镜像布局契约（`image-layout.ts`：虚拟根、config/manifest 路径、空目录、`lowered` 包装契约门）与 packer 共享。Worker 为 `home/profiles/preview/` 下可编辑的 profile 提供 `profileContext`：打包行初始化其插入 patch，ConfigEditor 将覆盖值持久化到该 VFS patch。ConfigEditor 协调每次写入，Loader 提交实时值。Worker 在隧道开始服务后提交 `appReady`，因此 HMR 可以加载并排队处理 profile 配置变更；`process` shim 不报告入口脚本，因此 HMR 不做 Node 模块缓存分类。插件管理可以加载并编辑 profile，其包操作会因 `execa` 拒绝而失败。部署 overlay 保持 JSONL 会话日志为明文，preset 根指向镜像内 `config/agent-presets`。配置修改在当前 Worker 生命周期内有效。预设声明包含在组合后的配置中。
+- **`lib/worker.js`（worker 束）**——装配库加本包的 Node 兼容层，合成一个自含 ES module。模块代理表（`module-proxies.ts`）是唯一平台叉口：`node:*` 内建走 VFS、隧道和浏览器原语，浏览器做不到的走结构化 stub（调用即在 console 报错并抛出），native/binary 包则替换执行后端。`node:module` 在镜像 package 根之上提供 `createRequire().resolve` 与 `.resolve.paths()`，使未修改的包无需执行目标模块即可发现 manifest。`node:util` 的 JSON 数据比较器检查可枚举的自有属性，使 `__proto__` 等记录字段的准入判定与 Node 一致。全局 `process` shim 带有包括 `title` 在内的 Node 环境识别字段，避免 Worker 执行误入仅适用于 DOM 的分支。pack 期解析器会把名称静态可知的模块请求报告给 packer 的可达性遍历，其中包括通过 `node:module` 或 `module` 具名导入在模块作用域直接发起的 `createRequire(import.meta.url)('pkg')` 调用。保存、经 CommonJS 获取或另设基准的 `createRequire` 调用需要镜像入口种子。VFS mutation 驱动 `node:fs` 的 callback、polling 和 promise watcher；打开的 descriptor 在 rename、replacement 和 unlink 后仍保留文件身份与访问模式，只要文件名仍指向该文件，`FileHandle.stat({ bigint: true })` 报告的 device 与 inode 身份就与路径 stat 相同，`FileHandle.chmod()` 则更新打开文件身份的权限；`readable-stream` 提供 `node:stream/promises` 的完成等待与管道方法，以及文件流以及 Chokidar、readdirp 等未修改镜像包所用的流状态机。AsyncLocalStorage 经 pack 时降低注入的 snapshot/restore 面在 `await` 间携带同步栈因果。worker 不带编译器：packer 未降低的镜像在挂载时被拒。回调式 `fs.realpath.native` 别名在已挂载的 VFS 内解析路径，并支持 `util.promisify`。
+- **`src/shell/`（worker 自己的进程层）**——浏览器 worker 无法 fork，所以 `node:child_process` 不是 stub 而是实现：`spawn` 把命令放进它自己的 Web Worker——就是这同一个束，由首帧告诉它「你是 shell 进程」——并以 subprocess 服务消费的 `ChildProcess` 面报告结果。命令不占宿主线程，`SIGKILL` 不管它在干什么都能终止它，而它只能靠消息触达 VFS（由宿主应答这些帧）。Worker 平台 executable 在不替换 JavaScript 包、也不把具体实现耦合进 `node:child_process` 的情况下保持 Landlock 等 native 包协议；`xdg-open` 把一个 VFS 文本文件交给页面的只读查看器，因此 **打开配置文件** 等桌面打开操作会在页面内显示该文件；普通命令使用本包的求值器与 coreutils 命令表。语法来自 `@yarnpkg/parsers` 的 `parseShell`，而 `execSync`/`fork` 依然拒绝，因为它们需要真进程。
+- **`lib/client.js`（页面半）**——启动分为相互独立的两段。`chooseWorkerHostSource({ image?, fixtureManifest? })` 可选地拥有 boot barrier 与 fixture manifest：没有 `preview-fixture` 时停在来源选择面板，合法 query 则直接选择；两条路径都返回按序排列的 overlays。`connectWorkerHost(worker, { image?, overlays? })` 仍是公开的基础运行态连接器；调用方跳过选择器时 overlay 列表为空。`apps/web` 调用这两段并提供静态打包的 Worker。开局 `init` 帧携带基础镜像与按序排列的 overlay URL，boot 载荷送达结构化 index 注入表，`applyIndexInjections` 在壳入口运行前逐行执行。脚本 preload 行只是提示，因此会被跳过：`/plugins` 资源只能经 tunnel 解析，`loadBundle` 会在首次需要时获取 combo、把仅 tunnel 可达的 sourcemap 内嵌为 Base64 data URL，再以 Blob 执行脚本。worker 主动发出的 `view-text` 帧会打开页面的模态文本查看器。Tunnel 还暴露 fetch 形式的传输、独立文件上传载体和 API 客户端。请求帧通过结构化克隆保留 Blob 请求体，并转移 `ReadableStream<Uint8Array>` 的所有权。Host Worker 将两种请求体都逐块送入路由，因此通用文件上传不会在任何浏览器线程创建完整字节数组。Remote 流的上行以 `stream-uplink-item` / `stream-uplink-end` 帧进入没有上限的 `TunnelUplink`，`end` 之后到达的项被丢弃：页面与其 worker 是同一个可信的同源边界，Host 的 inbox 上限在此不适用。
 
-Acceptance lives in `apps/web/tests/preview-boot.e2e.ts`, which serves the real built pages and drives the pre-boot chooser plus Worker activation in headless Chromium. The empty selection exercises first-run startup. The `vfs-example` overlay supplies ordinary workspace files and plaintext persistence artifacts for cold Workspace/Session discovery, tool presentation, subagent navigation, and history paging without a model request. The [packer](../webworker-packer/README.md) prepares current-generation successors from committed historical logs in Node; those source logs remain byte-identical in the overlay. The fixture generator owns the acceptance test's current projection cache. The chooser reserves WebFS as a separate user-authorized source; that provider does not read the built-in fixture.
+验收在 `apps/web/tests/preview-boot.e2e.ts`：静态服务真实构建页面，在 headless Chromium 里驱动 pre-boot 选择面板与 Worker 激活。空白选择验证首次启动；`vfs-example` overlay 提供普通 workspace 文件与明文 persistence 产物，无需模型请求即可验证 Workspace/Session 冷发现、工具呈现、subagent 导航和历史分页。[打包器](../webworker-packer/README.zh.md)在 Node 中根据已提交的历史日志准备当前代后继文件；这些源日志在 overlay 中逐字节保持不变。fixture 生成器负责验收测试的当前投影缓存。选择面板为 WebFS 保留独立的用户授权来源；该 provider 不读取内置 fixture。
 
-The [built-bundle import sweep](tests/compile/transform-corpus-check.ts) checks bare Node imports after the library build. Its Dockkit exception accepts Node’s unknown-`.css`-extension refusal for any stylesheet rather than one pinned path; another extension, error code, or message, and an unexpectedly successful exempt import, remain errors.
+[已构建 bundle 导入检查](tests/compile/transform-corpus-check.ts)在库构建后检查裸 Node 导入。Dockkit 例外接受 Node 针对任意样式表报告的未知 `.css` 扩展名错误，而不限定某一固定路径；其他扩展名、错误码或消息，以及意外成功的豁免导入，仍然报错。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package only hosts the tree in a browser worker and answers its `node:*` calls; every model-facing registration belongs to the plugins it boots.
+无：本包只在浏览器 worker 里承载插件树并应答它的 `node:*` 调用；所有面向模型的注册都属于它启动的那些插件。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无：本包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The worker composition writes plaintext session logs** (`compression: 'none'` boot patch): it carries no Zstandard codec, so exported logs are `.jsonl`, never `.jsonl.zstd`.
-- **`node:dns/promises`, `node:vm`, `node:net`, `node:sqlite`, `node:worker_threads` are structural stubs**: every call reports its refusal on the console and throws. Rows needing native DNS, a real process, or realm isolation cannot run here.
-- **`node:assert/strict` supports truthiness assertions only**: for falsy values, the callable default and `ok` throw `ERR_ASSERTION` with the supplied message or generic text, or rethrow a supplied Error unchanged. Other assertion APIs are absent.
-- **Native TLS listeners require a Node Host**: the worker's `node:https.createServer` rejects activation rather than substituting plaintext. The preview's internal HTTP tunnel does not bind sockets; browser-facing HTTPS belongs to its deployment server.
-- **Desktop product telemetry is unavailable**: `got.post` reports an explicit worker-host refusal. Got and its Node HTTP dependencies are excluded from the browser image; Desktop reporting remains disabled in the preview composition.
-- **Host package commands are unavailable**: `execa` reports an explicit worker-host refusal; the preview cannot run pnpm, install plugins, or install native dependencies.
-- **PTC Node programs are unavailable**: the process shim exposes `/dsh/bin/node` as its executable identity so the provider can activate, but the Worker has neither a Node executable nor `stripTypeScriptTypes`. Program execution fails before launching a child.
-- **Office conversion requires a Node Host**: the LibreOffice kit replacement rejects converter creation with `unavailable`. The browser image excludes the kit and its engine dependencies; the Office preview reports that conversion is unavailable.
-- **Filesystem watchers observe only the mounted VFS**: image seeding is silent and the VFS has no symlinks or external writers. `persistent`, `ref()`, and `unref()` preserve the Node API but cannot control a dedicated Worker's lifetime because browsers expose no ref-counted event loop.
-- **Worker confinement is a VFS boundary, not kernel Landlock**: `read-only` and `workspace-write` run the unchanged `@deepseek-ai/node-addon-system/landlock-run` JavaScript and launcher argv, but the process layer implements the logical `landlock-run` executable and enforces its grants on every shell filesystem request. `full` therefore covers the Worker command table and mounted VFS only; it does not claim arbitrary native-process execution or Linux kernel isolation.
-- **The worker bundle pins a path inside `@yarnpkg/parsers`** — the build resolves the package's own `lib/shell.js` instead of its root, whose barrel also re-exports the Syml parser and so drags js-yaml into a bundle that never parses that format (around 175 kB, plus its module body at worker start). The path is derived from the package manifest, so a layout change fails the build rather than reinstating the barrel; upgrading the dependency means re-checking that the shell parser still lives there.
-- **The shell is not bash**: no loops, functions, `case`, job control, or process substitution — the grammar stops at pipelines, `&&`/`||`, subshells, groups, redirections, and expansion. `&` runs its command to completion in place, `sed` accepts only substitution scripts, patterns are JavaScript regular expressions, and the command table holds coreutils only (no `git`, no network tools).
-- **A shell process has no synchronous filesystem**: it reads and writes the host's VFS by message, because blocking on a reply would need `SharedArrayBuffer`, which requires a cross-origin isolation GitHub Pages cannot grant. Directory-walking commands therefore cost one round trip per entry, and two concurrent commands can interleave their writes.
-- **Transport, worker-host, and page-half coverage needs a browser-grade harness** — the per-file coverage gate is unmet for those modules; unit specs cover storage, ALS, the transform, and the stub contracts.
+- **worker 组合写明文会话日志**（`compression: 'none'` boot patch）：不带 Zstandard 编解码器，导出日志是 `.jsonl`，不会是 `.jsonl.zstd`。
+- **`node:dns/promises`、`node:vm`、`node:net`、`node:sqlite`、`node:worker_threads` 是结构化 stub**：每次调用在 console 报告拒绝并抛出。需要原生 DNS、真进程或真 realm 隔离的行在此无法运行。
+- **`node:assert/strict` 仅支持真值断言**：对于假值，可调用的默认导出和 `ok` 使用传入的消息或通用文本抛出 `ERR_ASSERTION`，或原样抛出传入的 Error。其他断言 API 未提供。
+- **原生 TLS 监听器需要 Node Host**：worker 的 `node:https.createServer` 会拒绝激活，不会替换成明文。预览内部的 HTTP 隧道不绑定套接字；面向浏览器的 HTTPS 由部署服务器提供。
+- **桌面产品埋点不可用**：`got.post` 明确报告 worker host 不支持该调用。浏览器镜像不包含 Got 及其 Node HTTP 依赖；预览组合不启用桌面上报。
+- **宿主包管理命令不可用**：`execa` 明确报告 worker host 不支持该调用；预览无法运行 pnpm、安装插件或安装原生依赖。
+- **PTC Node 程序不可用**：process shim 用 `/dsh/bin/node` 表示可执行文件身份，使 provider 能够激活，但 Worker 既没有 Node 可执行文件，也没有 `stripTypeScriptTypes`。程序执行会在启动子进程前失败。
+- **Office 转换需要 Node Host**：LibreOffice kit 的替代模块以 `unavailable` 拒绝创建转换器。浏览器镜像排除 kit 及其引擎依赖；Office 预览提示转换不可用。
+- **文件 watcher 只能观察已挂载的 VFS**：镜像 seed 不产生事件，VFS 也没有符号链接或外部写入方。`persistent`、`ref()` 和 `unref()` 保留 Node API，但浏览器没有引用计数事件循环，因此这些接口不能控制 dedicated Worker 的生存期。
+- **Worker confinement 是 VFS 边界，不是内核 Landlock**：`read-only` 和 `workspace-write` 运行未经修改的 `@deepseek-ai/node-addon-system/landlock-run` JavaScript 与 launcher argv，进程层则实现逻辑 `landlock-run` 可执行文件，并在 shell 的每次文件系统请求上执行其授权。`full` 仅覆盖 Worker 命令表和已挂载 VFS，不表示能够执行任意 native 进程，也不表示 Linux 内核隔离。
+- **worker 束钉住了 `@yarnpkg/parsers` 的包内路径**——构建解析到该包自己的 `lib/shell.js` 而非包根，因为包根 barrel 还 re-export 了 Syml 解析器，会把 js-yaml 拖进一个从不解析该格式的束（约 175 kB，外加 worker 启动时的模块体求值）。该路径由包 manifest 派生，包内布局一变即构建期失败、不会静默退回 barrel；升级这个依赖时须复核 shell 解析器是否仍在那里。
+- **这个 shell 不是 bash**：没有循环、函数、`case`、作业控制或进程替换——语法止步于管道、`&&`/`||`、子 shell、group、重定向与展开。`&` 会就地把命令跑完，`sed` 只接受替换脚本，模式是 JavaScript 正则，命令表只有 coreutils（没有 `git`，没有网络工具）。
+- **shell 进程没有同步文件面**：它靠消息读写宿主的 VFS，因为阻塞等待回帧需要 `SharedArrayBuffer`，而那要求 GitHub Pages 给不了的跨源隔离。因此目录遍历类命令每个条目一次往返，并发的两条命令写入可以交错。
+- **transport、worker-host、页面半的覆盖需要浏览器级 harness**——这些模块未达 per-file 覆盖门；单测覆盖 storage、ALS、transform 与 stub 契约。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

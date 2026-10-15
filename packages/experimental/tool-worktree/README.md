@@ -1,96 +1,96 @@
 ---
-description: "Model tool that creates a new local Git worktree and changes the current Session directory."
+description: "创建新的本地 Git 工作树并改变当前 Session 目录的模型工具。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-tool-worktree
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Add Git Worktrees from the GUI plugin manager to let a model create and enter a new Git worktree with one call. This optional bundle is installed with Harness and stays off until selected. Native tool calls and PTC programs receive the same typed result, and the existing file policy governs creation.
+从 GUI 插件管理器添加 Git 工作树，让模型通过一次调用创建并进入新的 Git 工作树。此可选 bundle 随 Harness 安装，在选中之前保持关闭。原生工具调用与 PTC 程序获得相同的带类型结果，创建操作沿用现有文件策略。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [了解实现](#understand-the-implementation)
+- [深入探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与待办工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-In the GUI, open **Plugins → Official → Git Worktrees** and turn on the switch. The bundle loads the [worktree runtime](../worktree/README.md) and this tool together; it is off in every shipped profile. Turning it off removes `create_worktree` without deleting existing checkouts or branches. The built-in `working_directory` tool remains available.
+在 GUI 中打开**插件 → 官方 → Git 工作树**并启用开关。此 bundle 一起加载[工作树运行时](../worktree/README.zh.md)与本工具；所有随附 profile 默认关闭它。关闭后会移除 `create_worktree`，已有检出目录与分支会保留。内置 `working_directory` 工具仍然可用。
 
-For an explicit composition, mount this function plugin after the worktree runtime and tool registry.
+在显式组合中，将此函数插件挂载到工作树运行时和工具注册表之后。
 
 ```yaml
 - name: '@deepseek-ai/dsh-experimental-worktree'
 - name: '@deepseek-ai/dsh-experimental-tool-worktree'
 ```
 
-Call `create_worktree({ name?: string, from?: string })`. Success returns the canonical checkout `path`, new `branch`, pinned `baseCommit`, and source `repositoryRoot`, and changes the calling Session's current working directory. To leave, call `working_directory({ cd: path })`; the checkout and branch remain. The [generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-worktree) owns the exact schema and model-facing description.
+调用 `create_worktree({ name?: string, from?: string })`。成功会返回规范化检出路径 `path`、新分支 `branch`、固定提交 `baseCommit` 和源仓库根目录 `repositoryRoot`，并改变调用 Session 的当前工作目录。离开时调用 `working_directory({ cd: path })`；检出目录与分支会保留。[生成的工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-tool-worktree)拥有准确的 schema 与面向模型的描述。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 了解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) inserts the `worktree` runtime row and the `tool-worktree` consumer row. [`src/index.ts`](src/index.ts) registers one typed tool. Runtime creation owns Git behavior, cancellation, and the working-directory change. The tool returns the runtime record as its canonical value and renders that record as JSON; its Host presentation uses the generic card. Disposal unregisters the tool.
+[`cordis.patch.yml`](cordis.patch.yml) 插入 `worktree` 运行时行与 `tool-worktree` 消费方行。[`src/index.ts`](src/index.ts) 注册一个带类型的工具。运行时创建操作拥有 Git 行为、取消处理与工作目录切换。工具将运行时记录作为规范返回值，并渲染为 JSON；Host 展示使用通用卡片。销毁插件会注销工具。
 
-No runtime invariant companion is published because the tool retains no state independently of the worktree runtime.
+本包不发布运行时不变量伴随入口，因为工具不保留独立于工作树运行时的状态。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 深入探索
 
-- [Worktree runtime](../worktree/README.md) — configuration, creation semantics, and write permissions.
-- [Working directory](../../session/working-directory/README.md) — Session context and exit operation.
-- [Tool authoring](../../../docs/cookbook/adding-a-tool.md) — canonical results and pure presentation.
+- [工作树运行时](../worktree/README.zh.md)——配置、创建语义与写权限。
+- [工作目录](../../session/working-directory/README.zh.md)——Session 上下文与离开操作。
+- [工具编写](../../../docs/cookbook/adding-a-tool.zh.md)——规范结果与纯展示函数。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Creation tool
+### 创建工具
 
-#### What the model sees
+#### 模型看到什么
 
-The [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-experimental-tool-worktree) defines `create_worktree`. Each successful result contains the created checkout's canonical path, branch, base commit, and source checkout’s top-level directory. Failed calls report the operation error.
+[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-experimental-tool-worktree)定义 `create_worktree`。每个成功结果包含已创建检出目录的规范路径、分支、基准提交与源检出目录的顶层目录。失败调用报告操作错误。
 
-#### Token effect
+#### Token 影响
 
-The schema has a fixed per-request cost while mounted. Each call appends its arguments and bounded creation result or error to ordinary tool history.
+挂载期间，schema 为每次请求带来固定成本。每次调用将参数与有界创建结果或错误追加到普通工具历史。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Unchanged tool schemas retain their existing prefix. Calls append after prior history; the working-directory service separately records the successful directory change for later requests.
+未改变的工具 schema 保留既有前缀。调用追加到先前历史之后；工作目录服务另行记录成功的目录切换，供后续请求使用。
 
-## Known Limitations and Deferred Work
+## 已知限制与待办工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Calling Agent required** — the tool changes a Session directory and rejects calls without an Agent.
-- **Creation only** — inspection, merging, and checkout or branch removal are outside this tool; the [runtime limitations](../worktree/README.md#known-limitations-and-deferred-work) also apply.
+- **必须有调用 Agent**——工具改变 Session 目录，没有 Agent 的调用会被拒绝。
+- **仅负责创建**——检查、合并、移除检出目录或删除分支不属于此工具；[运行时限制](../worktree/README.zh.md#known-limitations-and-deferred-work)同样适用。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

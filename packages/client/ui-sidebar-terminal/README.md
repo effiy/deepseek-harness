@@ -1,88 +1,88 @@
 ---
-description: "Open, recover and control interactive shell tabs in the Web right sidebar."
+description: "在 Web 右侧栏打开、恢复和控制交互式 shell 标签页。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-sidebar-terminal
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Choose an installed shell from the right sidebar's Start page to run commands in the Session's current working directory. Rename terminals in their tabs and recover retained processes after reloading the page. Collapse the sidebar to keep commands running; close a terminal tab to request process termination. Tab completion follows the shell configuration. Commands use the execution environment’s system-user permissions independently of Agent permissions; see [user-terminal execution](../../api/terminal-controller/README.md#use-this-package).
+从右侧栏开始页选择已安装的 shell，在 Session 当前工作目录运行命令。在标签页上重命名终端，并在刷新页面后恢复保留的进程。折叠侧栏让命令继续运行，关闭终端标签页则请求结束进程。Tab 补全使用 shell 的配置。命令使用执行环境中系统用户的权限，独立于 Agent 权限；详见[用户终端执行](../../api/terminal-controller/README.zh.md#use-this-package)。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用此包](#use-this-package)
+- [了解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用此包
 
-The `terminal.new` command creates a separate terminal in the focused dock pane, replacing a guide and retaining existing content pages. From the conversation or a floating content page, it uses the active dock pane. The guide card right-aligns the current effective shortcut as unboxed text without a duplicate tooltip. Windows and macOS Web use the [shortcut service’s platform defaults](../shortcuts/README.md); Linux Web leaves the command unbound by default.
+命令 `terminal.new` 在焦点停靠分栏创建独立终端，替换开始页并保留已有内容页。从聊天区或浮动内容页触发时，使用活动停靠分栏。开始页卡片右侧对齐显示当前有效快捷键的无背景文字，不额外弹出重复提示。Windows 和 macOS Web 使用[快捷键服务的平台默认值](../shortcuts/README.zh.md)；Linux Web 默认不绑定此命令。
 
-Open the right sidebar and click **New terminal** to open the remembered available shell immediately. The separate arrow beside the title opens the installed-shell menu; selecting an item remembers it and opens that shell directly. Discovery runs when the menu opens and does not allocate a terminal. A failed lookup offers Retry in the menu. Use **New tab** to return to the guide and open another terminal.
+展开右侧栏，点击**新建终端**即可直接打开上次选择且仍可用的 shell。标题旁的独立箭头展开已安装 shell 菜单；选择后立即记住该项并打开终端。菜单展开时才查询 shell，不分配终端进程；查询失败可在菜单内重试。通过**新标签页**回到开始页并打开更多终端。
 
-Double-click the terminal's tab title to rename it. **Take control** makes the current attachment writable when another page owns input. A temporary disconnect preserves the screen and offers **Reconnect**, without exposing transport diagnostics. An exited shell remains visible with its exit code and offers **New terminal**; it never restarts automatically. Exited terminals count toward the Session limit; close unused tabs when the limit is reached.
+双击终端标签标题可重命名。其他页面持有输入权时，点击 **接管输入** 使当前连接可写。暂时断线时保留屏幕并提供 **重新连接**，不展示传输内部错误。已退出的 shell 仍显示退出码并提供 **新建终端**，不会自动重启。已退出的终端仍计入 Session 配额；达到上限时请关闭不用的标签。
 
-Closing or replacing a terminal tab removes it immediately and ends its process in the background. Cleanup failures have no notification or manual retry action; saved unfinished close requests are retried when the Client plugin starts. Collapsing, switching tabs or Sessions, floating and fullscreen presentation preserve the process.
+关闭或替换终端标签页会立即移除标签页，并在后台结束进程。清理失败没有通知或手动重试操作；已保存的未完成关闭请求会在 Client 插件启动时重试。折叠、切换标签页或 Session、浮动和全屏都保留进程。
 
-After reload, the [sidebar restores its layout](../../client/ui-sidebar-right/README.md#state) and each terminal reconnects to its saved Host identity in the original tab. Collapsed and inactive tabs do not create recovery duplicates or change selection. Host terminals absent from the saved layout do not reopen automatically and have no UI recovery entry; they remain subject to the controller's unattended idle reclamation and Session/Host disposal. A missing saved process shows a localized unavailable panel with **New terminal**. Clicking it replaces the unavailable tab in place with a fresh terminal; recovery never creates that replacement automatically.
+刷新后，[侧栏恢复布局](../../client/ui-sidebar-right/README.zh.md#state)，各终端在原标签页中重连保存的 Host 身份。折叠和非当前标签不会产生重复的恢复标签，也不改变选中项。保存布局之外的 Host 终端不会自动打开，也没有 UI 恢复入口；它们仍由 controller 的无人持有空闲回收及 Session/Host 卸载清理管理。保存的进程已消失时，显示本地化的不可用提示和 **新建终端**。点击后在原位置用全新终端替换失效标签；恢复过程不会自动创建替代进程。
 
-The terminal background, default text, cursor, and selection follow the DSH theme, including system preference and theme-token overrides. Theme changes preserve the running shell, output, and application OSC color overrides. Reset commands restore colors to the current DSH defaults. The screen uses the Settings terminal font size and places the Settings terminal font ahead of its built-in monospace stack; changing either keeps the shell and output, and a visible writable screen refits the Host grid to the new cell size. xterm adjusts text toward 4.5:1 contrast; the cursor keeps at least 3:1 contrast against its cell background, including Vim colorschemes.
+终端背景、默认文字、光标和选区跟随 DSH 主题，包括系统偏好和主题令牌覆盖。切换主题会保留运行中的 shell、输出和应用通过 OSC 设置的颜色。颜色重置命令恢复到当前 DSH 默认值。屏幕使用设置中的终端字号，并把设置中的终端字体排在内置等宽字体栈之前；修改任一项都会保留 shell 与输出，可见且可写的屏幕会按新的单元格尺寸重新适配 Host 网格。xterm 将文字对比度调整到 4.5:1；光标与所在单元格背景保持至少 3:1 的对比度，包括 Vim 配色方案。
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 了解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节</summary>
 
-This plugin registers the `terminal` type and body/title seats with the right sidebar. The guide reuses the Plugins page’s blue terminal artwork; tab titles use the line glyph. The React-free terminal model belongs to `api-terminal-controller`; keyed framework hooks expose its state. `ui-primitives` Menu and Button provide the shell picker and startup controls, including keyboard navigation and the selected-item marker. The body loads its package-local `client.terminal.js` chunk when a terminal view mounts, keeping xterm.js and FitAddon out of the startup `client.js`; they then render the screen and measure the viewport. The body reserves an 8px gap below the tab strip within the pane height. Input, including Tab and control characters, travels unchanged to the PTY.
+插件向右侧栏注册 `terminal` 类型及正文和标题 seat。开始页入口复用插件页面的蓝色终端图标，页签标题使用线条图标。无 React 依赖的终端模型属于 `api-terminal-controller`，通过框架 keyed hooks 暴露状态。`ui-primitives` 的 Menu 与 Button 提供 shell 选择和启动控件，支持键盘导航与选中标记。正文在 terminal 视图挂载时加载包内 `client.terminal.js` chunk，使 xterm.js 与 FitAddon 不进入启动 `client.js`；加载后由它们负责屏幕渲染和视口测量。正文在面板高度内为页签条下方预留 8px 间距。输入原样传到 PTY，包括 Tab 和控制字符。
 
-The terminal controller saves each globally unique content identity's Host association independently and owns content recovery; the sidebar owns layout persistence. A recovered view cannot allocate a replacement process. The sidebar's close handler schedules cleanup through the [terminal controller](../../api/terminal-controller/README.md#understand-the-implementation) and returns synchronously. Browser component cleanup and the tab's abort signal only detach browser work.
+终端 controller 独立保存每个全局唯一内容身份与 Host 的关联，并负责内容恢复；侧栏负责布局持久化。恢复视图不能分配替代进程。侧栏关闭 handler 通过[终端 controller](../../api/terminal-controller/README.zh.md#understand-the-implementation)安排清理并同步返回。浏览器组件清理和 tab 的 abort signal 只停止浏览器工作。
 
-At plugin startup, terminal-kind entries in the sidebar's complete open-tab inventory retain matching saved Host identities, including dormant Sessions. This window hold remains independent of React mounts and screen subscriptions. Removing the last matching occurrence releases it; collapsing or switching views does not. The [terminal controller](../../api/terminal-controller/README.md#use-this-package) owns unattended idle reclamation and long-command protection.
+插件启动时，侧栏完整打开标签清单中的 terminal 条目会持有相匹配的已保存 Host 身份，包括非当前 Session。窗口持有关系独立于 React 挂载和屏幕订阅。删除最后一个匹配的 occurrence 会释放持有关系；折叠或切换视图不会释放。[终端控制器](../../api/terminal-controller/README.zh.md#use-this-package) 负责无人持有时的空闲回收和长命令保护。
 
 </details>
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 延伸阅读
 
-- [Subprocess](../../subprocess/subprocess/README.md)
-- [Right Sidebar](../../client/ui-sidebar-right/README.md)
-- [Web terminal decision](../../../.agents/notes/implemented/feature/2026-09-09-web-sidebar-terminal.md)
+- [Subprocess](../../subprocess/subprocess/README.zh.md)
+- [Right Sidebar](../../client/ui-sidebar-right/README.zh.md)
+- [Web terminal decision](../../../.agents/notes/implemented/feature/2026-09-09-web-sidebar-terminal.zh.md)
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package handles user terminal interaction without adding model input.
+无；此包只处理用户交互式终端，不向模型请求添加内容。
 
-#### KV Cache effect
+#### KV 缓存影响
 
-None; terminal output travels only between the browser and Host.
+无；终端输出只在浏览器与 Host 之间传输。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Shell discovery or native PTY startup can fail. The tab reports the failure without launching a different shell.
-- Completion menus and inline suggestions depend on shell configuration. The Web UI adds no independent completion engine.
-- Application OSC color overrides are retained by the mounted renderer; a newly opened renderer cannot recover them from the Host screen snapshot.
-- Terminal history is bounded. The feature does not send terminal output to the Agent, provide split terminal panes inside a tab, or restore processes after Host restart.
-- A failed terminal chunk load requires a page reload because React caches a rejected lazy import for the page lifetime.
+- 默认 shell 或原生 PTY 可能启动失败。标签页显示错误，不启动其他 shell。
+- 补全菜单和内联建议取决于 shell 配置，Web UI 不提供独立补全引擎。
+- 应用的 OSC 颜色覆盖由已挂载的渲染器保留；新打开的渲染器无法从 Host 屏幕快照恢复这些颜色。
+- 终端历史有上限。此功能不向 Agent 发送终端输出，不在单个标签页内拆分终端，也不在 Host 重启后恢复进程。
+- Terminal chunk 加载失败后需要刷新页面，因为 React 会在页面生命周期内缓存被拒绝的 lazy import。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护说明</summary>
 
-None.
+无。
 
 </details>

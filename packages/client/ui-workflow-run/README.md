@@ -1,101 +1,101 @@
 ---
-description: "Durable workflow-run Conversation Node for the dsh web client: reconstructs top-level workflow runs as independent chat nodes with nested member disclosure."
+description: "dsh Web 客户端的持久化工作流运行 Conversation Node：把顶层工作流运行重建为带嵌套成员折叠的独立聊天节点。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-workflow-run
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-client-ui-workflow-run` to inspect each durable top-level workflow run as an independent Chat node. Expand a run to see its phases and expand a phase to see members; running, failed, cancelled, and interrupted levels open by default, while completed levels remain closed. A running member can open its child Session only when it belongs to the current Session and is available locally. The node shows identities and statuses only; scripts, outputs, errors, logs, usage, topology, and controls remain outside this surface.
+使用 `dsh-client-ui-workflow-run` 可以把每个持久化的顶层工作流运行作为独立 Chat 节点查看。展开运行可查看阶段，展开阶段可查看成员；运行中、失败、已取消与已中断的层级默认展开，已完成层级保持折叠。只有当运行中的成员属于当前会话且可在本地访问时，才能打开其子会话。节点只显示身份与状态；脚本、输出、错误、日志、用量、拓扑与控制操作不属于本界面。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-A top-level workflow run through `dsh-tool-workflow` appears in the conversation as its own node: expand the run to see its phases, and expand a phase to see its members. Phase groups come only from members that started, and settlement changes status without removing or reordering members.
+经 `dsh-tool-workflow` 发起的顶层工作流运行会在对话中显示为独立节点：展开运行查看其阶段，展开阶段查看其成员。阶段组只来自开始过的成员；成员结算只改变状态，不删除或重排成员。
 
-### Navigating the node
+### 导航节点
 
-Run and phase headers keep 6px gaps between their title, count, and status fields, with the status aligned to the right. The run uses a 32-pixel row with persistent chevrons, an inline state dot, and status text; phases use disclosure rows with title and member count in the main area and a fixed aggregate-status tail; members use a 16-pixel dot slot, a truncating name area, and a fixed status column. Opening a member's child Session requires both member and child to be running, with the current Session recorded as its parent and an available child identity projection. Navigation uses the child's own mode for both continuable and historical one-shot children; external executions have no local Session to open. Child activity uses the unified UI status, falling back to the Session summary when unknown. Workflow events establish membership; missing child identity, a different parent, or a terminal member keeps the row non-interactive.
+运行与阶段标题行在标题、数量和状态字段之间保留 6px 间距，状态靠右对齐。运行使用 32 像素行，带常驻 chevron、行内状态点与状态文字；阶段使用 disclosure 行，在主区显示标题与成员数、在固定尾部显示聚合状态；成员使用 16 像素状态点槽、可省略名称区与固定状态列。打开成员的子 Session 需要成员与子级均在运行，子级记录的父级为当前 Session，且子级身份投影可用。导航使用子级自身的模式，兼容可继续与历史 one-shot 子级；外部执行没有可打开的本地 Session。子级活动状态使用统一 UI status，未知时使用 Session 摘要。工作流事件建立成员关系；子级身份缺失、父级不符或成员已处于终态时，该行不可交互。
 
-### State and completion
+### 状态与完成
 
-Completion updates the visible status immediately but delays its automatic close while focus remains inside the content. A run or member without terminal events stays running after its Turn or Step ends normally, because a background run outlives its Tool Step. It is presented as interrupted, without changing the tool result, once its Turn is closed after a crash or at a fork boundary.
+完成状态会立即更新，但只要焦点仍位于展开内容内，自动折叠就会等待焦点离开。缺少终点事件的运行或成员在所属轮次或步骤正常结束后仍显示为运行中，因为后台运行的生命周期长于其工具 Step。只有当所属轮次在崩溃后或于分叉边界被关闭时，界面才把它们显示为已中断，且不改写工具结果。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The node is a deterministic replay of durable session events: `tool-workflow/run-start` creates one Context keyed by `runId`, and member starts, member endings, and the run ending update that Context in log order. A history tail containing only updates remains pending until an older page supplies the unique start, after which prepend, complete replay, and live append produce the same state.
+节点是持久化会话事件的确定性回放：`tool-workflow/run-start` 以 `runId` 创建唯一上下文，成员开始、成员结束与运行结束事件按日志顺序更新该上下文。只有 update 的历史尾页会保持 pending，直到更早页面补入唯一 start；此后 prepend、完整回放与实时 append 得到相同状态。
 
-### Disclosure choices
+### 展开选择
 
-Ordinary running updates preserve the current choice, the first abnormal edge opens once, normal completion closes once, and a completed phase plus the outer run open again when a new running member starts under the same phase key. If an entire new clean cycle arrives in one render while the run remains active, the phase finishes folded but the outer run opens once to expose its updated summary. `WorkflowRunPanel` owns the phase choices, so closing and reopening the outer run does not reset them; a renderer remount reconstructs every initial choice from durable facts.
+普通运行更新保留当前选择，首次进入异常状态时仅自动展开一次，正常完成时仅自动折叠一次；已完成阶段在同一 phase key 下有新的成员开始运行时，该阶段与外层运行会再次自动展开。若一次全新的正常周期在同一次渲染中完整到达，而运行仍处于活动状态，该阶段最终保持折叠，但外层运行会自动展开一次，以展示更新后的摘要。阶段选择由 `WorkflowRunPanel` 持有，因此关闭并重新打开外层运行不会重置这些选择；renderer remount 会根据持久化事实重建每层的初始选择。
 
-### Composition
+### 装配
 
-The package registers its Definition, locale dictionary, and `workflow-run` renderer as Cordis effects; removing the client entry retracts all three contributions. The shipped Web bundle includes the plugin after `ui-conversation` and `ui-tool`.
+本包把 Definition、locale 字典与 `workflow-run` renderer 都注册为 Cordis effect；移除客户端 entry 会撤销三者。shipped Web bundle 在 `ui-conversation` 与 `ui-tool` 之后装配该插件。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-These pages cover the tool seam, the conversation host, and the tool presentation layer.
+以下页面覆盖工具 seam、对话宿主与工具展示层。
 
-- [tool-workflow](../../workflow/tool-workflow/README.md) — the tool that owns the four `tool-workflow/*` Session events.
-- [ui-conversation](../ui-conversation/README.md) — the chat surface hosting the `conversation.chat.node` slot.
-- [ui-tool](../ui-tool/README.md) — the tool-call presentation layer this node sits beside.
-- [Conversation subsystem](../../../docs/subsystems/conversation.md) — how a business-owned feature registers a Conversation node.
+- [tool-workflow](../../workflow/tool-workflow/README.zh.md)——拥有四类 `tool-workflow/*` 会话事件的工具。
+- [ui-conversation](../ui-conversation/README.zh.md)——承载 `conversation.chat.node` slot 的聊天界面。
+- [ui-tool](../ui-tool/README.zh.md)——本节点相邻的工具调用展示层。
+- [Conversation 子系统](../../../docs/subsystems/conversation.zh.md)——业务自有功能如何注册 Conversation node。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the package is a browser-side UI plugin layer that renders durable workflow records without changing model context.
+无。该包是浏览器端 UI 插件层，只渲染持久化工作流记录，不改变模型上下文。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无；该包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define which runs produce records and what the node exposes; they are current package constraints.
+这些限制定义哪些运行会产生记录、节点暴露什么；它们是当前包约束。
 
-- **Only top-level calls through `dsh-tool-workflow` produce these records** — nested PTC mode calls and direct `WorkflowEngine` consumers do not.
-- **A run lost without terminal events in a normally ended Turn stays running** — for example a background run whose process crashed during a later Turn, or a run whose recording stopped after a failed append; the session log carries no fact that marks it stopped.
-- **Navigation is intentionally live-only** — terminal members remain visible for review but never expose a cold-session opener from this node.
-- **The node shows run, phase, member identity, and status only** — scripts, outputs, errors, logs, usage, static topology, and controls remain outside this surface.
+- **只有经 `dsh-tool-workflow` 发起的顶层调用会生成这些记录**：嵌套 PTC mode 调用和直接 `WorkflowEngine` 消费方不会生成。
+- **在正常结束的轮次中未写终点事件就丢失的运行保持运行中**：例如进程在之后的轮次中崩溃的后台运行，或追加失败后停止记录的运行；会话日志中没有标记其已停止的事实。
+- **导航刻意只面向实时运行**：终态成员继续保留供复盘，但本节点永不为其提供冷会话入口。
+- **节点只显示运行、阶段、成员身份与状态**：脚本、输出、错误、日志、用量、静态拓扑与控制操作都不属于本界面。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

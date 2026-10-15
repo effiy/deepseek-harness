@@ -1,37 +1,37 @@
 ---
-description: "Storage hub (ctx.storage) for compositions and maintainers choosing, mounting, or debugging named storage backends and data-form facilities."
+description: "存储枢纽（ctx.storage）：面向选择、挂载或排查具名存储后端与数据形式设施的组合方与维护者。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-storage
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-storage` to keep typed application data durable without adding it to session history. Mount it with a supported storage medium and domain configuration, then callers can access records through the public `ctx.storageDomain` API. Choose it for workspace records, session sidecars, or other application state that must survive restarts without becoming session events. It is available only to host code and has no model-visible effect; compositions that do not need such data can omit it.
+使用 `dsh-storage` 持久保存类型化应用数据，而不将其加入会话历史。将它与受支持的存储介质和领域配置一同挂载后，调用方即可通过公共 `ctx.storageDomain` API 访问记录。工作区记录、会话伴随数据或其他必须在重启后保留且不应成为会话事件的应用状态适合使用它。它仅供宿主代码使用，对模型没有可见影响；无需此类数据的组合可以省略它。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Use this package to give a composition durable, non-session storage: mount it together with backend and domain-form packages, and host-side packages read and write validated records through `ctx.storageDomain`. The hub itself adds nothing observable — it is the meeting point that makes the family work, and everything below is what a composition gets from it.
+使用本包为组合提供持久的非会话存储：把它与后端和数据形式包一起挂载，宿主包即可通过 `ctx.storageDomain` 读写经过校验的记录。枢纽自身不增加任何可观察行为——它是让整个家族运转起来的交汇点——以下内容就是组合从它得到的一切。
 
-### When to use it
+### 何时使用
 
-Mount the hub whenever any package in the composition persists data that is not a session event log — workspace records, session sidecars. It is required by the domain form and both shipped backends, so the storage rows of a composition are `storage` plus a backend plus `storage-domain`. Skip the whole group when nothing stores such data; the agent loop never needs it.
+当组合中任何包需要持久化会话事件日志以外的数据——工作区记录、会话伴随数据——时就挂载枢纽。领域数据形式与两个内置后端都依赖它，因此组合的存储行是 `storage` 加一个后端加 `storage-domain`。没有任何此类数据的组合可以省略整个组；agent loop（智能体循环）永远不需要它。
 
-### A minimal composition
+### 最小组合
 
 ```yaml
 - name: '@deepseek-ai/dsh-storage'
@@ -43,99 +43,99 @@ Mount the hub whenever any package in the composition persists data that is not 
     backend: json
 ```
 
-With these rows, the `json` backend registers itself and the `domain` data form mounts; a consumer such as `dsh-workspace` then opens its domain over the routed backend and reads and writes records through `ctx.storageDomain`. Several backends can stay mounted side by side; which backend serves which domain is the domain form's configuration, never a hub-wide choice.
+这些行加载后，`json` 后端注册自身、`domain` 数据形式挂载；诸如 `dsh-workspace` 之类的消费方随后在已路由后端上打开自己的领域，并通过 `ctx.storageDomain` 读写记录。多个后端可以并排保持挂载；哪个后端服务哪个领域由领域数据形式的配置决定，绝非枢纽的全局选择。
 
-### What you get
+### 你能得到什么
 
-- A mounted backend resolves by name, so a composition with both shipped backends can route each domain to either medium by configuration.
-- A mounted data form resolves as `ctx.storage.<form>`; the domain form is additionally served directly as `ctx.storageDomain`.
-- Misconfiguration fails loud with a stable `StorageError` code instead of silently deferring: an unknown backend name, a form read before its owner mounts, or a duplicate registration all throw.
+- 已挂载的后端按名称解析，因此同时挂载两个内置后端的组合可以把每个领域按配置路由到任一种介质。
+- 已挂载的数据形式解析为 `ctx.storage.<form>`；领域数据形式还直接以 `ctx.storageDomain` 对外服务。
+- 错误配置会以稳定的 `StorageError` 代码明确报错，而不是静默推迟：未知的后端名称、在其所有者挂载前读取数据形式、或重复注册都会抛出异常。
 
-### Failures and recovery
+### 失败与恢复
 
-- `backend-not-found` — the domain form routes to a backend that is not mounted; add the backend package. The form waits for every configured backend to register, so row order is not a failure mode.
-- `form-not-mounted` — a consumer reads `ctx.storage.domain` before `dsh-storage-domain` loads; mount the domain row before the consumer.
-- `duplicate-backend` / `duplicate-mount` — the same name or form registers twice; that is a composition bug and fails loud.
+- `backend-not-found`——领域数据形式路由到未挂载的后端；请添加后端包。数据形式会等待所有已配置后端注册，因此行序不会造成失败。
+- `form-not-mounted`——消费方在 `dsh-storage-domain` 加载前读取 `ctx.storage.domain`；请把领域行放在消费方之前。
+- `duplicate-backend`／`duplicate-mount`——同一名称或形式注册了两次；这是组合错误，会明确报错。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The hub is a pure registration table with two faces, designed so backends and data forms stay replaceable without the hub knowing their internals.
+枢纽是一张纯注册表，拥有两个面，设计目标是后端与数据形式可以独立替换，而枢纽无需了解它们的内部实现。
 
-### Design concept
+### 设计理念
 
-- **Backends own media, data forms own semantics.** The hub never performs IO; it only holds the name → backend table and the form-name → facility map. Backend packages register their medium owner, data-form packages mount their facility, and neither needs the other's details.
-- **Multiple backends stay side by side.** Which backend serves which consumer is the consumer's configuration (the domain form's route table), never a hub-global either-or.
-- **Registration and mounting are effects.** `register()` and `mount()` return disposers; disposal removes only that registration's contribution, and does not close the backend — the owning plugin closes it after unregistering.
-- **Activation cannot race registration.** Each backend plugin also publishes a lifecycle-only service key (`storage.backend.<name>`); form providers inject those keys, so the domain form activates only after every configured backend registers, while callers still resolve backends by name through the hub.
+- **后端拥有介质，数据形式拥有语义。** 枢纽从不执行 IO；它只持有名称 → 后端表和形式名 → 设施表。后端包注册其介质所有者，数据形式包挂载其设施，双方都不需要对方的细节。
+- **多个后端并排共存。** 哪个后端服务哪个消费方由消费方自身的配置决定（领域数据形式的路由表），绝非枢纽全局的二选一。
+- **注册与挂载都是 effect。** `register()` 与 `mount()` 返回资源释放函数；释放只移除该次注册的贡献，且不会关闭后端——由所属插件在注销后关闭。
+- **激活不会与注册竞争。** 每个后端插件还会发布一个仅用于生命周期的服务键（`storage.backend.<name>`）；数据形式提供方注入这些键，因此领域数据形式只在所有已配置后端注册后激活，而调用方仍通过枢纽按名称解析后端。
 
-### The backend contract
+### 后端约定
 
-[`src/backend.ts`](src/backend.ts) is the normative contract for backend implementers, checked clause by clause by the shared conformance suite in `tests/contract.ts`. A backend owns exactly one medium and exposes optional data-shape facets; `kv` is the only facet, and opening a unit yields a versioned, globally-singleton schema handle whose single calls are atomic and durable once resolved. Unit and table names must match `UNIT_NAME_RE`; record keys are arbitrary strings that never reach file paths. The unit does not serialize concurrent writes — ordering belongs to the caller — and a stored version differing from the descriptor rejects `version-mismatch` (no migration).
+[`src/backend.ts`](src/backend.ts) 是后端实现者的规范性约定，由 `tests/contract.ts` 中的共享一致性套件逐条款检查。一个后端只拥有一种介质，并暴露可选的数据形状分面；`kv` 是唯一的分面，打开单元即可获得一个带版本、全局单例的 schema 句柄，其每次调用均具备原子性，并在完成时保证持久化。单元名与表名必须匹配 `UNIT_NAME_RE`；记录键是任意字符串，绝不进入文件路径。单元不对并发写入做串行化——顺序由调用方负责——介质上记录的版本与描述符不同时拒绝 `version-mismatch`（不做迁移）。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Storage` service, form mounting, `StorageForms` map |
-| [`src/registry.ts`](src/registry.ts) | `BackendRegistry`: name → backend table, registration disposers |
-| [`src/backend.ts`](src/backend.ts) | The backend contract: facets, units, `UNIT_NAME_RE` |
-| [`src/error.ts`](src/error.ts) | `StorageError` codes shared by the hub and every backend |
-| [`tests/contract.ts`](tests/contract.ts) | The shared conformance suite run against each backend |
+| [`src/index.ts`](src/index.ts) | 插件入口：`Storage` 服务、数据形式挂载、`StorageForms` 表 |
+| [`src/registry.ts`](src/registry.ts) | `BackendRegistry`：名称 → 后端表、注册资源释放函数 |
+| [`src/backend.ts`](src/backend.ts) | 后端约定：分面、单元、`UNIT_NAME_RE` |
+| [`src/error.ts`](src/error.ts) | 枢纽与每个后端共享的 `StorageError` 代码 |
+| [`tests/contract.ts`](tests/contract.ts) | 针对每个后端运行的共享一致性套件 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the hub's view is not enough: the subsystem reference is the authoritative contract, and the Agent Note records the family design and its deferred work.
+当枢纽视角不够用时阅读以下页面：子系统参考是权威约定，Agent Note 记录了家族设计与延期工作。
 
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the backend contract, domain semantics, change events, and generated API.
-- [Storage package map](../README.md) — the family's packages and their repository position.
-- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the design behind the hub, the domain form, and the session-backend migration.
+- [存储子系统](../../../docs/subsystems/storage.zh.md)——后端约定、领域语义、变更事件与生成的 API。
+- [存储包映射](../README.zh.md)——家族的各包及其在仓库中的位置。
+- [领域 KV 存储 Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)——枢纽、领域数据形式与会话后端迁移背后的设计。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Backend and form registrations
+### 后端与形式注册
 
-#### What the model sees
+#### 模型看到什么
 
-Nothing. `ctx.storage` is a host-side registration table: the hub registers no tools, injects no prompts, and writes no session events, so no request field ever carries this package's data.
+无。`ctx.storage` 是宿主侧注册表：枢纽不注册工具、不注入提示词，也不写入会话事件，因此任何请求字段都不会携带本包的数据。
 
-#### Token effect
+#### Token 影响
 
-Zero direct tokens on every request.
+每次请求都不会直接增加 token。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Independent of live requests: the hub never touches a request prefix, so it cannot invalidate provider cache reuse.
+与实时请求相互独立：枢纽绝不触碰请求前缀，因此无法使提供方缓存复用失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the hub cannot do. They are current package constraints, not a task backlog.
+这些限制定义了枢纽不能做什么。它们是当前包约束，不是任务积压。
 
-- **`kv` is the only data shape** — a backend implements one facet; the `log` facet for session event logs is deferred to the session-backend migration ([Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md)).
-- **Forms resolve lazily** — reading `ctx.storage.domain` before the domain plugin mounts throws `form-not-mounted`; assemblies order plugins accordingly rather than silently deferring.
+- **`kv` 是唯一的数据形状**——后端只实现一个分面；面向会话事件日志的 `log` 分面被推迟到会话后端迁移（[Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)）。
+- **数据形式按需解析**——在领域插件挂载前读取 `ctx.storage.domain` 会抛出 `form-not-mounted`；组装会按相应顺序排列插件，而不是静默推迟。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

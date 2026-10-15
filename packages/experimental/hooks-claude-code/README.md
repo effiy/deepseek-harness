@@ -1,39 +1,39 @@
 ---
-description: "Run your existing Claude Code hooks.json or settings hook config during agent runs — block prompts and tools, attach context, or force continuation — for users and maintainers of the bridge."
+description: "在 agent 运行期间使用你现有的 Claude Code hooks.json 或 settings 钩子配置——阻塞提示词与工具、附加上下文或强制继续——供本桥接的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-hooks-claude-code
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-hooks-claude-code` runs command hooks from your existing Claude Code `hooks.json` or settings file during agent runs, without requiring a rewrite. Supported hooks can run when sessions, prompts, tools, stops, or subagents reach matching moments. They can block prompts or tool calls with model-visible reasons, add conversation context, or force another model turn. Choose this package to reuse Claude Code command hooks in the harness; use a native plugin for behavior that has no Claude Code equivalent.
+`dsh-hooks-claude-code` 在 agent（智能体）运行期间执行你现有 Claude Code `hooks.json` 或 settings 文件中的 command 钩子，无需重写。受支持的钩子会在会话、提示词、工具、停止或 subagent 到达对应时刻时运行。它们可以带模型可见的原因阻塞提示词或工具调用、添加对话上下文，或强制模型再执行一个轮次。需要在 harness 中复用 Claude Code command 钩子时选择本包；没有 Claude Code 对应物的行为应使用原生插件。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Hook processes and their payload `cwd` use the Session's current working directory when each hook point starts. `CLAUDE_PROJECT_DIR` follows it unless `projectDir` is configured. `SubagentStop` reads the child's final committed directory after disposal; it cannot recover a missing directory or mutate that Session, and a failed stop hook is warned.
+每个钩子事件开始时，钩子进程及其载荷中的 `cwd` 均使用 Session 的当前工作目录。未配置 `projectDir` 时，`CLAUDE_PROJECT_DIR` 同样使用该目录。`SubagentStop` 在子智能体释放后读取其最终已提交的目录；它不能恢复缺失目录或修改该 Session，停止钩子失败时会发出警告。
 
-Mount this package, point `configPath` at your hook config, and the hooks you already have start firing at the corresponding moments in agent runs. There is nothing else to set up before the first hook works.
+挂载本包并把 `configPath` 指向你的钩子配置，你已有的钩子就会在 agent 运行中的对应时刻开始触发。在第一个钩子生效之前无需其他设置。
 
-### When to choose it
+### 何时选择
 
-Use it when you own a Claude Code `hooks.json` (or a settings file whose `hooks` key holds the config) and its command hooks should gate prompts, tools, and turns. Skip it for behavior with no Claude Code equivalent: a native plugin has the full harness API, while this bridge runs only the reference tool's command-hook subset.
+当你持有 Claude Code `hooks.json`（或 `hooks` key 存放配置的 settings 文件）、且其中的 command 钩子需要把关提示词、工具与轮次时，使用它。没有 Claude Code 对应物的行为请跳过它：原生插件拥有完整的 harness API，而本桥接只运行参考工具的 command hook 子集。
 
-### Smallest working setup
+### 最小配置
 
 ```yaml
 - name: '@deepseek-ai/dsh-hooks-claude-code'
@@ -43,153 +43,153 @@ Use it when you own a Claude Code `hooks.json` (or a settings file whose `hooks`
     projectDir: .
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `configPath` | required | Path to a `hooks.json` or a settings file whose `hooks` key holds the config |
-| `pluginRoot` | — | Replaces `${CLAUDE_PLUGIN_ROOT}` in command strings |
-| `projectDir` | session workspace | Replaces `${CLAUDE_PROJECT_DIR}` and sets the `CLAUDE_PROJECT_DIR` env var |
-| `defaultTimeoutMs` | `600,000` | Per-hook timeout when a hook sets none (the Claude Code default) |
-| `stderrSummaryMaxChars` | `500` | Character cap on the persisted `hook/result` stderr summary |
+| `configPath` | 必填 | `hooks.json` 或 `hooks` key 存放配置的 settings 文件路径 |
+| `pluginRoot` | — | 替换命令字符串中的 `${CLAUDE_PLUGIN_ROOT}` |
+| `projectDir` | 会话工作区 | 替换 `${CLAUDE_PROJECT_DIR}` 并设置 `CLAUDE_PROJECT_DIR` 环境变量 |
+| `defaultTimeoutMs` | `600,000` | hook 未设置时的每 hook 超时（即 Claude Code 默认值） |
+| `stderrSummaryMaxChars` | `500` | 持久化 `hook/result` stderr 摘要的字符上限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-hooks-claude-code) is the exhaustive source for every accepted field.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-hooks-claude-code)是每个受支持字段的穷尽式真源。
 
-### What your hooks can do
+### 你的钩子能做什么
 
-| Your hook | When it runs | What it can do |
+| 你的钩子 | 运行时机 | 能做什么 |
 |---|---|---|
-| `SessionStart` | when a session starts | attach context the model sees in that session |
-| `UserPromptSubmit` | when the agent receives a prompt | block the prompt, or attach extra context |
-| `PreToolUse` | before a tool runs | block the tool, or ask for approval before it runs |
-| `PostToolUse` | after a tool runs | block the result with feedback, or attach extra context |
-| `Stop` | when the run is about to stop | force another step with a reason |
-| `SubagentStart` | when a subagent starts | attach context to a still-running subagent (in-process only) |
-| `SubagentStop` | when a subagent ends | observe only — cannot block or add context |
+| `SessionStart` | 会话开始时 | 附加该会话中模型可见的上下文 |
+| `UserPromptSubmit` | agent 收到提示词时 | 阻塞提示词，或附加上下文 |
+| `PreToolUse` | 工具运行前 | 阻塞工具，或在运行前请求批准 |
+| `PostToolUse` | 工具运行后 | 带反馈阻塞结果，或附加上下文 |
+| `Stop` | 运行即将停止时 | 带原因强制再执行一步 |
+| `SubagentStart` | subagent 启动时 | 向仍在运行的 subagent 附加上下文（仅限同进程） |
+| `SubagentStop` | subagent 结束时 | 只观测——不能阻塞或添加上下文 |
 
-### How hooks run and fail
+### 钩子如何运行与失败
 
-- Hooks run in the agent's current Session directory; `pwd`, payload `cwd`, and relative paths agree.
-- `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PROJECT_DIR}` in command strings are replaced from your config, and `CLAUDE_PROJECT_DIR` is set for every hook process.
-- One config applies to the whole process: it is read once at startup, and a relative `configPath` resolves from the directory that launched the process.
-- Hooks on the same event run one after another, in config order.
-- If the config cannot be read or parsed, the bridge logs a warning and runs no hooks — the agent still starts.
-- A hook that fails to run (a bad command or a crash) is logged, and the agent continues.
+- 钩子在 agent 的 Session 当前目录中运行；`pwd`、载荷中的 `cwd` 与相对路径保持一致。
+- 命令字符串中的 `${CLAUDE_PLUGIN_ROOT}` 与 `${CLAUDE_PROJECT_DIR}` 会按你的配置替换，且每个钩子进程都会设置 `CLAUDE_PROJECT_DIR`。
+- 一份配置应用于整个进程：启动时只读取一次，相对 `configPath` 从启动进程的目录解析。
+- 同一事件上的钩子按配置顺序逐个运行。
+- 如果配置无法读取或解析，桥接会记录警告且不运行任何钩子——agent 仍会启动。
+- 运行失败的钩子（命令错误或崩溃）会被记录，agent 继续运行。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the bridge and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释桥接背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Hook point mapping
+### Hook 点映射
 
-Each supported event programs against one harness extension point: `SessionStart` adds context through awaited `agent/created` initialization before the first turn, `UserPromptSubmit` and `PreToolUse` are waterfalls that can reject the incoming action (`agent/pre-step`, `tools/pre-execute`), `PostToolUse` is a waterfall that can block with feedback or add context to the downstream decision (`tools/post-execute`), and `Stop` is a serial listener whose blocking result forces another step through `steer()` (`agent/turn-stopping`). The two subagent events emit into the child lifecycle (`subagent/start`, `subagent/end`): start injects context into a live in-process child, stop observes only. Context-only hooks always delegate via `next()` before folding a sourced message into the downstream decision, so a later listener can still reject or rewrite; blocking decisions map to `deny` (`ask` for `PreToolUse`). The per-event wiring lives in [`src/index.ts`](src/index.ts).
+每个受支持事件都面向一个 harness 扩展点：`SessionStart` 在首个轮次前通过需等待的 `agent/created` 初始化加入上下文，`UserPromptSubmit` 与 `PreToolUse` 是能拒绝传入动作的 waterfall（瀑布式事件）（`agent/pre-step`、`tools/pre-execute`），`PostToolUse` 是能带反馈阻塞或向下游决策添加上下文的 waterfall（`tools/post-execute`），`Stop` 是串行监听器，其阻塞结果通过 `steer()` 强制再执行一步（`agent/turn-stopping`）。两个 subagent 事件面向 child 生命周期发射（`subagent/start`、`subagent/end`）：start 向仍在运行的同进程 child 注入上下文，stop 只观测。仅提供上下文的 hook 总是先通过 `next()` 委托，再把带来源的消息折叠进下游决策，因此后续监听器仍可拒绝或改写；阻塞决策映射为 `deny`（`PreToolUse` 为 `ask`）。逐事件接线位于 [`src/index.ts`](src/index.ts)。
 
-### Payloads and environment
+### 载荷与环境
 
-The bridge builds each event's stdin payload from a base of `session_id`, string-shaped `transcript_path`, `cwd`, and `hook_event_name` plus per-event fields. `transcript_path` stays in the payload for compatibility but is always `''`: the persistence seam exposes no artifact paths, and the default Zstandard-compressed session log is not readable by hook scripts. `CLAUDE_PROJECT_DIR` defaults per-run to the session workspace when `projectDir` is omitted, matching the directory the hook runs in; `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PROJECT_DIR}` substitution happens at config parse time.
+桥接从 `session_id`、字符串形态的 `transcript_path`、`cwd` 与 `hook_event_name` 的基础字段加逐事件字段构建每个事件的 stdin payload。`transcript_path` 出于兼容性保留在 payload 中，但始终为 `''`：持久化 seam 不暴露产物路径，且默认使用 Zstandard 压缩的会话日志无法被 hook 脚本读取。省略 `projectDir` 时，`CLAUDE_PROJECT_DIR` 按次默认到会话工作区，与钩子运行的目录一致；`${CLAUDE_PLUGIN_ROOT}` 与 `${CLAUDE_PROJECT_DIR}` 替换在配置解析时进行。
 
-### Matcher subjects and serial execution
+### Matcher subject 与串行执行
 
-The matcher subject is the tool name (`PreToolUse` / `PostToolUse`), the session source (`SessionStart`), or the constant `agent_type` `general-purpose` (`SubagentStart` / `SubagentStop` — the subagent seam carries no per-kind label); `UserPromptSubmit` and `Stop` ignore matchers. Matched hooks run serially in config order, which keeps each hook's `hook/invoked` / `hook/result` pair adjacent in the log, and the most-restrictive fold is order-independent (`deny > ask > allow`).
+matcher subject 是工具名称（`PreToolUse`／`PostToolUse`）、会话源（`SessionStart`），或常量 `agent_type` `general-purpose`（`SubagentStart`／`SubagentStop`——subagent seam 不携带每 kind 标签）；`UserPromptSubmit` 与 `Stop` 忽略 matcher。匹配 hook 按配置顺序串行运行，这使每个 hook 的 `hook/invoked`／`hook/result` 对在日志中相邻，且最严格折叠与顺序无关（`deny > ask > allow`）。
 
-### Detached runs and disposal
+### 脱离运行与释放
 
-The three emit points (`SessionStart`, `SubagentStart`, `SubagentStop`) run detached — no extension point awaits them. Each run chain is tracked, and disposing the bridge aborts still-running hook processes, then drains the continuations before the dispose resolves (`createDetachedRuns` in `dsh-hook-protocol`).
+三个 emit 点（`SessionStart`、`SubagentStart`、`SubagentStop`）以脱离方式运行——没有扩展点等待它们。每条运行链都会被跟踪，对桥接执行 dispose（资源释放）时会中止仍在运行的 hook 进程，并在 dispose 完成前排空 continuation（`createDetachedRuns`，位于 `dsh-hook-protocol`）。
 
-### Design philosophy
+### 设计理念
 
-- **A compatibility adapter, not a power tool.** The bridge exists to run the explicitly supported command-hook subset of an existing Claude Code config; bespoke behavior belongs in a native plugin on the same extension points.
-- **Adding context is not a veto.** A context-only hook delegates via `next()` before folding its message into a downstream enter decision, so a later `agent/pre-step` or `tools/post-execute` listener can still reject or rewrite.
-- **Containment at every failure.** Config read/parse failures and invalid matchers register nothing; a throwing detached inject is caught and logged instead of breaking session boot or the loop.
-- **Dispose reaches quiescence.** Detached runs are tracked and drained on disposal so no hook process or late callback outlives the fiber.
-- **Serial, not concurrent.** Matched hooks run serially in config order: each `hook/invoked` / `hook/result` pair stays adjacent in the log, and the decision fold is order-independent, so the outcome matches the reference engines' concurrent launch at the cost of serialized latency.
+- **兼容适配器，而非强力工具。** 桥接的存在意义是运行现有 Claude Code 配置中显式受支持的 command hook 子集；定制行为应放在同一批扩展点上的原生插件中。
+- **添加上下文不是否决。** 仅提供上下文的 hook 会先通过 `next()` 委托，再把其消息折叠进下游 enter 决策，因此后续 `agent/pre-step` 或 `tools/post-execute` 监听器仍可拒绝或改写。
+- **每个失败点都受控。** 配置读取／解析失败与无效 matcher 不注册任何内容；抛异常的脱离注入会被捕获并记录，而不是破坏会话启动或循环。
+- **dispose 必须达到完全停稳。** 脱离运行会被跟踪并在释放时排空，因此不会有 hook 进程或迟到回调超出 fiber 存活。
+- **串行而非并发。** 匹配 hook 按配置顺序串行运行：每个 `hook/invoked`／`hook/result` 对在日志中保持相邻，且决策折叠与顺序无关，因此结果与参考引擎的并发启动一致，代价是串行化的延迟。
 
-The [hook-bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) records the bridge design and the deferred gaps; the [hook-protocol-lib Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md) records the shared-versus-per-dialect split.
+[hook-bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) 记录了桥接设计与延期缺口；[hook-protocol-lib Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md) 记录了共享与逐方言的划分。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config validation, listener registration, per-event payloads, decision mapping |
-| [`src/config.ts`](src/config.ts) | Claude Code config parsing: supported events, matcher validation, command substitution |
+| [`src/index.ts`](src/index.ts) | 插件入口：配置校验、监听器注册、逐事件 payload、决策映射 |
+| [`src/config.ts`](src/config.ts) | Claude Code 配置解析：受支持事件、matcher 校验、命令替换 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the shared protocol to the bridge design and the extension points it programs against.
+当包级约定不够用时阅读以下页面。它们从共享协议进入桥接设计，以及桥接所面向的扩展点。
 
-- [Hooks group map](../README.md) — the sibling group page and its package table.
-- [Hook protocol library](../hook-protocol/README.md) — the shared hook rules this bridge applies.
-- [Hook bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) — the bridge design, decision mapping, and deferred gaps.
-- [Interception extension-points reference](../../../docs/tool-execution-pipeline.md) — the typed-Decision surface the bridge maps onto.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-hooks-claude-code) — every accepted config field and its source declaration.
+- [hooks 组地图](../README.zh.md)——同级组页面及其包表。
+- [hook 协议库](../hook-protocol/README.zh.md)——本桥接应用的共享钩子规则。
+- [钩子桥接 Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md)——桥接设计、决策映射与延期缺口。
+- [拦截扩展点 参考](../../../docs/tool-execution-pipeline.zh.md)——桥接所映射的类型化 Decision 接口面。
+- [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-hooks-claude-code)——每个受支持配置字段及其源声明。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Hook-provided context
+### Hook 提供的上下文
 
-#### What the model sees
+#### 模型看到什么
 
-`SessionStart`, accepted prompt, post-tool, and live in-process subagent-start hooks can add source-attributed context messages; a blocking `Stop` hook adds its reason as next-step steering. Remote-child injection has no local target.
+`SessionStart`、已接受提示词、工具后与实时同进程 subagent-start hook 可以添加带源归因的上下文消息；阻塞 `Stop` hook 将原因添加为下一步 steering（中途引导）。远程 child 注入没有本地目标。
 
-#### Token effect
+#### Token 影响
 
-No cost when hooks return no context. Hook text is data-dependent, logged, and resent in later conversation requests until compaction.
+hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记录，并在后续会话请求中重发，直到压缩（compaction）。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-### Blocked prompt or tool outcome
+### 已阻塞提示词或工具结果
 
-#### What the model sees
+#### 模型看到什么
 
-Provider-supplied reasons pass through verbatim. When absent, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`; a blocked prompt is discarded with no model-visible message, ending the turn as `blocked`. `systemMessage` and `updatedInput` are logged or warned but are not model-visible in this implementation.
+提供方提供的原因逐字传递。缺失原因时，已拒绝工具变为 `Error: blocked by PreToolUse hook`，已阻塞工具后反馈精确为 `blocked by PostToolUse hook`，阻塞 stop 则精确添加 steering `continue: blocked by Stop hook`；已阻塞提示词不会产生任何模型可见消息，而是以 `blocked` 结束该轮次。`systemMessage` 与 `updatedInput` 会被记录或警告，但在此实现中对模型不可见。
 
-#### Token effect
+#### Token 影响
 
-Blocking a prompt removes that prompt's request tokens; denial or feedback adds the retained fallback or provider text; forced continuation pays another full request.
+阻塞提示词不会产生该提示词对应的模型请求 token；拒绝或反馈会添加保留的回退或提供方文本；强制 continuation 需要另一个完整请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-A blocked prompt sends no request and invalidates nothing. Denial, feedback, and forced-continuation context append after the reusable prefix without rewriting it.
+已阻塞提示词不发送请求，不会导致失效。拒绝、反馈与强制 continuation 上下文会追加在可复用前缀之后，不改写前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what your Claude Code hooks cannot do through this bridge yet, and where behavior differs from the reference tool. They are current package constraints, not a task backlog.
+这些限制描述你的 Claude Code 钩子目前还无法通过本桥接做到的事情，以及行为与参考工具的差异。它们是当前包约束，而非任务积压。
 
-- **Unsupported hook events (23 of Claude Code's current 30)** — `Setup`, `InstructionsLoaded`, `UserPromptExpansion`, `MessageDisplay`, `PermissionRequest`, `PostToolUseFailure`, `PostToolBatch`, `PermissionDenied`, `Notification`, `TaskCreated`, `TaskCompleted`, `StopFailure`, `TeammateIdle`, `ConfigChange`, `CwdChanged`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`, `PreCompact`, `PostCompact`, `SessionEnd`, `Elicitation`, and `ElicitationResult`. Config for these events is ignored before group parsing, so an unsupported event cannot invalidate or register hooks. The comparison baseline is Claude Code's [official hook-event reference](https://code.claude.com/docs/en/hooks#hook-events).
-- **`SessionStart` is partial** — JSON `additionalContext` is consumed, but plain stdout context, `initialUserMessage`, `sessionTitle`, `watchPaths`, `reloadSkills`, and `CLAUDE_ENV_FILE` are unsupported. The hook runs detached, so context can miss the first request, and the payload omits optional fields such as `model`, `agent_type`, and `session_title`.
-- **`UserPromptSubmit` is partial** — blocking and JSON `additionalContext` work, but plain stdout context, `sessionTitle`, and `suppressOriginalPrompt` are unsupported. Unless overridden, the bridge also uses its 600-second default instead of Claude Code's event-specific 30-second command timeout.
-- **`PreToolUse` is partial** — `deny` and `ask` decisions work; `allow` does not pre-approve, `defer` is unsupported, `additionalContext` is ignored, and `updatedInput` is logged + warned but not honored ([the pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)).
-- **`PostToolUse` is partial** — blocking feedback and JSON `additionalContext` work, but `updatedToolOutput` and `updatedMCPToolOutput` are unsupported and `tool_response` is flattened to text.
-- **`SubagentStart` and `SubagentStop` are partial** — both report a constant `agent_type` of `general-purpose` and use the child session id where Claude Code reports the parent session. Start context is best-effort and can only reach a live in-process child; stop is observe-only and cannot block the subagent or feed it context. Stop omits `agent_transcript_path`, `last_assistant_message`, `background_tasks`, and `session_crons` and always reports `stop_hook_active: false`.
-- **`Stop` is partial** — blocking forces another model turn, but `stop_hook_active` is always `false`, `last_assistant_message`, `background_tasks`, and `session_crons` are omitted, and the consecutive-block cap is not implemented. An unconditionally blocking hook therefore force-continues every step unless it self-limits.
-- **Common payload and output fields are partial** — mapped event payloads omit `prompt_id`, `permission_mode`, and `effort` where Claude Code would provide them, and `transcript_path` is never populated: it is always the empty string, because the persistence seam exposes no artifact paths and the default Zstandard-compressed session log is not readable by hook scripts. `systemMessage` is logged + warned but not surfaced; `{"continue": false}` is recorded but does not halt the run; `suppressOutput`, `stopReason`, and `terminalSequence` are not applied.
-- **Handler and config support is partial** — only shell-form command handlers run. `http`, `mcp_tool`, `prompt`, and `agent` handlers are skipped; command-handler options such as `args`, `async`, `asyncRewake`, `shell`, `if`, `once`, and `statusMessage` are not honored. Matching handlers run serially and are not deduplicated, whereas Claude Code runs them in parallel and deduplicates identical handlers. One process-level `configPath` is parsed once at load; Claude Code's layered project, user, plugin, and policy discovery and live reload are not implemented.
+- **不支持的 hook 事件（Claude Code 当前 30 项中的 23 项）**——`Setup`、`InstructionsLoaded`、`UserPromptExpansion`、`MessageDisplay`、`PermissionRequest`、`PostToolUseFailure`、`PostToolBatch`、`PermissionDenied`、`Notification`、`TaskCreated`、`TaskCompleted`、`StopFailure`、`TeammateIdle`、`ConfigChange`、`CwdChanged`、`FileChanged`、`WorktreeCreate`、`WorktreeRemove`、`PreCompact`、`PostCompact`、`SessionEnd`、`Elicitation` 与 `ElicitationResult`。这些事件的配置会在配置组解析前被忽略，因此不支持的事件既不会使配置失效，也不会注册 hook。比较基线是 Claude Code [官方 hook 事件参考](https://code.claude.com/docs/en/hooks#hook-events)。
+- **`SessionStart` 只支持部分功能**——会消费 JSON `additionalContext`，但不支持纯 stdout 上下文、`initialUserMessage`、`sessionTitle`、`watchPaths`、`reloadSkills` 与 `CLAUDE_ENV_FILE`。hook 脱离运行，因此上下文可能错过第一个请求，payload 会省略 `model`、`agent_type` 与 `session_title` 等可选字段。
+- **`UserPromptSubmit` 只支持部分功能**——支持阻塞与 JSON `additionalContext`，但不支持纯 stdout 上下文、`sessionTitle` 与 `suppressOriginalPrompt`。除非被覆盖，否则桥接还会使用自身 600 秒默认值，而非 Claude Code 的事件特定 30 秒 command 超时。
+- **`PreToolUse` 只支持部分功能**——`deny` 与 `ask` 决策可用；`allow` 不会预审批，`defer` 不受支持，`additionalContext` 会被忽略，`updatedInput` 会被记录 + 警告但不应用（见 [pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.zh.md)）。
+- **`PostToolUse` 只支持部分功能**——支持阻塞反馈与 JSON `additionalContext`，但不支持 `updatedToolOutput` 与 `updatedMCPToolOutput`，`tool_response` 会展平为文本。
+- **`SubagentStart` 与 `SubagentStop` 只支持部分功能**——两者均报告常量 `agent_type` `general-purpose`，并在 Claude Code 报告父会话的位置使用 child 会话 id。Start 上下文是尽力而为，且只能到达仍在运行的同进程 child；stop 只观测，无法阻塞 subagent 或向其提供上下文。Stop 省略 `agent_transcript_path`、`last_assistant_message`、`background_tasks` 与 `session_crons`，并始终报告 `stop_hook_active: false`。
+- **`Stop` 只支持部分功能**——阻塞会强制另一个模型轮次，但 `stop_hook_active` 始终为 `false`，会省略 `last_assistant_message`、`background_tasks` 与 `session_crons`，且未实现连续阻塞上限。因此，无条件阻塞 hook 会在每个步骤中强制 continuation，除非它自我限制。
+- **通用 payload 与输出字段只支持部分功能**——已映射事件会省略 Claude Code 原本会提供的 `prompt_id`、`permission_mode` 与 `effort`，且 `transcript_path` 永不填充：它始终为空字符串，因为持久化 seam 不暴露产物路径，且默认使用 Zstandard 压缩的会话日志无法被 hook 脚本读取。`systemMessage` 会被记录 + 警告但不呈现；`{"continue": false}` 会被记录但不会停止运行；`suppressOutput`、`stopReason` 与 `terminalSequence` 不会被应用。
+- **Handler 与配置只支持部分功能**——只运行 shell 形态 command handler。会跳过 `http`、`mcp_tool`、`prompt` 与 `agent` handler；`args`、`async`、`asyncRewake`、`shell`、`if`、`once` 与 `statusMessage` 等 command handler 选项不会被遵循。匹配 handler 串行运行且不去重，而 Claude Code 会并行运行并对相同 handler 去重。一个进程级 `configPath` 会在加载时解析一次；尚未实现 Claude Code 的分层项目、用户、插件与策略发现以及实时重新加载。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-The deferred gaps above are the working queue: per-session hook-config discovery, a session-start delivery gate, a stop loop-guard, and a run-level halt for `continue: false`. None has a design yet; the official Claude Code reference is the baseline for closing any of them.
+上面的延期缺口就是工作队列：按会话的 hook 配置发现、会话启动投递门、stop 循环防护，以及 `continue: false` 的运行级停止。目前均无设计；官方 Claude Code 参考是实现其中任何一项的基线。
 
 </details>

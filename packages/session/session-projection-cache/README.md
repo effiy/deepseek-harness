@@ -1,41 +1,41 @@
 ---
-description: "The persisted session-projection cache for deployments and maintainers choosing, configuring, or debugging durable checkpoints, zero-I/O list reads, and accelerated cold projection folds."
+description: "面向部署方与维护者的持久会话投影缓存说明，用于选择、配置或排查持久检查点、零 I/O 列表读取与加速的冷投影折叠。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-projection-cache
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This package keeps durable per-session projection checkpoints so history lists, statistics, and goal snapshots can read cached values without loading each session log. Cold projection folds can resume after the checkpointed prefix, reducing restart work. The session log remains authoritative: a crash can leave a checkpoint stale, but never ahead of committed events, and incompatible records are ignored or backed up. Choose it for restarted sessions with frequent projection reads; skip it when projections are live-only or extra storage writes and unbounded checkpoint retention outweigh the saved work.
+本包保存持久的逐会话投影检查点，让历史列表、统计信息与 goal 快照无需加载每个会话日志即可读取缓存值。冷投影折叠可从已检查点化的前缀之后继续，从而减少重启后的工作量。会话日志始终是权威：崩溃可能使检查点陈旧，但不会使其领先于已提交事件；不兼容记录会被忽略或备份。当重启的会话需要频繁读取投影时选择本包；当投影只服务活会话，或额外存储写入与无限增长的检查点保留成本超过节省的工作量时跳过本包。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this package beside the projection registry and the storage stack when clients should list projection values for cold sessions without loading their logs. Without it, consumers must obtain the log before they can reconstruct cold projection values.
+当客户端应在不加载日志的情况下列出冷会话投影值时，把本包与投影注册表及存储栈一起挂载。没有它时，消费方必须先取得日志，才能重建冷投影值。
 
-### When to choose it
+### 何时选择
 
-Choose it when a deployment restarts sessions and needs durable projection values for history lists, statistics, or goal snapshots. Skip it when projections serve only live sessions, or when the extra storage writes cost more than the saved projection work.
+当部署会重启会话，并需要为历史列表、统计信息或 goal 快照提供持久投影值时，选择本包。当投影只服务活会话，或额外存储写入的成本高于所节省的投影工作时，跳过本包。
 
-### Minimal configuration
+### 最小配置
 
-Both throttle fields are required — flush cadence is a deployment choice with no universally correct value:
+两个节流字段均必填——写入节奏是部署选择，没有普适正确值：
 
-The cache opens its domain through the storage stack, so base mounts `storage`, `storage-json` (root `dshHomePath('storages')`), and `storage-domain` (`backend: json`) before it:
+缓存通过存储栈打开自己的域，因此 base 先挂 `storage`、`storage-json`（根 `dshHomePath('storages')`）与 `storage-domain`（`backend: json`）：
 
 ```yaml
 - id: session-projection-cache
@@ -45,96 +45,96 @@ The cache opens its domain through the storage stack, so base mounts `storage`, 
     writeIntervalMs: 5000
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `writeEveryEvents` | required | Committed events per session that force a durable checkpoint write between mandatory points |
-| `writeIntervalMs` | required | Longest time a dirty checkpoint may stay unwritten between mandatory points |
+| `writeEveryEvents` | 必填 | 在各必写点之间强制一次持久检查点写入的每会话已提交事件数 |
+| `writeIntervalMs` | 必填 | 各必写点之间脏检查点最长可保持未写入的时间 |
 
-The plugin injects `storageDomain`, `sessionProjections`, and `sessions`. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-projection-cache) is the exhaustive source for every accepted field and its JSDoc.
+本插件注入 `storageDomain`、`sessionProjections` 与 `sessions`。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-session-projection-cache)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### How checkpoints are written
+### 检查点如何写入
 
-Three mandatory points always write: session creation persists the seed-derived cut, `turn/end` persists the value that listing reads want, and session disposal persists the final live cut. Between them, the configured count and interval throttles write as events accumulate. Every write atomically replaces the session's complete record through the domain write chain; a failure logs a warning and keeps the cache stale, and the next write self-heals.
+三个必写点总是写入：会话创建保存由种子派生的切面，`turn/end` 保存列表读取所需的轮次终值，会话释放保存活会话的最终切面。其间，配置的条数与间隔节流随事件累积写入。每次写入通过领域写入链以原子方式替换该会话的完整记录；失败会记录警告并让缓存保持陈旧，后续写入会自行修复。
 
-### Reading cached values
+### 读取缓存值
 
-`cachedSnapshot(meta, keys?)` is the read-only face: it synchronously serves client values from the storage domain's in-memory tables with zero I/O. It accepts a record whose lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`) matches the header and serves its version- and schema-matching keys as one block whose `asOfSeq` is the lowest watermark among the served rows. That watermark is the stored record's own: a header witnesses no inherited cut and cannot vouch that the row sequence is comparable with the log a consumer later opens, so the Session list labels the block `cached` and the client lets every value the connected Session later produces supersede it. Within one format generation the cut is fixed at fork time and distinguishes no lifecycle the other fields do not, and a viewed value never seeds a fold, so seeded (forked) sessions are served exactly like unseeded ones. `cachedPredecessorTitle(meta)` is the narrower listing-only exception across a Session-format edge: a structurally admitted predecessor record whose lifecycle matches may expose only a current-version-compatible `title` row, because title text is invariant across the adjacent edges. All other predecessor rows remain unavailable. `coldSnapshot(meta, inheritedEventCount, events)` is a fold face: it accepts the exact cut with a complete ordered log, skips the checkpointed prefix while folding, and refreshes the record without reading persistence itself.
+`cachedSnapshot(meta, keys?)` 是只读面：以零 I/O 从存储域的内存表同步提供客户端值。它接受生命周期身份（`formatVersion`、`createdAt`、`cwd`、`isSeeded`）与 header 匹配的记录，把其中版本和 schema 均匹配的 key 作为一个 block 提供，其 `asOfSeq` 是所服务各行中最低的水位。这个水位是存储记录自己的：header 作证不了 inherited cut，也作证不了行序号与消费者稍后打开的日志可比，因此 Session list 把该 block 标为 `cached`，客户端让建连后的 Session 产出的任何值覆盖它。在同一格式代内，cut 在 fork 时写死，不能区分其他字段区分不了的生命周期，而只读视图也从不播种 fold，所以 seeded（fork 出来的）会话与 unseeded 会话被同样地提供。`cachedPredecessorTitle(meta)` 是跨 Session 格式 edge 的更窄列表专用例外：生命周期匹配且已通过结构准入的 predecessor record 只能公开与当前版本兼容的 `title` row，因为 title 文本在相邻 edge 之间保持不变。其他 predecessor row 仍不可用。`coldSnapshot(meta, inheritedEventCount, events)` 是 fold 面：接受精确切点与完整有序日志，在折叠时跳过已检查点化的前缀，并在自身不读取持久化层的情况下刷新记录。
 
-### What the cache guarantees
+### 缓存保证什么
 
-The log leads and the cache follows: a live checkpoint flushes the session's buffered events durably before the cache row lands, so a crash can leave the cache behind the log but never ahead of it. Reads and writes share the storage domain's coherent in-memory state; the per-unit write chain mutates memory only after durability. Each version-stamped record must match the live unit schema and the lifecycle identity (`formatVersion`, `createdAt`, `cwd`, `isSeeded`); the fold faces (`hydratePrepared`, `coldSnapshot`, and checkpoint writes) also require the exact `inheritedEventCount`, so a row folded from another Session format generation or fork cut cannot seed the caller. The JSON backend stores each record at `<root>/session_projcache/sessions/<id>.json` in an owner-only directory tree. Domain read validation preserves every own JSON key in checkpoint values, including `__proto__` and `constructor` inside opaque metadata. It rejects values that cannot survive a lossless JSON round trip, using the same rules as checkpoint writes. Each projection then validates its hydration state with its own `stateSchema`; fields carrying opaque JSON need a validator that preserves their keys.
+日志领先，缓存跟随：活会话检查点先把会话的缓冲事件持久化，然后才保存缓存记录。因此崩溃可能让缓存落后于日志，但绝不会让缓存领先。读取和写入共享存储域内一致的内存状态；逐单元写入链只在持久化成功后修改内存。每个带版本戳的记录必须匹配当前运行单元的 schema 与生命周期身份（`formatVersion`、`createdAt`、`cwd`、`isSeeded`）；fold 面（`hydratePrepared`、`coldSnapshot` 与检查点写入）还要求精确的 `inheritedEventCount`，因此从另一会话格式代或 fork 切点折叠出的行不能播种调用方。JSON 后端把每条记录存于仅所有者可访问的 `<root>/session_projcache/sessions/<id>.json` 目录树中。Domain 读取校验保留检查点值中的所有自有 JSON 键，包括不透明元数据中的 `__proto__` 与 `constructor`。它拒绝无法无损完成 JSON 往返的值，并与检查点写入使用相同规则。随后，每个 projection 用自己的 `stateSchema` 校验 hydration 状态；承载不透明 JSON 的字段需要使用保留其键的校验器。
 
-Upgrades never block startup or expose an unproven fold. Records stamped with a version in the spec's `compatibleVersions` remain structurally readable for a current checkpoint rewrite, but a missing or older `formatVersion` never matches a current Session and therefore cannot seed hydration. A lifecycle-matching predecessor title remains available only through the listing hint above because title text is invariant across the adjacent Session-format edges and its row still passes the current projection `stateVersion` and schema. Once the format matches, absent lineage fields decode as the unseeded lineage — exact for unseeded sessions, while a seeded caller fails the identity match and refolds cold. A stored record that still fails schema validation is moved aside as `<id>.json.bak.<stamp>` under the domain's `invalidRecords: 'backup-and-skip'` policy, logged with its cause, and rebuilt by the next checkpoint.
+升级绝不拖垮启动，也不会暴露未经证明的折叠结果。版本戳落在 spec `compatibleVersions` 集合内的记录仍可被结构化读取并等待当前检查点重写，但缺失或更旧的 `formatVersion` 绝不匹配当前 Session，因此不能作为 hydrate seed。生命周期匹配的 predecessor title 只能通过上述列表 hint 读取，因为 title 文本在相邻 Session format edge 之间保持不变，并且该 row 仍须通过当前 projection `stateVersion` 与 schema。格式匹配后，缺失的 lineage 字段解码为 unseeded lineage——对非 fork 会话精确无误，seeded 调用方则通不过身份比对、回落冷折叠。仍然通不过 schema 校验的存量记录会按域的 `invalidRecords: 'backup-and-skip'` 策略移出为 `<id>.json.bak.<时间戳>`、连同原因写入日志，并由下一次检查点重建。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the cache's durability and storage ownership; the observable behavior is covered in [Use this package](#use-this-package).
+本节说明缓存的持久性与存储所有权；可观察行为已在[使用本包](#use-this-package)中说明。
 
-### Design concept
+### 设计理念
 
-The cache is a fold shortcut over the projection registry's checkpoint face, stored in a `per-record` domain data table. It commits to six consequences: reads never bypass the domain write chain; every background write is fail-soft; a `ver` mismatch discards rather than migrates a row; a record must pass the live unit's `stateSchema`; writes replace one complete session record through the lossless-JSON boundary; and the log leads, the cache follows.
+缓存是投影注册表检查点接口上的折叠捷径，存于 `per-record` 领域数据表中。它带来六项后果：读取绝不绕过领域写入链；每次后台写入都 fail-soft；`ver` 不匹配时丢弃而不迁移记录；记录必须通过当前运行单元的 `stateSchema`；写入通过无损 JSON 边界替换一份完整会话记录；日志领先，缓存跟随。
 
-### Read and write ownership
+### 读写所有权
 
-The cache stores one version-stamped document per session in the `session_projcache` domain. It does not depend on a session-persistence backend, call `locate`, or inspect per-session directories. A malformed or stale record reads as absent, and consumers that require a cold value own any log refold.
+缓存在 `session_projcache` 领域中为每个会话保存一份带版本戳的文档。它不依赖会话持久化后端，不调用 `locate`，也不检查逐会话目录。畸形或陈旧的记录读作不存在；需要冷值的消费方负责提供日志以重新折叠。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `SessionProjectionCache` service, write-behind listeners, cache reads |
-| [`src/spec.ts`](src/spec.ts) | The `session_projcache` domain spec and record identity types |
+| [`src/index.ts`](src/index.ts) | 插件入口：`SessionProjectionCache` 服务、后台写入监听器、缓存读取 |
+| [`src/spec.ts`](src/spec.ts) | `session_projcache` 域 spec 与记录身份类型 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the cache to the registry it checkpoints and the storage domain that holds its records.
+当包级约定不够用时阅读以下页面。它们从缓存逐步进入它检查点化的注册表与保存其记录的存储域。
 
-- [Session projections subsystem](../../../docs/subsystems/session-projection.md) — the projection unit contract and drive semantics this cache checkpoints.
-- [Session projection registry](../session-projection/README.md) — the `ctx.sessionProjections` service whose checkpoints this cache persists.
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the domain routing and backend behavior that store cache records.
-- [Session package map](../README.md) — adjacent persistence, title, and telemetry packages.
-- [Session-projection RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md) — the persisted projection cache design rationale.
+- [会话投影子系统](../../../docs/subsystems/session-projection.zh.md)——本缓存检查点化的投影单元约定与驱动语义。
+- [会话投影注册表](../session-projection/README.zh.md)——本缓存持久化其检查点的 `ctx.sessionProjections` 服务。
+- [存储子系统](../../../docs/subsystems/storage.zh.md)——保存缓存记录的领域路由与后端行为。
+- [会话包映射](../README.zh.md)——相邻的持久化、标题与遥测包。
+- [会话投影 RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md)——持久投影缓存的设计理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the persisted cache accelerates host-side reads of projection state and registers nothing model-facing.
+无，因为持久缓存只加速主机侧的投影状态读取，不注册任何模型可见内容。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; the cache never assembles or sends provider requests.
+无；缓存从不组装或发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define where the cache needs operational care. They are current package constraints, not a task backlog.
+这些限制说明缓存何时需要运维注意。它们是当前包约束，不是任务积压。
 
-- **No eviction or retention surface** — records accumulate per session; pruning stored checkpoints is out-of-band maintenance, same stance as session persistence itself.
-- **Interval throttle is per-session coarse** — the timer arms at the first dirty event after a clean write; a steady sub-threshold trickle writes once per interval, not a sliding window.
-- **No cache-side cold refold** — the cache serves and refreshes its rows but never reads the session log (it does not depend on the persistence layer); a consumer that needs a guaranteed cold snapshot refolds from the log itself.
-- **Every schema or domain-version change must prove its upgrade story** — a change to the stored record schema or the domain version lands in the same PR with an archived fixture of the previously shipped on-disk format under `tests/fixtures/` and test cases in `tests/fixtures.spec.ts` proving the chosen disposition: read-compat recovery (`compatibleVersions`), current-version rewrite, or backup-and-skip salvage. A bump whose old records are simply discarded still proves that the discard neither causes startup to fail nor poisons the tree.
+- **无淘汰或保留接口**——记录按会话持续累积；清理已存储检查点属于带外维护，与会话持久化采用相同策略。
+- **间隔节流采用按会话的粗粒度控制**——一次无脏数据的写入完成后，计时器在首个脏事件到达时启动；持续但低于条数阈值的事件流每间隔写入一次，而非滑动窗口。
+- **缓存侧不做冷重折叠**——缓存只服务并刷新自己的记录，从不读取会话日志，因为它不依赖持久化层；需要保证冷快照的消费方自行从日志重新折叠。
+- **每次 schema 或域版本变更都必须论证升级路径**——改动存储记录 schema 或域版本时，同一 PR 必须在 `tests/fixtures/` 下归档此前已发布磁盘格式的 fixture（测试前置数据），并在 `tests/fixtures.spec.ts` 中用测试论证所选的处置方式：读兼容恢复（`compatibleVersions`）、当前版本重写，或 backup-and-skip 抢救。即便选择直接丢弃旧记录的 bump，也要证明丢弃既不会导致启动失败，也不会污染缓存树。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

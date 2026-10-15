@@ -1,71 +1,71 @@
 ---
-description: "Optional Web profile layer for raw Session logs and Chat node inspection."
+description: "用于原始 Session 日志与聊天节点检查的可选 Web profile 层。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-inspector-profile
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Enable this optional bundle to inspect Session data in the Sidebar and open NodeJS Inspector in the bottom panel. It enables both inspectors and Host fetch capture; the bundle itself is off by default in Plugin Manager.
+启用这个可选组合包，即可在 Sidebar 检查 Session 数据，并在底部面板打开 NodeJS 诊断。组合包启用两个 Inspector 和 Host fetch 采集；组合包自身在插件管理器中默认关闭。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Enable **Developer Tools** in Plugin Manager's official group. This selects `@deepseek-ai/dsh-experimental-inspector-profile` for the current Web profile.
+在插件管理器的官方分组中启用**开发者工具**，即可为当前 Web profile 选择 `@deepseek-ai/dsh-experimental-inspector-profile`。
 
-Open **Session Log** from the Sidebar's new-tab menu or guide. [Session Inspector](../session-inspector/README.md) provides one view with selectable Raw Log and Chat Group presentations; Raw Log is selected initially.
+从 Sidebar 的新建 tab 菜单或引导页打开**会话数据诊断**。[Session Inspector](../session-inspector/README.zh.md) 提供一个视图，可选择原始数据或对话分组展示形式，初始选中原始数据。
 
-Press **Ctrl/Cmd+Shift+.** to open or collapse **NodeJS Inspector** in the bottom panel with the packaged DevTools frontend. Enabling this bundle starts the local debugging backend and unredacted Host fetch capture; no user override or debugging argument is required.
+按 **Ctrl/Cmd+Shift+.** 可展开或收起底部面板中的 **NodeJS 诊断**，使用打包后的 DevTools 前端。启用组合包会启动本地调试后端和未经脱敏的 Host fetch 采集，不需要用户配置覆盖或调试参数。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现内部细节 — 点击展开</summary>
 
-[`cordis.patch.yml`](cordis.patch.yml) enables Session Inspector and the NodeJS Inspector backend with `captureFetch: true`, independently of debugging flags. See the Inspector [README](../inspector/README.md) for debugging and capture behavior. Each plugin owns its behavior and lifetime.
+[`cordis.patch.yml`](cordis.patch.yml) 启用会话数据诊断 和 NodeJS 诊断 后端，并设置 `captureFetch: true`，不依赖调试参数。调试与采集行为见 Inspector [README](../inspector/README.zh.md)。每个插件负责自身行为与生命周期。
 
 </details>
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this bundle mounts developer inspection plugins without contributing model context.
+无，因为本组合包挂载开发者检查插件，不贡献模型上下文。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; the bundle adds no request content.
+无；本组合包不增加请求内容。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **Web only** — the inspection views require the Web application's Session services.
-- **Internal diagnostics** — the component switch remains available, but there is no dedicated Web debugging button. Explicit activation enables unredacted capture and local code execution; see the [security restrictions](../inspector/README.md#security).
+- **仅支持 Web** — 检查视图依赖 Web 应用的 Session 服务。
+- **内部诊断** — 组件开关保持可用，但没有专用 Web 调试按钮。显式启用后会进行未脱敏采集并允许执行本地代码，请参阅[安全限制](../inspector/README.zh.md#security)。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文 — 点击展开</summary>
 
-None.
+无。
 
 </details>

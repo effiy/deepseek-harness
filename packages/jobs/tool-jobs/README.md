@@ -1,187 +1,187 @@
 ---
-description: "The model-facing background-job controls for users and maintainers choosing, configuring, or debugging job_output, job_list, job_kill, and completion notices."
+description: "面向模型的后台任务控制，供选择、配置或排查 job_output、job_list、job_kill 与完成通知的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-jobs
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-tool-jobs` to inspect and control background commands and PTY work through `job_output`, `job_list`, and `job_kill`. Reads can wait within a configured timeout, list results identify each job's kind and status, and cancellation settles only after the work stops. When owned work finishes, the agent receives an in-session notice: busy agents receive it in their next step, while idle agents are woken by a follow-up turn. Configuration controls wait limits, completion delivery, and an optional cap on consecutive wakeups. Stream output is consumed by one reader, and pending notices do not survive owner disposal.
+使用 `dsh-tool-jobs`，可通过 `job_output`、`job_list` 与 `job_kill` 检查和控制后台命令、PTY 工作与 subagent。读取可在配置的超时内等待，列表结果标识各任务的 kind 与状态，而取消只有在工作停止后才结算。归属明确的工作完成时，agent（智能体）会收到会话内通知：繁忙的 agent 在下一步收到通知，空闲的 agent 则由 follow-up 轮次唤醒。配置控制等待上限、完成投递与可选的连续唤醒上限。流输出仅供单一读取方消费，待领通知无法在所有者释放后存活。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Load this plugin in any composition where the agent should start, observe, and stop background jobs: it registers the three tools, attaches the controller producers need, and delivers completion notices. It requires the `ctx.tools`, `ctx.jobs`, and `ctx.systemPrompt` services from the composed harness; completion notices resolve their destination through `ctx.agents`, which every composition with owned jobs already provides.
+在 agent 需要启动、观察和停止后台任务的任何组合中加载本插件：它注册三个工具、附加生产方所需的控制器，并投递完成通知。它需要组合中已提供的 `ctx.tools`、`ctx.jobs` 与 `ctx.systemPrompt` 服务；完成通知经 `ctx.agents` 解析投递目标，凡有归属任务的组合都已提供它。
 
-### The three tools
+### 三个工具
 
-- `job_output(job_id, wait?, timeout_ms?)` — Read a job's output. Stream jobs return only the output since the previous read; final-output jobs return their result after settlement. Every response ends with `[status: ...]`. Reads are non-blocking unless `wait: true`, which waits up to the configured cap and leaves a still-running job alive on timeout. A read renders stdout first and stderr in one `[stderr]` section, notes output that left memory before the read, and carries a job's result (a subagent's answer) exactly once, on the first read after settlement.
-- `job_list()` — List your background jobs with their ids, kinds, and statuses, one per line: `<id> [<kind>] <status> — <label>`.
-- `job_kill(job_id, reason?)` — Request cancellation of a running job immediately; the job settles as `killed` once its work actually stops. A terminal job returns its current snapshot, and the optional reason is recorded and forwarded to the job.
+- `job_output(job_id, wait?, timeout_ms?)`——读取任务输出。流任务只返回自上次读取以来的输出；最终输出任务在结算后返回其结果。每个响应都以 `[status: ...]` 结尾。除非 `wait: true`，否则读取是非阻塞的；`wait: true` 最多等待到配置上限，超时时仍让运行中的任务保持存活。一次读取先渲染 stdout，再把 stderr 放进一段 `[stderr]`，标注读取前已离开内存的输出，并在结算后的第一次读取恰好携带一次任务的结果（subagent 的回答）。
+- `job_list()`——列出你的后台任务及其 id、kind 与状态，每行一个：`<id> [<kind>] <status> — <label>`。
+- `job_kill(job_id, reason?)`——立即请求取消运行中的任务；任务在其工作真正停止后以 `killed` 结算。终止任务返回其当前快照，可选的原因会被记录并转发给任务。
 
-The three tools return `{ text, job }`, `PublicJobSnapshot[]`, and `{ outcome: 'cancellation-requested' | 'already-finished', job }` respectively. A public snapshot carries id, kind, label, status with the live progress line or the terminal detail, and start/finish times, and omits ownership and ring offsets. All three render through generic UI cards: `read` for output and list, `execute` for kill.
+三个工具依次返回 `{ text, job }`、`PublicJobSnapshot[]` 与 `{ outcome: 'cancellation-requested' | 'already-finished', job }`。公共快照携带 id、kind、label、带实时进度行或终态 detail 的状态，以及开始／结束时间，并省略归属与环偏移。三个工具都通过通用 UI 卡片渲染：output 和 list 用 `read`，kill 用 `execute`。
 
-### Completion notices
+### 完成通知
 
-When a job finishes, the owning agent receives `background job <id> (<kind>: <label>) finished [status: ...]. Read its output with job_output.` as an in-session message. A busy agent has the notice injected into its next step — the turn cannot close while the inbox holds it, so several jobs settling together cost one step rather than one turn each. An idle agent is instead woken with a follow-up turn, because an unclaimed notice is a completion the model never learns about. Completions the model already collected get no notice: the registry reports a settlement that released a live `wait` as `awaited` — whether a `job_output` wait or a shell tool waiting on its own foreground command — and the plugin remembers the kills the model requested through `job_kill`; a settlement caused by owner or service teardown is skipped because nobody is left to read it.
+任务完成时，拥有它的 agent 会收到会话内消息 `background job <id> (<kind>: <label>) finished [status: ...]. Read its output with job_output.`。繁忙的 agent 会在下一步收到注入的通知——inbox 尚有内容时轮次无法结束，因此同时结算的多个任务只花掉一步，而不是各占一轮。空闲的 agent 则被一个 follow-up 轮次唤醒，因为无人领取的通知就是模型永远不会知道的完成。模型已经收走的完成不再通知：注册表把释放了存活 `wait` 的结算报告为 `awaited`——无论是 `job_output` 的等待，还是 shell 工具在等待自己的前台命令——插件则记着模型经 `job_kill` 请求的杀停；所有者或服务 teardown 导致的结算会被跳过，因为没有人能读它。
 
-Waking is unbounded by default: an unattended agent that chains background commands and one-shot subagents is woken for every completion. `maxConsecutiveWakes` caps that: each owner may be woken that many times before further notices degrade to injection, and claiming any user-authored message restores the budget. The cap bounds the self-exciting chain — a woken turn may start the background job whose completion wakes it again — but a notice past it waits silently until the next user input, so a session that relies on wakes to finish its work stalls there. `completionDelivery: quiet` keeps even idle owners on the injection lane, which deterministic transcripts need.
+唤醒默认不设上限：无人值守的 agent 连续串起后台命令与一次性 subagent 时，每次完成都会唤醒它。`maxConsecutiveWakes` 可以封顶：每个所有者最多被唤醒这么多次，此后的通知降级为注入；领取任何用户撰写的消息都会恢复预算。上限用来约束自激链——被唤醒的一轮可能启动某个后台任务，而它的完成又会唤醒同一个所有者——但超出上限的通知会静默等到用户下一次输入，依赖唤醒完成工作的会话会停在那里。`completionDelivery: quiet` 让空闲所有者也在注入通道上，确定性 transcript（文本记录）需要的正是这一点。
 
-### Minimal configuration
+### 最小配置
 
-Loading the plugin with no config is the common path; a `waitTimeoutMs` above `maxWaitTimeoutMs` fails at load.
+不带配置加载插件是常用路径；`waitTimeoutMs` 高于 `maxWaitTimeoutMs` 时会在加载时失败。
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-jobs'
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `waitTimeoutMs` | `30,000` | Wait used when `wait: true` omits `timeout_ms` |
-| `maxWaitTimeoutMs` | `600,000` | Cap for model-supplied waits; larger values clamp down to it |
-| `completionDelivery` | `wakeup` | `wakeup` opens a turn on an idle owner; `quiet` leaves the notice pending |
-| `maxConsecutiveWakes` | unset | Turns one owner may open by wake before notices degrade to injection; unset means no cap |
+| `waitTimeoutMs` | `30,000` | `wait: true` 省略 `timeout_ms` 时使用的等待时间 |
+| `maxWaitTimeoutMs` | `600,000` | 模型所给等待时间的上限；更大的值向下收敛到它 |
+| `completionDelivery` | `wakeup` | `wakeup` 为空闲所有者开启一轮；`quiet` 让通知继续待领 |
+| `maxConsecutiveWakes` | 未设置 | 一个所有者可由唤醒开启的轮数，超出后通知降级为注入；未设置即不封顶 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-jobs) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-jobs)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### What can go wrong
+### 可能出什么问题
 
-An agent whose composition loads no `tool-jobs` cannot start background work: this plugin's controller is what arms producers' `ctx.jobs.start()`. A model-supplied wait longer than `maxWaitTimeoutMs` is clamped down to the cap, and a timed-out wait returns `[status: running]` and leaves the job alive rather than failing. A completion notice pending on an idle owner does not survive that owner's disposal.
+组合中未加载 `tool-jobs` 的 agent 无法启动后台工作：本插件的控制器正是生产方 `ctx.jobs.start()` 得以启用所依赖的。模型给出的等待时间超过 `maxWaitTimeoutMs` 时会向下收敛到上限，超时的等待返回 `[status: running]` 并让任务保持存活，而不是失败。待领于空闲所有者的完成通知无法在该所有者释放后存活。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the tools and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释工具背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-- **Kind-independent controls.** The same three tools read, list, and cancel jobs of every producer kind — bash, PTY — because all of them register through the generic `ctx.jobs` runtime.
-- **Delivery is owned here; recipients are the registry's.** The plugin decides how an unreported completion reaches the owner — injected into a busy step, or a woken turn on an idle owner — while the registry routes each settlement to the listeners its owner's scope chain reaches, so a mount under one preset never sees another preset's agents, and an agent reads exactly one notice per completion however many presets are mounted.
-- **Producer-owned output bounds.** When a producer supplies `outputLimitBytes`, the complete model-facing result — output read, terminal kill snapshot, or completion notice — is capped after status and notice metadata are added; producers that omit it keep unbounded behavior.
+- **与 kind 无关的控制。** 同一套三个工具读取、列出和取消每种生产方 kind 的任务——bash、PTY——因为它们都通过通用的 `ctx.jobs` 运行时注册。
+- **投递归本插件，收件人归注册表。** 插件决定未报告的完成如何到达所有者——注入繁忙的一步，或唤醒空闲所有者的一轮——而注册表把每次结算路由给其所有者 scope 链所能抵达的监听器，因此某个 preset 下的挂载永远看不到另一个 preset 的 agent，无论挂载了多少 preset，一个 agent 每次完成都只读到一条通知。
+- **生产方自有的输出上限。** 生产方提供 `outputLimitBytes` 时，完整的模型侧结果——输出读取、终止 kill 快照或完成通知——会在添加状态与通知元数据之后被施加上限；省略该字段的生产方保持无界行为。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: tool registrations, the settlement subscription and model-kill set, prompt section, output capping |
-| [`src/render.ts`](src/render.ts) | Model-facing rendering: the public projection, status lines, and the consuming delta (stdout, `[stderr]` section, dropped-output notice) |
+| [`src/index.ts`](src/index.ts) | 插件入口：工具注册、结算订阅与模型杀停集合、提示词区段、输出上限 |
+| [`src/render.ts`](src/render.ts) | 面向模型的渲染：公共投影、状态行与消耗式增量（stdout、`[stderr]` 段、丢失输出提示） |
 
-### Output capping
+### 输出上限
 
-`job_output` and `job_kill` capture the caller-visible job in a prepended pre-execute listener before policy runs, so the producer's cap applies to the complete rendered result. `job_output` preserves its output/status split when policy left the default rendering intact, bounding the output tail and the `[status: ...]` suffix; other single-text results — denials, short-circuits, normalized tool or pipeline failures, replacements, and blocks — are bounded as one text, while structured multi-block policy results keep their shape. A bounded completion notice reserves the stable `background job <id>` prefix and the `job_output` collection instruction before spending remaining bytes on variable kind, label, status, detail, and truncation marker, so the notice stays actionable at the PTY's supported 64-byte minimum; an existing producer truncation marker is reused rather than duplicated.
+`job_output` 与 `job_kill` 会在策略运行前于前置的 pre-execute 监听器中捕获调用方可见任务，因此生产方上限适用于完整渲染结果。`job_output` 在策略保留默认渲染时保持其输出／状态拆分，对输出尾部与 `[status: ...]` 后缀设界；其他单文本结果——拒绝、短路、规范化工具或流水线失败、替换与阻止——按单个文本设界，而结构化多块策略结果保持自身形状。有界完成通知先为稳定的 `background job <id>` 前缀与 `job_output` 收集指令预留空间，再把剩余字节用于可变的 kind、label、status、detail 与截断标记，因此在 PTY 支持的 64 字节下限下通知仍可操作；已有的生产方截断标记会被复用，不会重复添加。
 
-### Notice delivery lanes
+### 通知投递通道
 
-The settlement subscription (`{ owners: 'scope' }`) skips settlements the registry reports as `awaited`, jobs the model killed through `job_kill`, unowned jobs, and teardown settlements, then resolves the agent registered for the owner session. A `wakeup` delivery opens a turn on an idle owner; with `maxConsecutiveWakes` set, only while the budget lasts, tracked per exact `Agent` in a `WeakMap`, and claiming a user-authored message (`agent/inbox/claimed`) resets that owner's budget. A busy owner — or any notice past a configured budget, or `quiet` delivery — is injected into the next-step inbox instead. The registry counts only a wait still owed the projection at settlement, so a wait that timed out or was aborted leaves a later settlement to notify as usual; a removal drops the job from the model-kill set, which only ever holds live jobs the model killed.
+结算订阅（`{ owners: 'scope' }`）跳过注册表报告为 `awaited` 的结算、模型经 `job_kill` 杀停的任务、无所有者的任务与 teardown 结算，然后解析登记在拥有者会话下的 agent。`wakeup` 投递为空闲所有者开启一轮；设置了 `maxConsecutiveWakes` 时只在预算内开启，按确切 `Agent` 记录在 `WeakMap` 中，领取用户撰写的消息（`agent/inbox/claimed`）会重置该所有者的预算。繁忙的所有者——或超出所配预算的任何通知，以及 `quiet` 投递——改为注入 next-step inbox。注册表只计入结算时仍被欠着投影的等待，因此超时或中止的等待会让之后的结算照常通知；移除会把任务从模型杀停集合里删掉，该集合只保有模型杀停过的存活任务。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the job types to the registry contract and the generated schemas.
+当包级约定不够用时阅读以下页面。它们从任务类型逐步进入注册表约定与生成 schema。
 
-- [Background task runtime subsystem](../../../docs/subsystems/jobs.md) — the job types, snapshot fields, and `ctx.jobs` Cordis surface.
-- [jobs group map](../README.md) — the sibling group page and its package table.
-- [Registry contract](../jobs/README.md) — the abstract `ctx.jobs` service behind the tools.
-- [Process-local registry](../jobs-local/README.md) — where jobs run in this process.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-jobs) — the exact `job_output`, `job_list`, and `job_kill` schemas.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-jobs) — every accepted config field and its source declaration.
-- [job-registry seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — the owner-fenced registry contract and its rationale.
+- [后台任务运行时子系统](../../../docs/subsystems/jobs.zh.md)——任务类型、快照字段与 `ctx.jobs` 的 Cordis 接口面。
+- [jobs 组映射](../README.zh.md)——同级组页面及其包表格。
+- [注册表约定](../jobs/README.zh.md)——工具背后的抽象 `ctx.jobs` 服务。
+- [进程本地注册表](../jobs-local/README.zh.md)——任务在本进程中的运行位置。
+- [生成的工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-jobs)——`job_output`、`job_list` 与 `job_kill` 的确切 schema。
+- [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-jobs)——每个受支持配置字段及其源声明。
+- [任务注册表 seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md)——按所有者隔离的注册表约定及其理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### System prompt
+### 系统提示词
 
-#### What the model sees
+#### 模型看到什么
 
-Every request in this plugin's registration scope contains this guidance. Agent-scoped tool filtering may hide the tools without removing the independently registered prompt section.
+该插件注册 scope 中的每次请求都包含以下指引。按 agent scope 过滤工具时，可能会隐藏工具，却不会移除独立注册的提示词区段。
 
-##### Background-job guidance
+##### 后台任务指引
 
 ```markdown
 Track every background job id you start. You are notified in-session when a job finishes — do not busy-poll or sleep on one; keep working on independent steps and do not duplicate a running job's work. Before giving a final answer, collect every still-relevant job with job_output (set wait: true only when you are genuinely blocked on it), and job_kill jobs that stopped mattering.
 ```
 
-#### Token effect
+#### Token 影响
 
-Small fixed input cost per request while active.
+激活期间，每次请求都会产生少量固定的输入 token 开销。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Prefix-stable while the plugin scope and guidance text are unchanged. Activation or disposal may invalidate reuse from this prompt section.
+只要插件 scope 与指引文本不变，前缀就保持稳定。激活或释放可能使从该提示词区段起的复用失效。
 
-### Tool schemas
+### 工具 schema
 
-#### What the model sees
+#### 模型看到什么
 
-The generated [`job_output`, `job_list`, and `job_kill` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-jobs) while this tool set is visible.
+该工具集可见时，会看到生成的 [`job_output`、`job_list` 和 `job_kill` schema](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-jobs)。
 
-#### Token effect
+#### Token 影响
 
-Fixed schema cost on each request where the tools are visible.
+工具可见时，每次请求都会产生固定的 schema token 开销。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Prefix-stable while tool definitions and visibility are unchanged. Registration lifecycle or scoped restrictions may invalidate reuse from the first changed schema token.
+只要工具定义与可见性不变，前缀就保持稳定。注册生命周期或 scope 限制可能使从第一个发生变化的 schema token 起的复用失效。
 
-### Results and notices
+### 结果与通知
 
-#### What the model sees
+#### 模型看到什么
 
-Reads return output or `(no new output)` followed by `[status: <status>]` and optional detail. An empty list returns `(no background jobs)`. Kill returns `requested cancellation of job <id>` or the existing terminal status. An owned completion the model has not already collected uses the notice above.
+读取会返回输出或 `(no new output)`，随后是 `[status: <status>]` 和可选 detail。空列表返回 `(no background jobs)`。kill 返回 `requested cancellation of job <id>` 或现有终止状态。模型尚未收走且有所有者归属的完成使用上述通知。
 
-#### Token effect
+#### Token 影响
 
-Results and notices remain in parent history until compaction. Stream reads do not repeat consumed output; a producer-supplied `outputLimitBytes` bounds each complete read or notice. Under `wakeup`, a notice reaching an idle owner also buys a model request the user did not ask for, capped per owner only when `maxConsecutiveWakes` is set; a notice reaching a busy owner adds a step to the turn it is already paying for.
+结果与通知在压缩（compaction）前保留于父级历史。流读取不会重复已消费的输出；生产方提供的 `outputLimitBytes` 会限制每次完整读取或通知。在 `wakeup` 下，抵达空闲所有者的通知还会额外买下一次用户并未要求的模型请求，其数量仅在设置了 `maxConsecutiveWakes` 时按所有者封顶；抵达繁忙所有者的通知则只是给它已经在支付的那一轮加一步。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV Cache entries.
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the tools are a poor fit. They are current package constraints, not a task backlog.
+这些限制说明工具何时不合适。它们是当前包约束，不是任务积压。
 
-- **A settlement inside the driver's retirement window still strands its notice** — between the turn loop's last inbox check and the driver committing its idle phase the owner still reads as busy, so the notice is injected and nothing wakes. Steering has the same hole; closing it belongs to `agent-loop`.
-- **A spent wake budget is not restored by time** — with `maxConsecutiveWakes` set, only user-authored input refills it, so an unattended agent whose budget ran out collects its remaining notices on the next turn something else opens, and nothing in the client shows that a notice is waiting.
-- **A notice pending on an idle owner does not survive that owner's disposal** — the disposal cancel clears the unclaimed inbox, and the log keeps the insert/cancel pair as the record.
-- **Model reads are single-consumer** — independent observers use the registry's non-consuming `readAt` (the Web client's `job.follow`), not these tools.
-- **Unowned jobs have no session fence** — external callers must supply policy or avoid them.
+- **落在 driver 退休窗口内的结算仍会让通知搁浅**——在轮次循环最后一次检查 inbox 与 driver 提交 idle 相位之间，所有者读起来仍是繁忙，因此通知走注入且无人唤醒。steering（中途引导）存在同样的问题；修复它属于 `agent-loop`。
+- **已花掉的唤醒预算不会随时间恢复**——设置了 `maxConsecutiveWakes` 时，只有用户撰写的输入才能补充，因此预算耗尽的无人值守 agent 要等到其他原因开启下一轮时才收走剩余通知，且客户端不会显示有通知在等待。
+- **待领于空闲所有者的通知无法在该所有者释放后存活**——释放时的取消会清空未领取的 inbox，日志保留插入/取消这一对作为记录。
+- **模型读取只有单一消费方**——独立观察者使用注册表非消耗的 `readAt`（Web 客户端的 `job.follow`），而不是这些工具。
+- **无 owner 的任务没有会话隔离**——外部调用方必须提供策略或避开这些任务。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

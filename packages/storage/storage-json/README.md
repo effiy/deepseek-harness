@@ -1,39 +1,39 @@
 ---
-description: "JSON storage backend for hosts and maintainers choosing, configuring, or debugging whole-unit and per-record files under a configured root."
+description: "JSON 存储后端：面向在配置根目录下选择、配置或排查整单元文件与逐记录文件的宿主与维护者。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-storage-json
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-storage-json` stores domain data as readable JSON under a configured root and registers as backend `json`. Its default `single` layout keeps one complete `<unit>.json` file per unit; its `per-record` layout keeps one version-stamped document per record. Both layouts publish each changed file atomically, while the domain layer orders calls. Choose it when operators need inspectable files and the selected layout fits the write volume; choose SQLite for larger or highly concurrent data. The backend is host-side only and contributes no prompt, tool, or schema.
+`dsh-storage-json` 在配置的根目录下把领域数据存为可读 JSON，并注册为后端 `json`。默认的 `single` 布局为每个单元保存一份完整的 `<unit>.json` 文件；`per-record` 布局为每条记录保存一份带版本戳的文档。两种布局都以原子方式发布每个变更文件，领域层负责安排调用顺序。当运维方需要可检查文件且所选布局适合写入量时选择它；对于更大或高并发的数据则选择 SQLite。本后端只面向宿主侧，不贡献提示词、工具或 schema。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Use this package when a composition needs readable, editable JSON storage. Route the relevant domains to backend `json`; each domain specification selects the `single` or `per-record` layout.
+当组合需要可读、可编辑的 JSON 存储时使用本包。把相关领域路由到 `json` 后端；每个领域规范选择 `single` 或 `per-record` 布局。
 
-### When to choose it
+### 何时选择
 
-Choose the default `single` layout for small units that benefit from one complete, pretty-printed file. Choose `per-record` when point writes should replace only one record document. Choose the SQLite backend when data is large, writes are frequent, or multiple records need transactional updates.
+小型单元需要一份完整、美化打印的文件时，选择默认的 `single` 布局。定点写入只应替换一份记录文档时，选择 `per-record`。当数据量大、写入频繁或多条记录需要事务更新时，选择 SQLite 后端。
 
-### Configuration
+### 配置
 
-The only plugin field is `root`, which holds the unit files and directories. It is required because the backend does not fall back to `process.cwd()`. The backend creates the root with mode `0o700` on demand. A domain specification selects its layout; this plugin has no layout override.
+唯一的插件字段是 `root`，用于保存单元文件与目录。它是必填项，因为本后端不回退到 `process.cwd()`。后端按需以 `0o700` 模式创建根目录。领域规范选择其布局；本插件不提供布局覆盖项。
 
 ```yaml
 - name: '@deepseek-ai/dsh-storage'
@@ -45,37 +45,37 @@ The only plugin field is `root`, which holds the unit files and directories. It 
     backend: json
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `root` | required | Directory holding `<unit>.json` files and `<unit>/` trees; created `0o700` on demand |
+| `root` | 必填 | 保存 `<unit>.json` 文件与 `<unit>/` 目录树的目录；按需以 `0o700` 创建 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-storage-json) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-storage-json)是每个受支持字段及其 JSDoc 的穷尽式真源。
 
-### Observable behavior
+### 可观察行为
 
-A missing `single` file or `per-record` directory opens as an empty unit and materializes on the first write. In `single`, malformed content rejects with `malformed-medium`, and a different stored version rejects with `version-mismatch`. In `per-record`, each malformed or unreadable document, and each document whose version is outside the descriptor's current and compatible versions, reads as an absent record, so one bad document does not reject the unit. Record keys must match `[a-zA-Z0-9_-]+`; an unsafe key rejects before any file operation. Every resolved write is durable, and operations after close reject with `closed`.
+缺失的 `single` 文件或 `per-record` 目录会作为空单元打开，并在第一次写入时物化。在 `single` 中，畸形内容以 `malformed-medium` 拒绝，不同的已存版本以 `version-mismatch` 拒绝。在 `per-record` 中，每份畸形或不可读的文档，以及版本不在描述符的当前版本和兼容版本内的文档，都读作记录不存在，因此单个坏文档不会使单元被拒绝。记录键必须匹配 `[a-zA-Z0-9_-]+`；不安全的键在任何文件操作前被拒绝。每次已完成的写入都已持久化，关闭后的操作以 `closed` 拒绝。
 
-An empty `per-record` tree can initialize its declared tables from a valid `<root>/<unit>.json` whole-unit document only when the source unit name matches and its version is current or declared compatible. The backend leaves that source file unchanged and stamps migrated records with the current version. A source version outside the accepted set leaves the new tree empty. Any document path in a declared table, or a declared `global.json`, suppresses this initialization for the complete unit, even if that document is unreadable or stale.
+只有当源单元名称匹配，且源版本为当前版本或已声明的兼容版本时，空的 `per-record` 目录树才可以从有效的 `<root>/<unit>.json` 整单元文档初始化其已声明表。后端保持该源文件不变，并为迁移的记录写入当前版本戳。接受集合之外的源版本会使新目录树保持为空。已声明表中只要存在任意文档路径，或存在已声明的 `global.json`，就会对整个单元禁止该初始化，即使该文档不可读或版本陈旧。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The two layouts share atomic publication but assign state ownership differently. `single` owns an in-memory unit projection; `per-record` treats its directory tree as authoritative.
+两种布局共享原子发布机制，但以不同方式确定状态所有权。`single` 拥有一份内存单元投影；`per-record` 把目录树视为权威状态。
 
-### Design concept
+### 设计理念
 
-- **`single` keeps memory authoritative.** Each write changes the in-memory unit, serializes its complete state, and atomically replaces `<unit>.json`. A failed publish restores the prior in-memory value.
-- **`per-record` keeps the directory authoritative.** Each put or delete changes one `<unit>/<table>/<key>.json` document, and `loadAll()` rereads the tree. Each document stamps the unit version and carries one record value.
-- **Publication is durable per call.** A write uses a temporary file, fsync, atomic `rename()` replacement, and a parent-directory fsync on POSIX. The domain layer's write chain supplies ordering across calls.
+- **`single` 以内存为权威状态。** 每次写入都会更改内存单元、序列化其完整状态，并以原子方式替换 `<unit>.json`。发布失败会恢复先前的内存值。
+- **`per-record` 以目录为权威状态。** 每次 put 或 delete 都会更改一个 `<unit>/<table>/<key>.json` 文档，`loadAll()` 则重新读取目录树。每份文档都带有单元版本戳与一条记录值。
+- **每次调用都持久发布。** 写入过程使用临时文件、fsync、原子 `rename()` 替换，并在 POSIX 上 fsync 父目录。领域层写入链负责安排跨调用的顺序。
 
-### File formats
+### 文件格式
 
-A `single` document carries the unit identity, global singleton, and all tables:
+`single` 文档携带单元标识、全局单例与所有表：
 
 ```json
 {
@@ -85,68 +85,68 @@ A `single` document carries the unit identity, global singleton, and all tables:
 }
 ```
 
-A `per-record` table document at `<root>/<unit>/<table>/<key>.json` has the form `{ "version": 1, "record": <value> }`; the optional global value uses `<root>/<unit>/global.json`. The format version comes from the domain specification.
+`per-record` 表文档位于 `<root>/<unit>/<table>/<key>.json`，形式为 `{ "version": 1, "record": <value> }`；可选的全局值使用 `<root>/<unit>/global.json`。格式版本来自领域规范。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: backend registration, `root` config, unit open/close table |
-| [`src/single-unit.ts`](src/single-unit.ts) | One `single` unit: authoritative memory, write primitives, publish rollback |
-| [`src/per-record-unit.ts`](src/per-record-unit.ts) | One `per-record` unit: tree reads, path-safe records, and one-document writes |
-| [`src/format.ts`](src/format.ts) | Whole-unit and record serialization with version validation |
-| [`src/atomic.ts`](src/atomic.ts) | Atomic file replacement: temp write, fsync, rename, directory fsync |
+| [`src/index.ts`](src/index.ts) | 插件入口：后端注册、`root` 配置、单元打开／关闭表 |
+| [`src/single-unit.ts`](src/single-unit.ts) | 一个 `single` 单元：权威内存、写入原语与发布回滚 |
+| [`src/per-record-unit.ts`](src/per-record-unit.ts) | 一个 `per-record` 单元：目录树读取、路径安全记录与单文档写入 |
+| [`src/format.ts`](src/format.ts) | 带版本校验的整单元与记录序列化 |
+| [`src/atomic.ts`](src/atomic.ts) | 原子文件替换：临时文件写入、fsync、rename、目录 fsync |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when this backend's view is not enough: the subsystem reference is the authoritative contract, and the sibling backend shows the alternative medium.
+当本后端视角不够用时阅读以下页面：子系统参考是权威约定，兄弟后端展示了另一种介质。
 
-- [Storage subsystem](../../../docs/subsystems/storage.md) — the backend contract, domain semantics, and generated API.
-- [Storage package map](../README.md) — the family's packages and their repository position.
-- [SQLite storage backend](../storage-sqlite/README.md) — the point-update medium for high-frequency data.
-- [domain KV storage Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.md) — the design behind the backend family and its deferred work.
+- [存储子系统](../../../docs/subsystems/storage.zh.md)——后端约定、领域语义与生成的 API。
+- [存储包映射](../README.zh.md)——家族的各包及其在仓库中的位置。
+- [SQLite 存储后端](../storage-sqlite/README.zh.md)——面向高频数据的定点更新介质。
+- [领域 KV 存储 Agent Note](../../../.agents/notes/proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)——后端家族背后的设计及其延期工作。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Stored domain records
+### 已存领域记录
 
-#### What the model sees
+#### 模型看到什么
 
-Nothing. This backend contributes no prompt, tool, or schema; it persists non-session domain data behind `ctx.storage` for host-side consumers only.
+无。本后端不贡献提示词、工具或 schema；它在 `ctx.storage` 后面持久化非会话领域数据，只供宿主侧消费方使用。
 
-#### Token effect
+#### Token 影响
 
-Zero live-request tokens.
+实时请求 token 为零。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None — the backend never touches live request prefixes.
+无：本后端从不触碰实时请求前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this backend is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+这些限制说明本后端何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是任务积压。
 
-- **`single` rewrites the whole unit** — each write republishes the complete unit file; use `per-record` or route the domain to SQLite when this cost is too high.
-- **No cross-process write locking** — two processes writing the same unit can interleave replacements; writes to the same file use last-completion wins.
-- **Windows rename without explicit write-through** — durability relies on libuv's `rename()` (`MoveFileExW` with replacement); the stricter Win32 write-through publish helper from the session-log backend is planned to move down here when the `log` facet lands.
+- **`single` 会重写整个单元**——每次写入都重新发布完整单元文件；当此成本过高时，使用 `per-record` 或把领域路由到 SQLite。
+- **没有跨进程写锁**——两个进程写入同一单元时可能交错执行替换；对同一文件的写入以最后完成者为准。
+- **Windows rename 没有显式 write-through**——持久性依赖 libuv 的 `rename()`（`MoveFileExW` 并启用替换）；`log` 分面落地时，计划把会话日志后端更严格的 Win32 write-through 发布辅助函数下移到此处。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-The Agent Note flags the whole-unit rewrite scale premise as a risk: if a second consumer lands on this backend at thousand-record scale before being routed to SQLite, rewrite cost surfaces earlier than expected. The mitigation is configuration — point `routes` at the SQLite backend — not a change to this package.
+Agent Note 把整单元重写的规模前提标记为风险：如果在被路由到 SQLite 之前，第二个消费方以千条记录规模落到本后端，重写成本会比预期更早显现。缓解办法是配置——把 `routes` 指向 SQLite 后端——而不是修改本包。
 
 </details>

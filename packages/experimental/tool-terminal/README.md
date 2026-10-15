@@ -1,46 +1,46 @@
 ---
-description: "Six model-facing persistent terminal tools with owner isolation, bounded results, and optional background sends for agents that need cross-call terminal state."
+description: "面向需要跨调用终端状态的 agent（智能体）的 6 个持久终端工具，带所有者隔离、有界结果与可选后台发送。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-terminal
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-tool-terminal` when an agent needs persistent terminal state or interactive input across calls. It can open, send to, read, signal, close, and list terminal sessions while preventing one agent from operating another agent's sessions. Sends may wait for bounded foreground output or return a background job id for later collection or interruption. `maxResultBytes` caps each result, which remains in session history until compaction. The model is guided to prefer one-shot tools for bounded work.
+当 agent 需要跨调用保留终端状态或提供交互式输入时，使用 `dsh-tool-terminal`。它可以打开、发送、读取、传递信号、关闭和列出终端会话，同时防止一个 agent 操作其他 agent 的会话。发送可以等待有界的前台输出，也可以返回供后续收集或中断的后台任务 job id。`maxResultBytes` 限制每个结果的大小，而结果会保留在会话历史中直到压缩（compaction）。指引会让模型对有界工作优先使用单次工具。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-`terminal_open` defaults to the Session's current working directory and resolves relative `cwd` overrides from it. Open terminals keep their own directory after the Session changes directory.
+`terminal_open` 默认使用 Session 的当前工作目录，并以该目录解析相对 `cwd` 覆盖值。Session 切换目录后，已打开的终端仍保留各自的目录。
 
-Enable these tools when the composition mounts a terminal backend and the model should be able to use terminal state across calls — stepping a debugger, exploring in a REPL, or returning to a shell after interrupting a foreground command. The guidance section steers the model toward the one-shot bash, read, write, and edit tools for bounded operations.
+当组合挂载了终端后端、且模型应当能跨调用使用终端状态时启用这些工具——使用调试器单步调试、在 REPL 中探索，或中断前台命令后回到 shell。指引章节会引导模型对有界操作使用单次 bash、read、write 与 edit 工具。
 
-### The six tools
+### 六个工具
 
-| Tool | What it does | Result |
+| 工具 | 作用 | 结果 |
 |---|---|---|
-| `terminal_open` | Creates an owner-scoped session from a backend type | Session id, name, type, pid, status, and bounded startup output |
-| `terminal_send` | Writes text, optionally submitting Enter, and waits for readiness — or starts a background job | Bounded output plus wait and session status, or a job id |
-| `terminal_read` | Reads a bounded page of retained output without sending input | Text with line pagination metadata |
-| `terminal_signal` | Delivers one allowed signal to the foreground process group | `delivered` plus the target process group id |
-| `terminal_close` | Closes a session and waits for its process tree to end | Closed or already-closing outcome |
-| `terminal_list` | Lists the caller's live sessions | Owner-scoped session summaries |
+| `terminal_open` | 按后端类型创建限定所有者范围的会话 | 会话 id、名称、类型、pid、状态与有界启动输出 |
+| `terminal_send` | 写入文本，可选地提交 Enter，并等待就绪——或启动后台任务 | 有界输出加等待与会话状态，或一个 job id |
+| `terminal_read` | 不发送输入，读取一页有界保留输出 | 带行分页元数据的文本 |
+| `terminal_signal` | 向前台进程组投递一个允许的信号 | `delivered` 加目标进程组 id |
+| `terminal_close` | 关闭会话并等待其进程树结束 | 已关闭或正在关闭的结果 |
+| `terminal_list` | 列出调用方的活跃会话 | 限定所有者范围的会话摘要 |
 
-### Composition
+### 组合方式
 
 ```yaml
 - name: '@deepseek-ai/dsh-terminal'
@@ -48,139 +48,139 @@ Enable these tools when the composition mounts a terminal backend and the model 
 - name: '@deepseek-ai/dsh-tool-terminal'
 ```
 
-The tools need `ctx.terminals` — a backend must be mounted — and the system-prompt service for the guidance section. Background sends additionally require the jobs service and its model-facing controller (`@deepseek-ai/dsh-tool-jobs`).
+工具需要 `ctx.terminals`——必须挂载一个后端——以及用于指引章节的系统提示词服务。后台发送还额外要求任务服务及其面向模型的控制器（`@deepseek-ai/dsh-tool-jobs`）。
 
-### Configuration
+### 配置
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `enableRunInBackground` | `true` | Expose and accept `run_in_background`; `false` removes the schema field and rejects the argument |
-| `maxResultBytes` | `262144` | UTF-8 cap (minimum `64`) for each complete terminal result after wait, session, pagination, truncation, and job-status metadata |
+| `enableRunInBackground` | `true` | 公开并接受 `run_in_background`；设为 `false` 时移除 schema 字段并拒绝该参数 |
+| `maxResultBytes` | `262144` | 每个完整终端结果的 UTF-8 上限（最小值 `64`）；在等待、会话、分页、截断与任务状态元数据全部加入后计算 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-terminal) and [tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal) are the exhaustive sources for config fields and schemas.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-terminal)与[工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-terminal)是配置字段与 schema 的穷尽式真源。
 
-### Background sends
+### 后台发送
 
-`terminal_send(run_in_background: true)` returns a job id immediately instead of waiting. The job is collected with `job_output`, which waits and reads incremental output, and stopped with `job_kill`, which delivers a real `SIGINT` to the foreground process group. Background mode fails before writing input when the jobs surface is absent.
+`terminal_send(run_in_background: true)` 立即返回 job id，而不是等待。任务用 `job_output` 收集——它会等待并读取增量输出——用 `job_kill` 停止，后者向前台进程组投递真正的 `SIGINT`。缺少任务接口面时，后台模式会在写入输入之前失败。
 
-### Observable outcomes and failures
+### 可观察结果与失败
 
-A foreground send returns the terminal's new output plus `wait: <reason>` and the session status; `session_exit` means the top-level shell exited, while `inferred_idle` or `timeout` never proves the foreground command exited. Opening a session with an unregistered backend type fails. Results larger than `maxResultBytes` are truncated at a UTF-8 boundary with a marker.
+前台发送返回终端的新输出以及 `wait: <原因>` 与会话状态；`session_exit` 表示顶层 shell 已退出，而 `inferred_idle` 或 `timeout` 绝不证明前台命令已退出。用未注册的后端类型打开会话会失败。大于 `maxResultBytes` 的结果会在 UTF-8 边界处截断并附标记。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design behind the tools and points at the code that realizes it; the observable behavior is covered in [Use this package](#use-this-package).
+本节解释工具背后的设计并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中说明。
 
-### Design concept
+### 设计理念
 
-The package is a thin adapter: the six tools forward to `ctx.terminals` with the executing agent as the owner, and the presentation layer renders bounded results. Background sends register the in-flight operation on `ctx.jobs` so the generic job surface owns waiting, incremental reads, and `SIGINT` delivery.
+本包是薄适配器：6 个工具以执行 agent 作为所有者转发到 `ctx.terminals`，呈现层渲染有界结果。后台发送把在途操作注册到 `ctx.jobs`，由通用任务接口面负责等待、增量读取与 `SIGINT` 投递。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Six tool definitions, schemas, guidance section, background-job integration |
-| [`src/render.ts`](src/render.ts) | Result rendering and the complete-result UTF-8 cap |
+| [`src/index.ts`](src/index.ts) | 6 个工具定义、schema、指引章节、后台任务集成 |
+| [`src/render.ts`](src/render.ts) | 结果渲染与完整结果的 UTF-8 上限 |
 
-### Result bounding
+### 结果上限
 
-Every terminal-owned single-text result is capped by `maxResultBytes` after normalized tool or pipeline errors, policy denials and short-circuits, replacements and blocks, and generic job-status text; cuts preserve UTF-8 boundaries and reserve room for a truncation marker. Structured multi-block policy results retain their shape. The minimum cap of 64 bytes keeps every registry-issued session or job id visible in its creation acknowledgement.
+每个终端自身的单文本结果都会在规范化后的工具或流水线错误、策略拒绝与短路、替换与阻止、以及通用任务状态文本之后，受 `maxResultBytes` 限制；截断保留 UTF-8 边界并为截断标记预留空间。结构化的多块策略结果保留其结构。64 字节的最小上限保证注册表签发的每个会话或 job id 都出现在创建确认中。
 
-### UI render intents
+### UI 呈现意图
 
-Foreground sends use terminal call and result cards; background sends and the other five tools use generic `execute`, `read`, or `delete` cards. None of the tools emits source locations.
+前台发送使用终端调用与结果卡片；后台发送与其他 5 个工具使用通用 `execute`、`read` 或 `delete` 卡片。所有工具都不输出源位置。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the generated schemas to the service contract, the backend, and the background-job surface.
+当包级约定不够用时阅读以下页面。它们从生成的 schema 进入服务约定、后端与后台任务接口面。
 
-- [Tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal) — the six generated schemas and result shapes.
-- [Terminal subsystem reference](../../../docs/subsystems/terminal.md) — the service contract and shared types behind the tools.
-- [terminal service](../../terminal/terminal/README.md) — session operations, owner fencing, and cleanup semantics.
-- [terminal-bash backend](../../terminal/terminal-bash/README.md) — the shipped shell backend that provides sessions.
-- [jobs package map](../../jobs/README.md) — the background-job surface that collects and kills background sends.
-- [Persistent PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.md) — the capability design and deferred boundaries.
+- [工具目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-terminal)——6 个生成的 schema 与结果形态。
+- [终端子系统参考](../../../docs/subsystems/terminal.zh.md)——工具背后的服务约定与共享类型。
+- [terminal 服务](../../terminal/terminal/README.zh.md)——会话操作、所有者限制与清理语义。
+- [terminal-bash 后端](../../terminal/terminal-bash/README.zh.md)——提供会话的随附 shell 后端。
+- [jobs 包映射](../../jobs/README.zh.md)——收集与停止后台发送的后台任务接口面。
+- [持久 PTY Agent Note](../../../.agents/notes/implemented/feature/2026-07-16-persistent-pty-sessions.zh.md)——能力设计与暂缓边界。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### System prompt
+### 系统提示词
 
-#### What the model sees
+#### 模型看到什么
 
-The plugin contributes this fixed guidance section:
+该插件贡献以下固定指引章节：
 
-##### Terminal guidance
+##### 终端指引
 
 ```markdown
 Use a terminal session only when work needs persistent terminal state or interactive stdin; prefer shell/read/write/edit for bounded one-shot operations. Track every terminal session id and close sessions that no longer matter. An inferred_idle or timeout result does not prove the foreground command exited.
 ```
 
-#### Token effect
+#### Token 影响
 
-Small fixed input cost on every request while the plugin is active.
+插件活跃期间，每次请求都会产生少量固定输入成本。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Prefix-stable while the registration scope and guidance text are unchanged.
+注册范围与指引文本不变时，前缀保持稳定。
 
-### Tool schemas
+### 工具 schema
 
-#### What the model sees
+#### 模型看到什么
 
-The six generated schemas are listed in the [`dsh-tool-terminal` catalog section](../../../docs/tool-catalog.md#deepseek-aidsh-tool-terminal). Their fixed schema tokens are present whenever this plugin is active; agent-scoped tool filtering may hide them.
+6 个生成的 schema 列在 [`dsh-tool-terminal` 目录章节](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-terminal)中。此插件活跃时，请求中会包含它们的固定 schema token；按 agent 范围过滤工具时可能隐藏这些 schema。
 
-#### Token effect
+#### Token 影响
 
-Fixed schema cost on requests where the tools are visible.
+工具可见的请求会产生固定的 schema 成本。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Prefix-stable while tool visibility and definitions are unchanged.
+工具可见性与定义不变时，前缀保持稳定。
 
-### Tool results and task context
+### 工具结果与任务上下文
 
-#### What the model sees
+#### 模型看到什么
 
-Spawn returns the id and bounded startup output. Send and read return bounded terminal text plus readiness and history markers. Background mode returns a generic job id. Every terminal-owned single-text result is capped by `maxResultBytes`; results remain in session history until compaction, and incremental task reads do not repeat consumed output.
+spawn 返回 id 与有界启动输出。发送与读取返回有界终端文本以及就绪与历史标记。后台模式返回通用 job id。每个终端自身的单文本结果都受 `maxResultBytes` 限制；结果保留在会话历史中直到压缩，增量任务读取不会重复已经消费的输出。
 
-#### Token effect
+#### Token 影响
 
-Terminal-owned results are data-dependent and bounded by `maxResultBytes`; each returned result stays in history until compaction.
+终端自身的结果随数据变化，并受 `maxResultBytes` 限制；每个返回结果都保留在历史中直到压缩。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; new results follow the reusable request prefix.
+仅追加；新结果位于可复用请求前缀之后。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the model-facing surface that is absent. They are current package constraints, not a task backlog.
+这些限制说明缺失的面向模型接口面。它们是当前包约束，不是任务积压。
 
-- **No TUI or key-sequence surface** — named key sequences, full-screen TUI interaction, BEL, resize, and auto-start are not exposed in any schema.
-- **Background mode requires the jobs surface** — `run_in_background` needs both `@deepseek-ai/dsh-jobs` and its model-facing controller (`@deepseek-ai/dsh-tool-jobs`); without them the argument is rejected.
+- **没有 TUI 或按键序列接口面**——具名按键序列、全屏 TUI 交互、BEL、调整大小与自动启动均未出现在任何 schema 中。
+- **后台模式要求任务接口面**——`run_in_background` 同时需要 `@deepseek-ai/dsh-jobs` 及其面向模型的控制器（`@deepseek-ai/dsh-tool-jobs`）；缺少时会拒绝该参数。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

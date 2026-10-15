@@ -1,40 +1,40 @@
 ---
-description: "Browser-use capability packages for selecting and registering one browser backend."
+description: "浏览器操作能力包，用于选择与注册一个浏览器后端。"
 kind: "package-group"
 ---
 
 # packages/browser-use
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Browser-use providers let models inspect and operate web pages. This group owns exclusive provider registration. Experimental providers supply browser tools and manage each Session's browser resources.
+浏览器操作 提供方 让模型检查与操作网页。本组拥有独占 提供方 注册。实验性 提供方 提供浏览器工具，并管理各 Session 的浏览器资源。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-Choose one provider and mount the shared registration service.
+选择一个 提供方 并挂载共享注册服务。
 
-| Package | Role | ctx key |
+| 包 | 职责 | ctx 键 |
 |---|---|---|
-| [`browser-use`](browser-use/README.md) | Exclusive named provider registration | `ctx.browserUse` |
+| [`browser-use`](browser-use/README.zh.md) | 独占具名 提供方 注册 | `ctx.browserUse` |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [Browser use](../../docs/subsystems/browser-use.md) — capability ownership and provider choices.
-- [Experimental packages](../experimental/README.md) — Playwright MCP, Chrome DevTools MCP, and Stagehand providers.
+- [浏览器操作](../../docs/subsystems/browser-use.zh.md) — 能力所有权与 提供方 选择。
+- [实验包](../experimental/README.zh.md) — Playwright MCP、Chrome DevTools MCP 与 Stagehand 提供方。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
-None.
+无。

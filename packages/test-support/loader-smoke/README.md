@@ -1,35 +1,35 @@
 ---
-description: "Shared subprocess and direct-agent harness for keyless example smoke tests, for test authors booting real Loader compositions."
+description: "面向无密钥示例冒烟测试的共享子进程与直接 agent（智能体） harness，供测试作者启动真实 Loader 组合。"
 kind: "package-library"
 ---
 
 # @deepseek-ai/dsh-loader-smoke
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `dsh-loader-smoke` to boot an application fixture from its real bin and `cordis.yml` in an isolated temporary directory, with captured output and cleanup. `runFixtureTurn` drives one task through the configured root agent and returns the final assistant text plus token usage. Tests can select zero-build source execution or built-package execution, so local and CI smoke tests use the intended consumer path for each environment. This support-tier library is for test authors, not product integrations.
+使用 `dsh-loader-smoke` 可从应用 fixture（测试前置数据）的真实可执行文件及其 `cordis.yml` 启动应用，并在隔离的临时目录中捕获输出和完成清理。`runFixtureTurn` 通过已配置的根 agent 驱动一项任务，并返回最终 assistant 文本与 token 用量。测试可以选择零构建的源码执行或已构建包执行，使本地和 CI 冒烟测试分别采用对应环境预期的消费路径。这个支持层库面向测试作者，不用于产品集成。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-This package boots an application fixture the way an installed consumer would and lets a test watch the result: choose source or built mode, launch the bin with its config from an isolated cwd, and either wait for a clean exit or drive one task through the root agent.
+本包以已安装消费方的方式启动应用 fixture，并让测试观察结果：选择源模式或构建模式，从隔离 cwd 用其配置启动可执行文件，然后要么等待干净退出，要么让一项任务通过根 agent。
 
-### Booting an application fixture
+### 启动应用 fixture
 
-`runLoaderSmoke` takes bin and config paths, optional complete bin arguments, environment overrides, stdin, pre-run setup, and pre-cleanup inspection. It owns the isolated cwd, DSH homes, diagnostics, deadline, termination, EOF, and cleanup of a cwd it created (a caller-provided cwd is left in place), and returns both streams after a zero exit or rejects with both streams on failure:
+`runLoaderSmoke` 接受可执行文件与配置路径、可选的完整可执行文件参数、环境覆盖、标准输入、运行前准备与清理前检查。它负责隔离工作目录、DSH 主目录、诊断、截止时间、终止、EOF 与清理（只清理自己创建的 cwd，调用方自带的 cwd 原样保留）；进程以零状态退出后返回两个流，失败时则拒绝并附带两个流：
 
 ```text
 const result = await runLoaderSmoke({
@@ -41,90 +41,90 @@ const result = await runLoaderSmoke({
 })
 ```
 
-Set `sourceImport: 'tsx/esm'` when a source smoke exercises the supported `dsh` launcher; built mode ignores this option. Set `expectedExitCode` when the scenario pins a designed failure surface — a one-shot turn ending in an error result — and a run that exits any other way, including succeeding, still fails the smoke.
+源码 smoke 测试支持的 `dsh` 启动器时，设置 `sourceImport: 'tsx/esm'`；built 模式忽略此选项。当场景固定一个设计好的失败面——即一次性轮次以错误结果结束——时设置 `expectedExitCode`；以任何其他方式退出（包括成功退出）都会使冒烟测试失败。
 
-### Testing a shipped profile
+### 测试交付 profile
 
-Profile integration drivers use the repository-only `tests/fixtures/production-profile.ts` helper. It loads the named shipped profile and its bundle patches through `loadProfile`, computes the runtime resolution, installs it through `PluginPackages`, and passes the bundle patches followed by the test's `*.patch.yml` files to the root `cordis:include` mounted by `boot`. Those patches should contain only the test provider or model, isolated persistence paths, and subject-specific changes. Package-level unit tests that need an agent loop without profile integration mount `dsh-agent-loop-testkit` locally instead.
+Profile 集成 driver 使用仅限仓库内部的 `tests/fixtures/production-profile.ts` helper。它通过 `loadProfile` 加载指定的已交付 profile 及其组合包 patch，计算 runtime resolution，并通过 `PluginPackages` 安装它，然后把组合包 patch 与测试 `*.patch.yml` 文件依次交给 `boot` 挂载的根 `cordis:include`。这些 patch 应只包含测试提供方或模型、隔离持久化路径及被测对象专用变更。只需要 agent loop 而不测试 profile 集成的包级单元测试改为在本地挂载 `dsh-agent-loop-testkit`。
 
-### Driving a fixture turn
+### 驱动 fixture 轮次
 
-`runFixtureTurn(ctx, options)` drives one task through exactly one configured root agent: it waits for the task to reach the durable inbox, forwards canonical events to your observer, flushes the session, and returns the final assistant text plus accumulated usage. Example-local drivers keep configuration, rendering, and assertion ownership.
+`runFixtureTurn(ctx, options)` 让一项任务通过恰好一个已配置的根 agent：它等待任务进入持久收件箱，把规范事件转发给你的观察器，刷写会话，并返回最终 assistant 文本与累计用量。示例本地的 driver 继续负责配置、渲染与断言。
 
-### Source or built mode
+### 源模式或构建模式
 
-`resolveExampleLaunch` picks the artifact an example bin boots from. `src` mode runs the bin under tsx with `TSX_TSCONFIG_PATH` set, so workspace imports resolve through the tsconfig `paths` map — the zero-build dev path. `lib` mode runs the built `lib/` bin under plain Node, so bare package plugins resolve through real package `exports`, exactly as an installed consumer resolves them. The mode comes from an explicit value or `DSH_EXAMPLE_MODE` (CI sets `lib`, dev leaves it unset); anything else fails loud.
+`resolveExampleLaunch` 选择示例可执行文件从哪个产物启动。`src` 模式在 tsx 下运行可执行文件并设置 `TSX_TSCONFIG_PATH`，使工作区导入通过 tsconfig `paths` 映射解析——这是零构建开发路径。`lib` 模式在普通 Node 下运行构建后的 `lib/` 可执行文件，使裸包插件通过真实包 `exports` 解析，与已安装消费方的解析方式完全一致。模式来自显式值或 `DSH_EXAMPLE_MODE`（CI 设置 `lib`，开发时保持未设置）；其他任何值都会明确报错。
 
-### What can go wrong
+### 可能出什么问题
 
-- **The process never exits** — the smoke enforces a deadline and reports the captured streams in the failure; a faulty fixture that spawns its own process tree can outlive the smoke and needs external cleanup.
-- **Built mode needs a prior build** — run `pnpm run build` before selecting `DSH_EXAMPLE_MODE=lib`; the owning package manifest must also declare every package named by the config.
-- **Captured output is bounded by execa's default 100 MB `maxBuffer`** — a runaway child is terminated at that ceiling rather than at a smoke-chosen budget.
+- **进程永不退出**——冒烟测试强制执行截止时间，并在失败信息中报告捕获的流；会 spawn 自身进程树的故障 fixture 可能比冒烟测试存活更久，需要外部清理。
+- **构建模式需要事先构建**——选择 `DSH_EXAMPLE_MODE=lib` 前先运行 `pnpm run build`；拥有该配置的包 manifest（元数据清单）还必须声明配置中点名的每个包。
+- **捕获输出受 execa 默认 100 MB `maxBuffer` 约束**——失控子进程在该上限处被终止，而不是在冒烟测试自选的预算处。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design of the harness; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释 harness 的设计；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design
+### 设计
 
-The harness is built on one separation: the smoke runs in a child process under an isolated world, and the test process only observes and asserts. `runLoaderSmoke` creates a temporary cwd (or reuses a caller-provided one), prepares world state there, spawns the resolved bin with isolated DSH homes (`DSH_HOME`, `DSH_AGENTS_HOME` under that cwd), closes stdin immediately, and awaits a clean exit within the deadline before inspecting on every outcome and removing only a cwd it created. `runFixtureTurn` stays in-process: it looks up the composition's single root agent, follows the task from its durable inbox receipt through whole-agent idle, sums per-step usage, and flushes the session before returning.
+harness 建立在一个分离之上：冒烟测试在隔离世界中的子进程里运行，测试进程只观察与断言。`runLoaderSmoke` 创建临时 cwd（或复用调用方提供的 cwd）、在那里准备世界状态、以隔离的 DSH 主目录（该 cwd 下的 `DSH_HOME`、`DSH_AGENTS_HOME`）spawn 解析出的可执行文件、立即关闭 stdin，并在截止时间内等待干净退出，然后在每种结果下都执行检查，且只删除自己创建的 cwd。`runFixtureTurn` 留在进程内运行：它查找组合中的唯一根 agent，从持久收件箱收到任务起持续跟踪，直至整个 agent 完全停稳；随后汇总每步用量，并在返回前刷写会话。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Mode resolver, `runLoaderSmoke` subprocess harness, options and result types |
-| [`src/agent-turn.ts`](src/agent-turn.ts) | `runFixtureTurn` direct-agent driver and result envelope |
-| [`tests/fixtures/production-profile.ts`](tests/fixtures/production-profile.ts) | Repository-only shipped-profile composition helper for integration fixtures |
+| [`src/index.ts`](src/index.ts) | 模式解析器、`runLoaderSmoke` 子进程 harness、选项与结果类型 |
+| [`src/agent-turn.ts`](src/agent-turn.ts) | `runFixtureTurn` 直接 agent driver 与结果信封 |
+| [`tests/fixtures/production-profile.ts`](tests/fixtures/production-profile.ts) | 仅限仓库内部、供集成 fixture 使用的交付 profile 组装 helper |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the harness to the composition it boots and the fixtures it serves.
+当包级约定不够用时阅读以下页面。它们从 harness 逐步进入它启动的组合以及它所服务的 fixture。
 
-- [llm-replay](../llm-replay/README.md) — the keyless model fixture smoke compositions mount to run without a provider key.
-- [Agent package](../../core/agent/README.md) — the root agent `runFixtureTurn` drives.
-- [Testing policy](../../../docs/testing.md) — the keyless snapshot and smoke tiers.
-- [Test-support group map](../README.md) — sibling harnesses and support packages.
+- [llm-replay](../llm-replay/README.zh.md)——冒烟测试组合为在没有提供方密钥的情况下运行而挂载的无密钥模型 fixture。
+- [Agent 包](../../core/agent/README.zh.md)——`runFixtureTurn` 驱动的根 agent。
+- [测试策略](../../../docs/testing.zh.md)——无密钥快照与冒烟层级。
+- [test-support 组地图](../README.zh.md)——兄弟 harness 与支持包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as the test harness submits only the consuming test's ordinary user task and delegates prompt and tool composition to the loaded tree.
+无，因为测试 harness 仅提交调用方测试的普通用户任务，并将提示词与工具组装交由已加载的树负责。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None beyond the loaded tree; the helper neither changes the request prefix nor retains state across runs.
+除已加载树本身的影响外，无其他影响；该 helper 既不更改请求前缀，也不跨运行保留状态。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the harness needs special care. They are current package constraints, not a task backlog.
+这些限制说明何时需要对该 harness 特别小心。它们是当前包约束，不是任务积压。
 
-- **Built mode requires a prior build** — the owning package manifest must also declare every package named by the config.
-- **Captured stdout and stderr are bounded only by execa's default 100 MB `maxBuffer`** — a runaway child is terminated at that ceiling rather than at a smoke-chosen budget.
-- **Timeout kills only the direct child** — a process tree spawned by a faulty fixture can outlive the smoke and needs external cleanup.
+- **构建模式需要事先构建**——拥有该配置的包 manifest 还必须声明配置中点名的每个包。
+- **捕获的 stdout 与 stderr 仅受 execa 默认 100 MB `maxBuffer` 约束**——失控子进程在该上限处被终止，而不是在冒烟测试自选的预算处。
+- **超时只终止直接子进程**——有故障的 fixture spawn 的进程树可能比冒烟测试存活更久，需要外部清理。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

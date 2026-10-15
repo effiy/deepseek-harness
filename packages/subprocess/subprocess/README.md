@@ -1,44 +1,44 @@
 ---
-description: "The subprocess service (ctx.subprocess) for composition authors and capability consumers starting, observing, and terminating managed child processes and terminal sessions."
+description: "面向组合作者与能力消费方的子进程服务（`ctx.subprocess`）说明：启动、观察并终止受管子进程与终端会话。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-subprocess
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`ctx.subprocess` resolves executables, starts explicitly specified child processes or real terminal sessions, streams or collects bounded output, and terminates the full managed process range. Configure one subprocess implementation for each composition, choosing local or remote execution according to where commands must run. Each request sets argv, working directory, stdio, environment overrides, termination grace, and cancellation, with no shell interpretation or hidden execution defaults. Child environments remove ambient credentials and `DSH_*` values before applying explicit overrides; callers own deadlines, teardown policy, and model-facing rendering, while collected output remains readable after exit.
+`ctx.subprocess` 可解析可执行文件、启动显式指定的子进程或真实终端会话、流式读取或有界收集输出，并终止完整的受管进程范围。每个组合配置一个 subprocess 实现，并根据命令运行位置选择本地或远程执行。每次请求都指定 argv、工作目录、stdio、环境覆盖、终止宽限期与取消信号，不会添加 shell 解释或隐藏的执行默认值。子进程环境会先移除环境中的凭据与 `DSH_*` 值，再应用显式覆盖；时限、拆卸策略与面向模型的渲染由调用方负责，收集的输出在进程退出后仍可读取。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount a subprocess provider in any composition that must run child processes, and call `ctx.subprocess` from the capability that owns the command. The common path is explicit: resolve the executable, spawn with a fully specified request, read the output you asked for, and terminate the managed range when the work is done.
+在需要运行子进程的组合中挂载一个 subprocess 提供方，并从拥有该命令的能力调用 `ctx.subprocess`。常用路径是显式的：解析可执行文件、用完全明确的请求 spawn、读取你要的输出，并在工作完成时终止受管范围。
 
-### Mounting the service
+### 挂载服务
 
-One provider registers `ctx.subprocess` per composition; load it beside the consumers that spawn through it — the bash executors, the LSP host, the PTY shell backend, or an out-of-process subagent backend. Loading a second provider fails loudly (one service per context, Cordis standard).
+每个组合由唯一一个提供方注册 `ctx.subprocess`；把它与经由它 spawn 的消费方放在一起加载——bash 执行器、LSP 主机、PTY shell 后端或进程外 subagent 后端。加载第二个提供方会快速失败（每个上下文只有一个服务，这是 Cordis 的标准行为）。
 
 ```yaml
 - name: '@deepseek-ai/dsh-subprocess-local'
 - name: '@deepseek-ai/dsh-bash-local'
 ```
 
-### Starting a managed process
+### 启动受管进程
 
-The request is fully explicit: the program and arguments, the working directory, one stdio disposition per stream, a termination grace, an optional abort signal, and optional environment overrides. Target and managed-range identities remain provider-private. `done` resolves with the direct command's exit facts (`exitCode` and `signal`) and rejects for spawn or provider failures; collected output stays readable after exit.
+请求完全明确：程序与参数、工作目录、每条流一种 stdio 处置方式、终止宽限期、可选的中止信号与可选的环境覆盖。目标与受管范围标识保留在提供方内部。`done` 以直接命令的退出事实（`exitCode` 与 `signal`）resolve，并在 spawn 或提供方失败时 reject；收集输出在退出后仍可读取。
 
 ```text
 const executable = await ctx.subprocess.resolveExecutable('bash')
@@ -52,112 +52,112 @@ const { exitCode, signal } = await handle.done
 const output = handle.collected.stdout?.readFrom(0)
 ```
 
-### Choosing how output is delivered
+### 选择输出投递方式
 
-- `'pipe'` hands you the raw stream for your own protocol framing — JSON-RPC for the LSP host, ndjson for the ACP backend.
-- `'inherit'` lets the child write to the parent's own stream, for pass-through diagnostics.
-- A collect object buffers a bounded in-memory tail; add a `spill` cap and the complete stream is also recoverable from a spill file.
+- `'pipe'` 把原始流交给你做自己的协议分帧——LSP 主机用 JSON-RPC，ACP（Agent Client Protocol）后端用 ndjson。
+- `'inherit'` 让子进程直接写父进程自己的流，用于直通诊断输出。
+- 收集对象（collect object）在内存中缓冲一段有界尾部；加上 `spill` 上限后，完整流还可以从 spill 文件中恢复。
 
-Reads are offset-based and non-consuming: a background reader and a final batch read can share one stream without stealing each other's bytes.
+读取基于偏移量且从不消费：后台读取与最终批量读取可以共享同一条流，而不会抢走彼此的字节。
 
 <a id="using-a-control-pipe"></a>
-### Using a control pipe
+### 使用控制管道
 
-Set `stdio.control: 'pipe'` to receive a separate raw `Duplex` in `handle.control`. The Node child opens fd 7 with `openInheritedControlChannel()` from `@deepseek-ai/dsh-subprocess/control`; this helper consumes the provider-owned `DSH_SUBPROCESS_CONTROL=pipe` marker. Callers cannot supply that marker through `env`. Control bytes never enter stdout/stderr collectors. The consumer owns framing, validation, backpressure, and closing its endpoint; provider disposal destroys any endpoint remaining after process teardown. Omitting the request returns `control: undefined`. This channel is available only for ordinary processes, and carries no authority to bypass tool approval.
+设置 `stdio.control: 'pipe'` 后，`handle.control` 会返回独立的原始 `Duplex`。Node 子进程通过 `@deepseek-ai/dsh-subprocess/control` 的 `openInheritedControlChannel()` 打开 fd 7；该辅助函数会消费提供方拥有的 `DSH_SUBPROCESS_CONTROL=pipe` 标记。调用方不能通过 `env` 提供该标记。控制字节不会进入 stdout/stderr 收集器。消费方负责分帧、校验、背压和关闭自身端点；提供方销毁时会在进程拆卸后销毁仍存在的端点。省略请求则返回 `control: undefined`。该通道仅适用于普通进程，不授予绕过工具审批的权限。
 
-### Managing process lifetime
+### 管理进程生命周期
 
-Termination and waiting use one provider-managed range. `terminate()` starts the provider's documented procedure, is idempotent, and becomes a no-op after that range is empty; the request's abort signal starts the same procedure. `waitForExit()` observes the same range and resolves only after the provider proves it quiescent, so direct command completion does not hide a surviving descendant. It rejects when the selected owner can no longer prove quiescence. Providers document their native owners and weaker fallbacks; callers own deadlines, teardown ladders, and cause classification.
+终止与等待使用同一个由提供方管理的范围。`terminate()` 会启动提供方记录的流程，具有幂等性，并在该范围为空后成为空操作；请求的中止信号会启动同一流程。`waitForExit()` 观察同一范围，只在提供方证明它完全停稳后 resolve，因此直接命令结束不会掩盖仍存活的后代。所选 owner 无法再证明完全停稳时，它会 reject。提供方记录其 native owner 与较弱 fallback；时限、拆卸阶梯与原因分类归调用方所有。
 
-### Running a terminal session
+### 运行终端会话
 
-For interactive programs, `spawnTerminal` allocates a real PTY: write text, read UTF-8 output, inspect and signal the current foreground process group, and await one `terminate()` that settles every session member the provider can still observe. Readiness, scrollback, and prompt policy stay with the PTY consumer.
+对于交互式程序，`spawnTerminal` 分配真实 PTY：写入文本、读取 UTF-8 输出、检查当前前台进程组并向其发送信号，以及等待一次 `terminate()`，让提供方仍可观察到的每个会话成员完全停稳。就绪状态、scrollback 与提示符策略仍归 PTY 消费方所有。
 
-A terminal request can opt into `shellActivity`. `inspectActivity()` combines supported shell lifecycle evidence with owned-job observations and returns `idle`, `busy` or `unknown`, plus a handle-scoped revision. Unsupported or incomplete observations never imply idle; input invalidates existing prompt evidence. Opted-in terminals keep remaining work owned after the root shell exits instead of using that exit as permission to terminate descendants. Consumers own retention and cleanup deadlines.
+终端请求可显式启用 `shellActivity`。`inspectActivity()` 结合支持的 shell 生命周期信号与自有任务观察，返回 `idle`、`busy` 或 `unknown`，以及句柄内的 revision。不支持或不完整的观察不能推出空闲；输入会使已有提示符证据失效。启用后，根 shell 退出时继续持有剩余工作，不把该退出视为终止后代进程的许可。保活和清理期限由消费者决定。
 
-### Environment every child starts from
+### 每个子进程起步时的环境
 
-Children never inherit the harness's ambient secrets: credential-shaped names and ambient `DSH_*` facts are scrubbed, and the caller's explicit `env` merges after that scrub. A deliberately forwarded credential or a current `DSH_*` deployment fact still reaches the child; an explicit `undefined` tombstone removes an ordinary ambient entry.
+子进程永远不会隐式继承 harness 的环境秘密：形似凭据的名称与环境中的 `DSH_*` 事实都会被清除，调用方显式的 `env` 在该清除之后合并。有意转发的凭据或当前的 `DSH_*` 部署事实仍会到达子进程；显式的 `undefined` 墓碑值则移除一个普通的环境项。
 
-### What can go wrong
+### 可能出错的地方
 
-An executable that cannot be resolved fails loudly with a stable error. A spawn that never starts rejects `done`; there is no buffered output for a process that never ran. `waitForExit()` also rejects when the provider cannot prove its selected range is empty, and a provider fallback may not own descendants that escape its process group or observed session. When a transport owns its own spawn (the SDK client, MCP), route around the service and import `scrubbedParentEnv` directly so environment policy stays single-sourced.
+无法解析可执行文件时，服务会明确报出稳定的错误。从未启动成功的 spawn 会让 `done` reject；从未运行过的进程没有任何缓冲输出。提供方无法证明所选范围为空时，`waitForExit()` 也会 reject；提供方 fallback 可能无法拥有逃离其进程组或已观察会话的后代。当传输拥有自己的 spawn（SDK 客户端、MCP）时，请绕开本服务并直接导入 `scrubbedParentEnv`，让环境策略保持单一来源。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the seam and points at the code that realizes them; the observable behavior is covered in [Use this package](#use-this-package).
+本节解释 seam 背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中说明。
 
-### Design concept
+### 设计理念
 
-The seam is built on one separation: the service owns process coordinates and lifetime; consumers own what a process means and every default that shapes one. That is why the spawn request is fully explicit — no hidden subprocess-service default — and why `SubprocessOutcome` carries exit facts only: callers own deadlines, teardown ladders, and cause classification. The `dsh-shell` request/spec split is the owning template.
+本 seam 建立在一个分离之上：服务负责进程坐标与生命周期；消费方负责定义进程的含义，以及决定塑造该进程的每一项默认值。正因如此，spawn 请求完全明确——没有任何隐藏的子进程服务默认值——`SubprocessOutcome` 也只携带退出事实：时限、拆卸阶梯与原因分类归调用方所有。`dsh-shell` 的 request/spec 拆分是这条规则的所属模板。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: abstract `SubprocessRuntime`, `ctx.subprocess` registration, the shared `scrubbedParentEnv` scrub |
-| [`src/types.ts`](src/types.ts) | Vocabulary: spawn spec, stdio modes, handles, readers, outcomes, `DSH_*` namespace |
+| [`src/index.ts`](src/index.ts) | 插件入口：抽象 `SubprocessRuntime`、`ctx.subprocess` 注册、共享的 `scrubbedParentEnv` 清除 |
+| [`src/types.ts`](src/types.ts) | 词汇：spawn spec、stdio 模式、句柄、读取器、结果、`DSH_*` 命名空间 |
 
-### Data model and flow
+### 数据模型与流程
 
-A spawn returns a live handle immediately without exposing target identity. `done` independently reports the direct command outcome or failure, while `waitForExit()` reports managed-range quiescence. The request's abort signal drives the same termination procedure as `terminate()`. Collected readers are cursor-free: offsets are whole-stream byte coordinates the caller owns, so independent readers cannot consume one another's output, and a read whose offset slid out of the in-memory tail is `lossy` and points at the spill file when one exists. `spawnTerminal` is one deep primitive because ordinary pipes cannot allocate a controlling terminal or clean terminal-session members.
+spawn 会立即返回活动句柄，而不公开目标身份。`done` 独立报告直接命令的结果或失败，`waitForExit()` 则报告受管范围是否完全停稳。请求的中止信号驱动与 `terminate()` 相同的终止流程。收集模式的读取器无游标：偏移量是调用方拥有的全流字节坐标，因此独立读取器不会消费彼此的输出，偏移量滑出内存尾部的读取标记为 `lossy`，并在 spill 文件存在时指向它。`spawnTerminal` 是一项底层原语，因为普通管道无法分配控制终端或清理终端会话成员。
 
-### Lifecycle and invariants
+### 生命周期与不变式
 
-One implementation registers per context; loading a second throws (Cordis standard). Disposal of the service terminates every still-running managed process and awaits its exit, so process lifetime survives consumer reloads. `argv` is never shell-interpreted; a consumer that wants a shell passes `['bash', '-c', command]` itself. Terminal allocation cancellation (the spec signal) is separate from the published handle's lifetime.
+每个上下文只注册一个实现；加载第二个会抛错（Cordis 标准行为）。服务自身的 dispose（资源释放）会终止所有仍在运行的受管进程并等待其退出，因此进程生命周期在消费方重载后依然延续。`argv` 绝不经过 shell 解释；需要 shell 的消费方自行传入 `['bash', '-c', command]`。终端分配的取消（spec 信号）与已发布句柄的生命周期相互独立。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the exhaustive type reference to the providers and the decision evidence behind the seam.
+当包级约定不够用时阅读以下页面。它们从穷尽式类型参考逐步进入各提供方，以及 seam 背后的决策证据。
 
-- [Subprocess subsystem](../../../docs/subsystems/subprocess.md) — spawn specs, output readers, outcomes, and the `DSH_*` environment in full.
-- [dsh-subprocess-local](../subprocess-local/README.md) — the local host provider that implements this contract.
-- [dsh-bash-local](../../shell/bash-local/README.md) — the largest consumer: bash commands over this service.
-- [Subprocess seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — why the process half became its own seam and what moved with it.
+- [子进程子系统](../../../docs/subsystems/subprocess.zh.md)——spawn spec、输出读取器、结果与完整的 `DSH_*` 环境。
+- [dsh-subprocess-local](../subprocess-local/README.zh.md)——实现本约定的本地宿主提供方。
+- [dsh-bash-local](../../shell/bash-local/README.zh.md)——最大的消费方：经由本服务运行 bash 命令。
+- [subprocess seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md)——进程部分为何成为独立的 seam，以及随之迁移的内容。
 
 -----
 
-Terminal consumers use `terminalEnvironment()` to read the provider platform and preferred shell, and `resolveExecutable()` to verify candidates. A completed lookup miss throws `SubprocessExecutableNotFoundError`; transport failures remain distinct. `spawnTerminal` requires `terminalType` and initial dimensions, and its handle supports `resize(cols, rows)` without reallocating the process.
+终端消费者通过 `terminalEnvironment()` 读取 provider 平台和首选 shell，通过 `resolveExecutable()` 验证候选。确定未找到可执行文件时抛出 `SubprocessExecutableNotFoundError`，传输故障仍单独报告。`spawnTerminal` 要求 `terminalType` 和初始尺寸，返回的 handle 通过 `resize(cols, rows)` 调整尺寸，不重新分配进程。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through consumer seams such as the bash executor family, which own all model-facing rendering of process output and lifecycle.
+通过消费方 seam（例如 bash 执行器家族）间接影响，它们负责进程输出与生命周期的全部面向模型渲染。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; the named consumers own any request-prefix changes.
+不会直接导致 KV Cache 失效；请求前缀变更由上述消费方负责。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the seam is a poor fit or leaves work to its consumers. They are current package constraints, not a comparison or a backlog.
+这些限制说明该 seam 何时不合适，或何时把工作留给消费方。它们是当前包约束，不是对比或任务积压。
 
-- **SDK-managed spawns remain outside** — a transport that owns its internal spawn (the SDK client, MCP) cannot route that call through this service; it can still import `scrubbedParentEnv` so environment policy stays single-sourced.
-- **Teardown ladders are consumer-owned** — the seam ships signalling verbs and the managed-range wait, not a canned quiesce sequence; each out-of-process consumer encodes its child's cooperation shape itself (the ACP backend's stdin-EOF-first ladder is the in-repo template).
-- **Observability is provider-specific** — native providers may own escaped descendants through systemd scopes or Windows Jobs, while fallback providers expose weaker process-group, tree, or session visibility. The seam adds no continuous process-table monitor.
+- **由 SDK 管理的 spawn 仍在服务之外**——拥有内部 spawn 的传输（SDK 客户端、MCP）无法把该调用路由到本服务；它仍可导入 `scrubbedParentEnv`，使环境策略保持单一来源。
+- **拆卸阶梯归消费方所有**——该 seam 只提供信号动词与受管范围等待，不提供现成的完全停稳序列；每个进程外消费方自行编码其子进程的配合方式（ACP 后端以 stdin EOF 打头的阶梯是仓库内模板）。
+- **可观察性取决于提供方**——native 提供方可以通过 systemd scope 或 Windows Job 拥有逃逸后代，fallback 提供方则只暴露较弱的进程组、进程树或会话可见性。该 seam 不新增持续的进程表监视器。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open design questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+本开发备注是维护者的工作上下文：开放设计问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-Future: non-shell runners. The seam was split so a direct-argv executor or worker supervisor could consume it without reaching into bash internals; none is shipped yet, and the terminal primitive keeps readiness policy in its consumer.
+未来：非 shell 运行器。该 seam 拆分的目的就是让直接 argv 执行器或 worker supervisor 无需深入 bash 内部即可消费它；目前尚无任何实现交付，终端原语也把就绪策略留在其消费方。
 
 </details>

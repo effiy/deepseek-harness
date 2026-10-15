@@ -1,35 +1,35 @@
 ---
-description: "Declare accessible files as deliverables with present; configuration, Session ownership, and source-file opening."
+description: "通过 present 声明交付可访问的文件；配置、Session 归属与源文件打开。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-tool-present
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `present` to declare final files accessible through the Session filesystem, including files created through shell commands. Users open the current source files in their default application. The tool records paths and optional descriptions without copying file contents.
+使用 `present` 声明交付Session 文件系统可访问的最终文件，包括通过 shell 命令创建的文件。用户使用默认应用打开当前源文件。工具记录路径和可选说明，不复制文件内容。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-`present` validates paths against the Session's current working directory and records absolute paths, so later directory changes do not redirect delivered files.
+`present` 按 Session 的当前工作目录校验路径并记录绝对路径，因此后续目录切换不会让已交付文件指向其他位置。
 
-The `standard`, `ptc`, and `cordis` agent presets mount this plugin. Call `present` with `files: [{ path, description? }]` after creating the files. Files must be regular files accessible through the Session filesystem. Relative paths resolve against the Session working directory; absolute paths may name files outside it, including `/tmp` or Downloads. Missing files, directories, final symbolic links, and provider-denied paths fail the call. Files in a shell sandbox’s private `/tmp` must first be written somewhere the Session filesystem can access.
+`standard`、`ptc` 与 `cordis` Agent preset 挂载本插件。创建文件后，以 `files: [{ path, description? }]` 调用 `present`。文件必须是 Session 文件系统可访问的普通文件。相对路径按 Session 工作目录解析；绝对路径可以指向工作区外的文件，包括 `/tmp` 或 Downloads。文件缺失、为目录、最终路径为符号链接或提供方拒绝访问时，调用失败。Shell 沙箱私有 `/tmp` 中的文件需要先写入 Session 文件系统可访问的位置。
 
-Mount it in an agent's Cordis composition with `tools`, `fs`, and the `turnBoundary` Session projection available:
+在 Agent 的 Cordis 组合中挂载，并提供 `tools`、`fs` 和 `turnBoundary` Session 投影：
 
 ```yaml
 - name: '@deepseek-ai/dsh-tool-present'
@@ -37,66 +37,66 @@ Mount it in an agent's Cordis composition with `tools`, `fs`, and the `turnBound
     maxFiles: 8
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `maxFiles` | `8` | Positive maximum file count per call |
+| `maxFiles` | `8` | 每次调用的最大文件数，为正整数 |
 
-The file-count limit is validated at mount. The tool requires an agent Session with a workspace and an open turn. Delivery belongs to the calling Session; a parent must call `present` itself to declare files created by a subagent.
+挂载时校验文件数量上限。工具要求 Agent Session 具有工作区和尚未结束的轮次。交付归调用方 Session 所有；父 Session 如需声明交付子 Agent 创建的文件，必须自行调用 `present`。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The tool resolves paths through the configured filesystem provider and checks regular-file metadata without reading contents. Successful final `tools/result` notifications append `deliverables/presented`, including nested calls. A later enclosing program failure does not revoke an already completed declaration. Blocked results publish none. Each plugin instance records only calls it executed; scoped tools with the same name cannot publish through another instance.
+工具通过配置的文件系统提供方解析路径，检查普通文件元数据，不读取内容。成功的最终 `tools/result` 通知追加 `deliverables/presented`，嵌套调用也适用。外层程序随后失败不会撤销已完成的声明。被阻止的结果不发布声明。每个插件实例只记录其实际执行的调用；同名作用域工具不能通过其他实例发布交付。
 
-The pure `./types` entry declares `PresentedFile` and the Session event without importing Host runtime code. The Web consumer validates persisted declarations before displaying or opening them. New declarations store absolute paths. Legacy relative declarations retain the viewed Session's original workspace as their base.
+纯 `./types` 入口声明 `PresentedFile` 与 Session 事件，不导入 Host 运行时代码。Web 消费方在展示或打开文件前校验持久声明。新声明保存绝对路径。历史相对路径声明继续以当前查看的 Session 原始工作区作为基准。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-- [Filesystem subsystem](../../../docs/subsystems/filesystem.md) — provider paths and errors.
-- [Web deliverables](../../client/ui-deliverables/README.md) — source-file opening and cards.
-- [Delivery decision](../../../.agents/notes/implemented/feature/2026-09-08-present-workspace-source-files.md) — Session ownership and required-on-read events.
+- [文件系统子系统](../../../docs/subsystems/filesystem.zh.md)——提供方路径与错误。
+- [Web 交付](../../client/ui-deliverables/README.zh.md)——源文件打开与卡片。
+- [交付决策](../../../.agents/notes/implemented/feature/2026-09-08-present-workspace-source-files.zh.md)——Session 归属与读取端必须识别的事件。
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
 ### present
 
-#### What the model sees
+#### 模型看到的内容
 
-The [present schema](../../../docs/tool-catalog.md#present) asks for existing accessible files: “Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.” The `files` parameter asks for the 1-2 most important deliverables and at most 4 per call. Results report `Presented <path>` for each file; the program result and durable event contain paths and optional descriptions.
+[present schema](../../../docs/tool-catalog.zh.md#present)要求已有且可访问的文件：“Declare existing files as final deliverables for the user. Use it when the user needs a separate file, especially Office documents, spreadsheets, and slide decks; prefer your final response when that suffices. The user opens the current files; their contents are not copied.” `files` 参数要求选择 1-2 个最重要的交付物，每次调用最多 4 个。每个文件的结果为 `Presented <path>`；程序结果和持久事件包含路径及可选说明。
 
-#### Token effect
+#### Token 影响
 
-One tool schema per mounted agent and one result line per delivered file. File bytes do not enter model messages.
+每个挂载的 Agent 增加一个工具 schema，每个交付文件增加一行结果。文件字节不进入模型消息。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-The tool schema is static for the mount lifetime. Delivery result text extends the conversation without rewriting its prompt prefix.
+工具 schema 在挂载期间保持静态。交付结果文本扩展对话，不重写提示词前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Metadata and Host-path checks cannot atomically prevent replacement before a desktop application opens a file.
-- Edits change what opens. Deleted or moved source files cannot be opened from their declarations.
-- Session ZIP exports contain declarations, not file contents. Persistent delivery versions and copy-on-write storage are deferred.
+- 元数据和 Host 路径检查无法原子性地阻止桌面应用打开文件前发生的路径替换。
+- 编辑会改变打开的内容。源文件删除或移动后，无法通过原声明打开。
+- Session ZIP 导出包含声明，不包含文件内容。交付版本持久化和写时复制存储延期实现。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

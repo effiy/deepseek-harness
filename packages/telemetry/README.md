@@ -1,35 +1,35 @@
 ---
-description: "Shared telemetry transport plugins for business consumers."
+description: "供业务调用方共享的遥测传输插件。"
 kind: "package-group"
 ---
 
-# telemetry/ — shared reporting
+# telemetry/ — 共享上报
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This group provides reporting infrastructure shared by product analytics and feedback-authorized Session uploads. Business plugins select events, identities, authorization, and redaction; transport plugins own encoding and delivery.
+本组提供产品埋点和反馈授权 Session 上传共用的上报基础设施。业务插件选择事件、身份、授权和脱敏规则；传输插件负责编码和投递。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Role |
+| 包 | 职责 |
 |---|---|
-| [`otel`](otel/README.md) | Cordis service creating independent ordinary-event and byte-bounded Session-log channels |
+| [`otel`](otel/README.zh.md) | 创建独立普通事件通道和受字节上限约束的 Session 日志通道的 Cordis 服务 |
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [OTel subsystem](../../docs/subsystems/otel.md) — shared service and consumer ownership.
+- [OTel 子系统](../../docs/subsystems/otel.zh.md) — 共享服务与调用方职责。
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
-None.
+无。

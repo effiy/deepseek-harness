@@ -1,103 +1,103 @@
 ---
-description: "Client command API for the Web GUI: the / command source, three dispatch kinds, the per-session command directory, and popupSelect and action registration for business packages; for users and maintainers of slash commands."
+description: "Web GUI 的客户端命令 API：/ 命令 source、三类派发、会话级命令目录，以及面向业务包的 popupSelect 与 action 注册；供斜杠命令的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-commands
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Typing a `/` command opens a registered popup, a client action, a host command's input, or direct execution; a command line is never silently downgraded to a plain prompt. Business packages register popupSelect specs (`/model`, `/permission`) or actions through `ctx.commandUi`, or decorate existing host commands with either kind while preserving their catalog rows and argument claims. Space and Enter resolve the line against the session's directory: a host descriptor with `input` is `leadingInput`, a registered `CommandUiSpec` is `popupSelect` or `action`, and everything else is `execute`.
+键入 `/` 命令会打开已注册的弹窗、运行客户端动作、进入宿主命令的输入或直接执行，命令行不会被静默降级为普通提示词。业务包通过 `ctx.commandUi` 注册 popupSelect（`/model`、`/permission`）或 action，也可用这两种方式装饰既有宿主命令，同时保留其目录行与参数声明。空格与回车根据会话目录解析命令行：带 `input` 的宿主描述符是 `leadingInput`，注册了 `CommandUiSpec` 的是 `popupSelect` 或 `action`，其余是 `execute`。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this plugin alongside `ui-input-trigger` and `ui-conversation`; the `/` source then appears in the trigger menu, and business packages register their command surfaces through `ctx.commandUi`. Typing `/model` opens the registered popup; a host command with an argument claim opens its input or executes directly. The popup holds composer focus: typing filters the loaded rows locally, `↑`/`↓` walk them, Enter and `Tab` accept the highlighted row, and Escape and `Shift+Tab` return to the composer. The highlight opens on the row the options mark as the session's current value, so accepting on a freshly opened panel confirms it. The composer's `+` button and a typed `/` open the same menu: an Add section (File, Goal, Plan, Feedback) and a Commands section (Compact, Permission, Model, Export) in usage order, each row with a glyph, a localized title and description, and the command name as an alias where the localized title differs from it.
+与 `ui-input-trigger` 及 `ui-conversation` 一起挂载本插件；`/` source 随即出现在触发菜单中，业务包经 `ctx.commandUi` 注册自己的命令表面。键入 `/model` 打开已注册的弹窗；带参数声明的宿主命令打开其输入或直接执行。弹窗持有 composer 焦点：键入即在已加载的行上本地筛选，`↑`／`↓` 在行间移动，回车与 `Tab` 接受高亮行，Escape 与 `Shift+Tab` 把焦点还给 composer。高亮落在选项标记为会话当前值的行上，因此在刚打开的弹窗上接受即确认当前值。composer 的 `+` 按钮与键入的 `/` 打开同一个菜单：「添加」小节（文件、目标、计划、反馈）与「指令」小节（压缩、权限、模型、下载日志）按使用频次排列，每行带图标、本地化的标题与说明，本地化标题与命令名不同时还显示命令名作为别名。
 
-### Kinds and decorations
+### 种类与装饰
 
-A contribution is a client-owned command; a host-name collision fails loudly. Its UI is a popupSelect spec or an action: a callback a bare invocation runs after the trigger token is consumed, without submitting a message. Business packages own their actions and availability; the composer registers File through this same API. A decoration adds a bare-invocation popup or action to an existing host command while preserving its catalog row, argument claim, and lifecycle logging; it never fires without a matching host row. Menu queries fuzzy-match ordered, case-insensitive subsequences of command names and titles, with prefixes first and no section headings.
+贡献项是客户端自有命令，与宿主命令同名会明确报错。它的 UI 是 popupSelect 规格或动作：裸调用消费触发 token 后运行回调，不提交消息。业务包负责自己的动作及可用性，输入框通过同一 API 注册「文件」。装饰为已有宿主命令添加裸调用弹窗或动作，并保留其目录行、参数认领与生命周期记录；没有匹配的宿主行时不触发。菜单查询按顺序、不区分大小写地模糊匹配命令名与标题的子序列，前缀优先，不显示小节标题。
 
-A popupSelect spec may supply `searchLabels()` to resolve its placeholder, empty-catalog text, and no-match text for each opening. Omitted labels retain the shell's generic copy; labels from one popup never carry into the next.
+popupSelect 规格可提供 `searchLabels()`，在每次打开时解析占位文字、空目录提示和无匹配提示。未提供时保留外壳的通用文案；一个弹窗的文案不会沿用到下一个弹窗。
 
-Options may carry `group: { name, label }`: `name` identifies the group and `label` supplies its localized sticky heading. Equal names share one group; groups retain first-occurrence order in the loaded options, including when a query hides earlier rows. Ungrouped options form one headingless block at their first occurrence. Groups without matching rows are hidden.
+选项可携带 `group: { name, label }`：`name` 标识分组，`label` 提供本地化吸顶标题。同名选项归入同一组；分组保持在已加载选项中首次出现的顺序，即使查询隐藏了较早的行也不变。未分组选项在首次出现的位置组成一个无标题区块。没有匹配行的分组会隐藏。
 
-The optional `searchMode` defaults to `'substring'`, matching `label` and `detail` case-insensitively without ranking. `'fuzzy-label'` matches only labels as ordered, case-insensitive subsequences and ranks within each group: prefixes first, then alignment score, then original row order. Both modes ignore leading and trailing query spaces; a blank query keeps every row in group order. Rendering, keyboard navigation, and selection use the same filtered order. `/model` opts into `'fuzzy-label'`; other commands retain substring matching unless they opt in.
+可选的 `searchMode` 默认为 `'substring'`，不区分大小写地匹配 `label` 与 `detail` 的子串，不进行相关性排序。`'fuzzy-label'` 仅匹配标签中按顺序、不区分大小写的子序列，并在组内排序：前缀优先，其次按匹配得分，最后按原始行顺序。两种模式均忽略查询首尾空格；空查询按分组顺序保留所有行。渲染、键盘导航与选择使用相同的筛选顺序。`/model` 启用 `'fuzzy-label'`；其他命令未显式启用时仍使用子串匹配。
 
-### Built-in row faces
+### 内置行的展示面
 
-First-party command definitions carry stable `definitionId` values. The client selects their localized titles, descriptions, icons, and input spellings by identity; changing a Host description cannot change that selection. Same-name overrides without the matching identity keep their own copy and receive no first-party aliases. Chinese and English spellings resolve through the same effective Session catalog in every locale, preserving the typed spelling in the draft and submitting the registered Host name. Contributions supply their own `label`, `description`, and `icon`, read on every candidate pass. Empty-query section order follows names, with unlisted rows closing Commands.
+内置命令定义携带稳定的 `definitionId`。客户端按标识选择本地化标题、说明、图标和输入写法，修改宿主说明不会改变选择结果。没有匹配标识的同名覆盖保留自己的文案，也不获得内置别名。在任何界面语言下，中英文写法都通过同一个会话有效目录解析，草稿保留手输写法，提交使用宿主注册名。贡献项提供自己的 `label`、`description` 和 `icon`，每次生成候选项时读取。空查询按名称确定小节顺序，未列出的行排在「指令」末尾。
 
-### Attachment-carrying submissions
+### 带附件提交
 
-When the composer submits with images or generic files, only a host command declaring `input.attachments` proceeds. Every other command route throws the localized `attachmentsUnsupported` refusal, rendered as a transient toast while the draft and attachment cards stay in place. Handler errors preserve the same draft state for retry.
+composer 携带图片或通用文件提交时，只有声明了 `input.attachments` 的宿主命令继续。其余命令路径都会抛出本地化的 `attachmentsUnsupported` 拒绝，以瞬态 toast 呈现，草稿与附件卡保持原位。处理器出错时保留相同草稿状态供用户重试。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
-Popup selection panels fill the composer overlay's width, matching the slash menu. Popup search fields keep transparent backgrounds and borders in both palettes. Grouped options use [ui-primitives](../ui-primitives/README.md#understand-the-implementation)' shared `MenuGroup` headings and `observeStickyMenuGroups`; an ordinary effect owns the asynchronous observation and rebuilds it when rendered groups change. Menus use the shared `MenuSurface` material, including the macOS backing for background blur; custom content follows the [menu rules](../../../docs/web-styling.md#component-rules).
+弹窗选择面板撑满 composer 浮层宽度，与斜杠菜单一致。弹窗搜索框在浅／深色主题下均保持背景和边框透明。分组选项使用 [ui-primitives](../ui-primitives/README.zh.md#understand-the-implementation) 共享的 `MenuGroup` 标题与 `observeStickyMenuGroups`；普通 effect 负责异步观察，并在渲染分组变化时清理和重建观察器。菜单采用共享 `MenuSurface` 材质，包括用于背景模糊的 macOS 底层；自定义内容遵循[菜单规则](../../../docs/web-styling.zh.md#component-rules)。
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-`src/client/contract.ts` defines contribution and decoration registration, plus `dismiss(name)`, which closes that command's open popups and confirmations: dismissal aborts pending option loads, prevents their late results from reopening the popup, and preserves composer drafts. `CommandDirectory` owns the per-session wire cache and resolves typed commands through `resolution.ts`; that module owns first-party identity matching and localized input spellings. `matchSpace` reads the ready cache synchronously, while `matchEnter` waits for readiness and rejects on warmup failure or cancellation. Forwarded catalog and connection events invalidate the cache. After a matched Host execution, this browser emits `command/executed`; other clients observe only the durable command events. `PopupSelectController` owns popup state, and `PopupSelectView` occupies the input overlay. `presentation.ts` owns row labels, icons, and sections; its helpers and the resolution helpers stay internal to the plugin.
+`src/client/contract.ts` 定义贡献项和装饰的注册接口，以及 `dismiss(name)`：它关闭该命令已打开的弹窗与确认对话框，中止待完成的选项加载，阻止晚到结果重新打开弹窗，并保留 composer 草稿。`CommandDirectory` 负责会话级协议缓存，并通过 `resolution.ts` 解析输入命令；该模块负责内置命令标识匹配和本地化输入写法。`matchSpace` 同步读取就绪缓存，`matchEnter` 等待缓存就绪，预热失败或取消时拒绝。转发的目录和连接事件使缓存失效。宿主执行匹配的命令后，本浏览器发布 `command/executed`，其他客户端只观察持久命令事件。`PopupSelectController` 负责弹窗状态，`PopupSelectView` 占据输入浮层。`presentation.ts` 负责行标题、图标和分节，展示与解析辅助函数均留在插件内部。
 
-Each command-directory fetch requires an existing retained Client Session and waits for its initial history open to succeed before sending `commands.list`. A temporary `commandCatalog` reference holds that Session until the fetch settles. An unretained Session or a failed open rejects without sending the RPC, so background catalog refreshes do not reopen closed Sessions.
+每次命令目录拉取都要求客户端已持有该会话，并等待首次历史打开成功后才发送 `commands.list`。临时的 `commandCatalog` 引用持续持有会话，直到拉取结束。未被持有的会话或打开失败会直接拒绝，不发送 RPC，因此后台目录刷新不会重新打开已关闭的会话。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the command surface is not enough. They move from the command API to the trigger pipeline and the host command registry.
+如果仅了解命令交互还不够，请阅读以下页面。它们从命令 API 进入触发流水线与宿主命令注册表。
 
-- [ui-input-trigger](../ui-input-trigger/README.md) — the pipeline the `/` source registers into.
-- [ui-conversation](../ui-conversation/README.md) — declares the input overlay slot and owns the composer.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [ui-input-trigger](../ui-input-trigger/README.zh.md)——`/` source 注册进的流水线。
+- [ui-conversation](../ui-conversation/README.zh.md)——声明输入浮层 slot 并拥有 composer。
+- [客户端包映射](../README.zh.md)——相邻的浏览器 UI 包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through the host `command.execute` RPC they trigger, each command handler's host package owns any model-visible effect (the `/plan` handler flips plan mode, whose owning package injects its policy section), while the command line, the detached result, and every menu and notice rendering stay client-side and never enter the session log.
+派发路径通过其触发的宿主 `command.execute` RPC 间接影响模型：每个命令 handler 的宿主包拥有任何模型可见效果（`/plan` 的 handler 翻转 plan 模式，其归属包注入 policy 段），而命令行、分离结果与所有菜单和 notice 渲染都留在客户端，永不进入会话日志。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None directly; this package neither assembles nor sends a provider request. Command handlers it triggers may change what the owning host packages contribute to the next request's system prompt — a section appearing or disappearing replaces earlier request tokens and invalidates the provider prefix from that point — but that effect is owned and documented by each command's host package.
+无直接影响；该包既不组装也不发送提供方请求。它触发的命令 handler 可能改变归属宿主包对下一个请求系统提示词的贡献——某个 section 的出现或消失会替换较早的请求 token，并使提供方前缀从该点起失效——但这一影响由各命令的宿主包拥有并记录。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current command surface. They are current package constraints, not a general command-line comparison or a task backlog.
+这些限制界定了当前命令交互方式。它们是当前包约束，不是通用命令行对比或任务积压。
 
-- **Detached-result notices fall back to the console off-session** — the fire-and-forget paths route results to the triggering session's composer via `SessionInput.notify`; after session teardown the console line is the only remaining surface.
+- **脱离会话后，分离结果 notice 回退到 console**——fire-and-forget 路径经 `SessionInput.notify` 把结果送到触发会话的 composer；会话销毁后，console 输出行是仅剩的呈现面。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

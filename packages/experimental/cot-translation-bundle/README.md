@@ -1,81 +1,81 @@
 ---
-description: "Enable machine translation of displayed reasoning from the Plugins page."
+description: "从插件页面启用已展示思考内容的机器翻译。"
 kind: "package-bundle"
 ---
 
 # @deepseek-ai/dsh-experimental-cot-translation-bundle
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Translate expanded reasoning into the interface language or another chosen language. Enable Reasoning translation on the Web or Desktop Plugins page; shipped profiles leave it disabled. Bing is the default provider, and Google is available in the bundle settings. Original reasoning remains available and stays unchanged in the Session and model input.
+将展开的思考内容翻译为界面语言或其他指定语言。在 Web 或 Desktop 的插件页面启用思考过程翻译；发布的 profile 默认禁用该功能。默认翻译服务为 Bing，也可在 Bundle 设置中选择 Google。原始思考内容始终可访问，Session 与模型输入中的原文保持不变。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [了解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与后续工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Open Plugins and enable Reasoning translation in the Official group. Open its details to select a translation service and target language. `auto` follows the interface language; an explicit language code such as `zh`, `en`, or `ja` overrides it. Save applies the preferences.
+打开插件页面，在官方分组中启用思考过程翻译。打开详情，选择翻译服务及目标语言。`auto` 跟随界面语言；填写 `zh`、`en` 或 `ja` 等语言代码则使用指定语言。保存后应用设置。
 
-Expand a Think row to start translation. The row translates completed paragraphs and request-sized prefixes of long streaming paragraphs while retaining the unfinished tail. View original in the translation toolbar switches the expanded body to the source; View translation switches it back. A failed translation leaves the original visible and offers Retry. Disabling the bundle removes its controls and cancels pending calls. Successful translations remain saved in the Session and are reused when the same request is reopened, the page reloads, or the Host restarts.
+展开思考行以开始翻译。内容区翻译完整段落和流式长段落中达到请求长度的前缀，并保留未完成的末尾片段。翻译工具栏内的“查看原文”将展开的正文切回源文本，“查看译文”切回译文。翻译失败时保留原文，并提供重试。禁用 Bundle 会移除控件并取消待处理请求。成功译文仍保存在 Session 中，相同请求在重新展开、页面重新加载或 Host 重启后会复用已有结果。
 
-The selected service receives the expanded reasoning, which can contain private code and conversation details. Google and Bing send source text in POST request bodies. Bing and Google require no additional login or API key, but neither anonymous endpoint guarantees availability or free quotas. Eligible native `deepseek-flash` routes appear as explicit paid choices using the configured DeepSeek Account or Official API credentials. Each uncached fragment issues one independent query with thinking disabled. Reopening reuses saved results; changing provider, language, source or recipe may require another billed query. The model ID is matched without a version number, and pi-ai routes are excluded. Provider failure never sends the text to another service automatically.
+所选服务会接收展开的思考内容，其中可能包含私有代码与对话细节。Google 和 Bing 通过 POST 请求体接收原文。Bing 和 Google 无需额外登录或 API key，但两种免登录端点均不保证可用性或免费额度。符合条件的原生 `deepseek-flash` 路由显示为显式的付费选项，使用已配置的 DeepSeek 账号或官方 API 凭据。每个未缓存片段执行一次关闭思考的独立查询。重新展开复用已保存结果；改变 Provider、语言、原文或翻译规则时可能需要再次付费查询。匹配模型 ID 时不限制版本号，且排除 pi-ai 路由。Provider 失败后不会自动将文本发送给其他服务。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 了解实现
 
 <details>
-<summary>Maintainer details — click to expand</summary>
+<summary>维护者细节 — 点击展开</summary>
 
-The bundle patch inserts `translator` and `cot-translation`, selecting Bing and the interface language. The translator owns provider protocols, network limits, and shared persisted requests and results; the GUI consumer owns settings, paragraph scheduling, and a local cache for the current display. The GUI reuses saved results directly and joins normal Session activation when a new translation needs its existing writer. Its generated Remote contribution is mounted only while the bundle is enabled. The translation wrapper and Chat's default Body entry both call the official reasoning Content Factory.
+Bundle 补丁插入 `translator` 和 `cot-translation`，选择 Bing 与界面语言。Translator 负责 Provider 协议、网络限制及统一持久保存的请求与结果；GUI 消费者负责设置、段落调度和当前展示使用的本地缓存。GUI 直接复用已保存结果，新翻译需要现有写入器时等待正常 Session 激活。生成的 Remote contribution 仅在 Bundle 启用期间挂载。翻译包装与 Chat 默认 Body 条目均调用官方思考 Content Factory。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 延伸阅读
 
-[Text translation subsystem](../../../docs/subsystems/translation.md) · [Translator service](../translator/README.md) · [GUI consumer](../client-ui-cot-translation/README.md)
+[文本翻译子系统](../../../docs/subsystems/translation.zh.md) · [Translator 服务](../translator/README.zh.md) · [GUI 消费者](../client-ui-cot-translation/README.zh.md)
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through optional independent paid Flash requests and normal Session activation on cache misses; the translator owns translation prompts, and the Session's preset owns startup context.
+间接影响来自可选的独立付费 Flash 请求，以及缓存未命中时的正常 Session 激活；translator 负责翻译提示词，Session 的 preset 负责启动上下文。
 
-#### KV Cache effect
+#### KV Cache 效果
 
-Translation records leave original reasoning intact; normal Session activation and optional paid queries have the cache effects described by the [GUI consumer](../client-ui-cot-translation/README.md#model-experience).
+翻译记录保留原始思考内容；正常 Session 激活及可选付费查询的缓存影响见 [GUI 消费者](../client-ui-cot-translation/README.zh.md#model-experience)。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Collapsed summaries remain in the original language. Translation starts when the reader expands the reasoning body; it may change Markdown or code formatting. Original always remains accessible.
-- Anonymous Google and Bing browser endpoints may fail, rate-limit requests, or change their response formats. Mainland China connectivity depends on the deployment's network and proxy configuration. Successful translations remain in the Session after collapse, bundle removal, or restart. Experimental records have best-effort retention across future Session-format migrations.
+- 折叠摘要保留原始语言。读者展开思考内容后才开始翻译；译文可能改变 Markdown 或代码格式。原文始终可访问。
+- 免登录 Google 和 Bing 浏览器端点可能失败、限制请求或更改响应格式。中国大陆连通性取决于部署的网络与代理配置。成功译文在折叠、移除 Bundle 或重启后仍保留在 Session 中。实验性记录在未来 Session 格式迁移中仅提供尽力保留。
 
 -----
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文 — 点击展开</summary>
 
-None.
+无。
 
 </details>

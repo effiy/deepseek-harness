@@ -1,37 +1,37 @@
 ---
-description: "The file-backed credentials provider for users and maintainers choosing, configuring, or debugging the local credential store and its environment layering."
+description: "面向用户与维护者的文件型凭据提供方：选择、配置或排查本地凭据存储及其环境分层。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-credentials-local
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-credentials-local` keeps API keys and other secrets in a private file under your harness home. You can save credentials through the configuration UI or edit the file directly; changes reload automatically and saved values survive restarts. Credential lookup follows a fixed precedence: the launch environment wins, followed by the stored file, the project's `.env`, and the harness-home `.env`; a newly saved value immediately overrides older `.env` values. Only your OS user can read the file, but agent tool processes run as that same user, so this store cannot isolate secrets from the agent.
+`dsh-credentials-local` 把 API 密钥和其他机密保存在 harness home 下的私有文件中。你可以通过配置界面保存凭据，也可以直接编辑文件；变更会自动重载，保存的值也会跨重启保留。凭据查找采用固定优先级：启动环境优先，其次是存储文件、项目 `.env` 和 harness home 的 `.env`；新保存的值会立即覆盖 `.env` 中的旧值。只有你的 OS 用户能读取该文件，但 agent（智能体）的工具进程以同一用户身份运行，因此该存储无法向 agent 隔离机密。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-This package gives a composition a local credential store: save API keys and other secrets once, and every request that names them uses them. The common path is explicit: load the store, save keys through the configuration UI or `ctx.credentials`, and let the product resolve them when needed.
+本包为组合提供本地凭据存储：API 密钥与其他机密只需保存一次，之后每个按名引用它们的请求都会用到。常用路径是显式的：加载存储、通过配置界面或 `ctx.credentials` 保存密钥，然后在需要时由产品解析。
 
-### When to use it
+### 何时使用
 
-Use it as the default local store: the product's base composition loads it, and a key you save through a configuration UI takes effect immediately. Choose a different store when a deployment must keep provider keys away from its own agent — file permissions cannot do that, because the agent's tool processes run as your OS user (see "Who can read the file").
+把它作为默认本地存储：产品的基础组合会加载它，你通过配置界面保存的密钥会立即生效。当部署必须让提供方密钥远离自身 agent 时选择其他存储——文件权限做不到这一点，因为 agent 的工具进程以你的 OS 用户身份运行（见「谁能读取该文件」）。
 
-### Setting it up
+### 设置
 
 ```yaml
 - name: '@deepseek-ai/dsh-credentials-local'
@@ -39,18 +39,18 @@ Use it as the default local store: the product's base composition loads it, and 
     path: /absolute/path/to/.credentials.yaml
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `path` | `<harness home>/.credentials.yaml` | Where the credential file lives |
-| `dshHome` | `$DSH_HOME` or `~/.dsh` | Harness home used when `path` is omitted |
-| `watch` | `true` | Reload the file automatically when it changes on disk |
-| `debounceMs` | `100` | Wait this long after a change before reloading, in milliseconds |
+| `path` | `<harness home>/.credentials.yaml` | 凭据文件所在位置 |
+| `dshHome` | `$DSH_HOME` 或 `~/.dsh` | `path` 缺省时使用的 harness home |
+| `watch` | `true` | 文件在磁盘上变化时自动重载 |
+| `debounceMs` | `100` | 变化后等待这么久再重载，单位为毫秒 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-credentials-local) is the exhaustive source for every accepted field and its JSDoc.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-credentials-local)完整列出了所有受支持字段及其 JSDoc，是这些信息的真源。
 
-### Storing and removing keys
+### 存储与移除密钥
 
-Save a key with `set`, remove it with `unset`, and check whether a key is configured with `describe` — the same operations the credential API provides:
+用 `set` 保存密钥、用 `unset` 移除、用 `describe` 检查密钥是否已配置——与凭据 API 提供的操作相同：
 
 ```ts
 import type { Context } from '@deepseek-ai/cordis'
@@ -64,24 +64,24 @@ await ctx.credentials.describe(ref)             // { configured, source?, writab
 await ctx.credentials.unset(ref)                // remove
 ```
 
-A key you save is usable by the next request that names it, and `describe` reports whether it is set, where it comes from, and whether you can write to it — never the value itself. Records persist in the same file, addressed by `<owner>/<id>` and managed with the seam's record operations (`readRecord`, `describeRecord`, `listRecords`, `modifyRecord`, `deleteRecord`).
+你保存的密钥会被下一个按名引用它的请求使用；`describe` 报告它是否已设置、来自哪里、能否写入——绝不返回值本身。记录也持久化在同一文件中：插件按 `<owner>/<id>` 寻址一条记录，并用 seam 的记录操作（`readRecord`、`describeRecord`、`listRecords`、`modifyRecord`、`deleteRecord`）管理它。
 
-### Where keys come from
+### 密钥从哪里来
 
-Keys are resolved in one fixed order — the first place that has a value wins:
+密钥按一个固定顺序解析——先有值的位置胜出：
 
-| Place | Writable? | Wins over |
+| 位置 | 可写？ | 优先于 |
 |---|---|---|
-| The environment you launched in (`DEEPSEEK_API_KEY=… dsh`) | no | everything |
-| The stored file | yes (`set`/`unset`) | both `.env` files |
-| Your project's `.env` (`<invocation cwd>/.env`) | not here | your home `.env` |
-| Your home `.env` (`$DSH_HOME/.env`) | not here | nothing |
+| 你启动时的环境（`DEEPSEEK_API_KEY=… dsh`） | 否 | 一切 |
+| 存储文件 | 是（`set`/`unset`） | 两个 `.env` 文件 |
+| 项目的 `.env`（`<invocation cwd>/.env`） | 不在此处 | 主目录 `.env` |
+| 主目录的 `.env`（`$DSH_HOME/.env`） | 不在此处 | 无 |
 
-The launching environment wins because a per-run override — `DEEPSEEK_API_KEY=… dsh`, a CI secret, a container `-e` — is this run's explicit intent; it cannot be edited from inside the product, so it is reported read-only and writes to it are refused. Everything else loses to the stored file, which is why a key you save takes effect immediately even when an older key sits in a `.env`; those two `.env` layers resolve when nothing is stored. The environment layer is the launcher's snapshot taken at launch ([environment snapshot](../../util/launch-environment/README.md)), so a variable exported after startup is not seen.
+启动环境优先，因为按次覆盖——`DEEPSEEK_API_KEY=… dsh`、CI 机密、容器 `-e`——代表本次运行的明确意图；它无法从产品内部修改，因此被报告为只读，写入会被拒绝。其他一切来源都输给存储文件，这正是你保存的密钥会立即生效的原因，即使某个 `.env` 里还留着更旧的密钥；没有存储任何东西时，那两个 `.env` 层会参与解析。环境层是启动时拍摄的启动器[环境快照](../../util/launch-environment/README.zh.md)，因此启动之后才导出的变量不会被看到。
 
-### The credential file
+### 凭据文件本身
 
-A versioned YAML document with one section per key space, and nothing else:
+带版本的 YAML 文档，每个键空间一个分节，除此之外别无他物：
 
 ```yaml
 version: 1
@@ -106,108 +106,108 @@ records:
     kind: api-key               # neither: the owner confirmed the ambient credential chain
 ```
 
-You can edit the file directly — the store reloads it automatically and picks up the change, including a key or record you delete. `refs` holds key values by environment-variable name; `records` holds per-plugin credentials by `<owner>/<id>`, each tagged `api-key` or `grant`, whose grant payload the store keeps verbatim because only its owner can interpret it. Comments and the formatting of untouched entries survive product writes; a comment directly above an entry is that entry's note and is removed with it. The file holds only credentials, so anything else is refused loudly rather than silently ignored: a non-mapping root, an unknown top-level key, a key that is not addressable in its space, a wrong-typed or empty value, an unknown record tag or field, duplicate keys, and malformed YAML all fail at startup, and on a live reload the last good content keeps serving with a warning.
+你可以直接编辑该文件——存储会自动重载并接收变更，包括你删除的密钥或记录。`refs` 按环境变量名存放密钥值；`records` 按 `<owner>/<id>` 存放各插件的凭据，每条都带 `api-key` 或 `grant` 标签，其中 grant 的 payload 由存储逐字保留，因为只有它的拥有者能解释。产品写入时会保留注释与未触及条目的排版；直接位于某条目上方的注释属于该条目的注解，会随它一起删除。文件只存放凭据，因此任何其他内容都会被明确拒绝，而不是被静默忽略：非 mapping 的根、未知的顶层键、在其键空间内不可寻址的键、类型错误或空的值、未知的记录标签或字段、重复键以及格式错误的 YAML 都会在启动时失败；运行期热重载时则保留最后可用内容并告警。
 
-A key's value can be any text, multi-line values included — no quoting tricks needed. An empty value means "no key", which is why an empty string in the file is rejected: removing a key deletes it, it does not blank it. A `grant` payload must survive a JSON round trip, enforced on the way in and on the way out, so the store refuses a value it could not read back exactly as written. If the file on disk no longer parses, saving fails instead of overwriting content the product could not read.
+密钥的值可以是任意文本，包括多行值——不需要任何引号技巧。空值等于「没有密钥」，这正是文件中的空字符串被拒绝的原因：移除密钥是删除它，而不是把它置空。`grant` 的 payload 必须经受 JSON 往返，进出两个方向都会强制这一点，因此存储会拒绝无法逐字读回的值。如果磁盘上的文件已无法解析，保存会失败，而不是覆盖产品读不懂的内容。
 
-### Who can read the file
+### 谁能读取该文件
 
-Only your OS user can read the file: the product creates it with owner-only permissions, and on POSIX it refuses to load a file that any other user can read — the error tells you to run `chmod 600`. Windows has no mode to inspect, so the check is skipped there rather than faked. The agent is not another user: its tool processes run as you, so they can read the file like any other file you own. The product never hands the agent the file's path and never loads the file into the environment, so reaching a value takes a deliberate read of a path the agent was not given. That is discretion, not a boundary: a deployment that must keep provider keys away from its own agent cannot get there with file permissions.
+只有你的 OS 用户能读取该文件：产品以仅属主可访问的权限创建它，在 POSIX 上还会拒绝加载任何其他用户可读的文件——错误会提示你运行 `chmod 600`。Windows 没有可检查的 mode，因此在那里跳过该检查而不是伪造它。agent 不是另一个用户：它的工具进程以你的身份运行，因此它们读这个文件与读你拥有的任何其他文件毫无二致。产品绝不把文件路径交给 agent，也绝不把文件载入环境，因此要拿到某个值，需要刻意去读一条并未交给 agent 的路径。这是审慎，不是边界：必须让提供方密钥远离自身 agent 的部署无法靠文件权限做到。
 
-### What can go wrong
+### 可能出错的地方
 
-- **A key the launching environment supplies is read-only** — `DEEPSEEK_API_KEY=… dsh` wins for this run; saving or removing it is refused. Clear the variable in the launching shell first.
-- **An empty value cannot be saved** — storing an empty string is refused; remove the key instead.
-- **The store refuses to load a file it cannot trust** — a file any other user can read, malformed YAML, or an unreachable path fails at startup; on a live reload the last good content keeps serving with a warning.
-- **Changes made at the same time are both kept** — if you edit the file while the product writes, your change is folded in rather than overwritten.
+- **启动环境提供的密钥是只读的**——`DEEPSEEK_API_KEY=… dsh` 在本轮运行中优先，保存或移除它都会被拒绝。请先在启动 shell 中清除该变量。
+- **空值无法保存**——存储空字符串会被拒绝；请改为移除密钥。
+- **存储拒绝加载它无法信任的文件**——任何其他用户可读的文件、格式错误的 YAML 或无法访问的路径都会在启动时失败；运行期热重载则保留最后可用内容并告警。
+- **同一时刻的修改都会被保留**——如果你在产品写入的同时编辑文件，你的变更会被并入，而不是被覆盖。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the provider and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释提供方背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-- **One honest precedence.** The inherited environment wins because it is this run's explicit intent and cannot be edited from inside; everything below it loses to the managed store, so a stored key is never displaced by a stale `.env`.
-- **The document holds only credentials.** A versioned document with `refs` and `records` sections rather than a dotenv file: a store the harness owns and never materializes into the environment cannot also serve as the user's environment layer, which would shadow non-secret entries behind its precedence.
-- **Writes patch, reloads replace.** Line edits preserve comments and untouched entries under the cross-process writer lock; reloads swap the parsed snapshot wholesale so a deleted entry never lingers in memory.
-- **Fail loud where trust is at stake.** Boot and reload reject a document that is unreadable, invalid, or readable beyond its owner; a live reload that fails keeps the last good snapshot and warns rather than taking the process down.
+- **一套明确的优先级。** 继承环境优先，因为它是本次运行的明确意图且无法从进程内部修改；它之下的所有来源都输给受管存储，因此已存密钥永远不会被陈旧的 `.env` 挤掉。
+- **文档只存放凭据。** 它是带 `refs` 与 `records` 分节的版本化文档，而不是 dotenv 文件：一个 harness 拥有、且绝不物化进环境的存储，不能同时充当用户的环境层，否则会以自己的优先级遮蔽非机密条目。
+- **写入打补丁，重载整体替换。** 行编辑在跨进程写锁下保留注释与未触及条目；重载整体交换解析后的快照，已删除条目绝不在内存滞留。
+- **信任攸关处明确报错。** 启动与重载都会拒绝不可读、无效或可被属主之外读取的文档；运行期重载失败时会保留最后可用快照并告警，而不是拖垮进程。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Provider: layer resolution, strict document parse, reference and record write paths under the writer lock, watcher lifecycle, permissions check |
+| [`src/index.ts`](src/index.ts) | 提供方：层解析、严格文档解析、写锁下的引用与记录写路径、watcher 生命周期、权限检查 |
 
-### Resolution and write paths
+### 解析与写入路径
 
-`resolve` and `describe` read the inherited environment snapshot, the parsed document snapshot, and the `.env` fallbacks in precedence order. `set`/`unset` queue onto one exclusive operation chain: entry checks reject early (disposed, empty value, environment-shadowed), and the queue re-judges them at run time before a read-modify-write under the writer lock commits and fires `credentials/reference-updated` exactly once.
+`resolve` 与 `describe` 按优先级顺序读取继承环境快照、已解析文档快照与 `.env` 后备层。`set`/`unset` 排入同一条独占操作链：入口检查提前拒绝（已释放、空值、被环境遮蔽），队列在运行时会重新判定，随后在写锁下执行读-改-写、提交，并恰好触发一次 `credentials/reference-updated`。
 
-`modifyRecord` runs on the same chain and lock: it re-reads the document, passes the record as it stands to the mutation, admits the result — a non-empty API key, a grant payload that survives a JSON round trip — renders the record wholesale, and commits, firing `credentials/record-updated` once. A composition the product CLI did not boot has only the inherited environment as its layer.
+`modifyRecord` 走同一条链与同一把锁：它重新读取文档、把当前记录交给变更函数、准入其结果——非空的 API 密钥、能经受 JSON 往返的 grant payload——整体渲染该记录并提交，恰好触发一次 `credentials/record-updated`。并非由产品 CLI（命令行界面）启动的组合只有继承环境这一层。
 
-### Reload lifecycle
+### 重载生命周期
 
-A watcher event or the ready-time reconciliation queues a refresh behind the same chain. `reconcileFromDisk` re-checks permissions, re-reads the text, replaces both snapshots wholesale when the text differs, and publishes one event per changed reference or record; content equal to the text cache — including the provider's own writes — is a no-op. Disposal sets the closed flag, stops accepting events, closes the watcher, and waits out queued operations so nothing publishes after teardown.
+watcher 事件或就绪时的对账会将一次刷新排到同一链条之后。`reconcileFromDisk` 重新检查权限、重读文本，文本有差异时整体替换两个快照，并按变更引用或记录逐个发布事件；与文本缓存一致的内容——包括提供方自己的写入——是 no-op。释放时设置关闭标志、停止接收事件、关闭 watcher，并等待排队操作结算完毕，确保资源销毁后不再发布任何事件。
 
-### Document versioning
+### 文档版本化
 
-The document carries `version: 1`, stamped on every write. A boot that recognizes the pre-release flat layout — a bare mapping of reference names with no `version` — upgrades the document in place under the writer lock, nesting the original lines under `refs:` so values, comments, and spellings survive byte for byte; any other unversioned shape is refused by name rather than read as an empty store. A live reload never migrates: a flat document restored mid-run keeps the last good snapshot until the next boot.
+文档携带 `version: 1`，每次写入都会盖上版本戳。启动时若识别出预发布扁平布局——没有 `version` 的裸引用名 mapping——会在写锁下就地升级，把原始行嵌套到 `refs:` 之下，值、注释与拼写逐字节保留；任何其他无版本形态都会按名拒绝，而不会被当作空存储。运行期热重载绝不迁移：中途恢复的扁平文档会保留最后可用快照，直到下一次启动。
 
-### Diagnostics never quote a value
+### 诊断信息绝不引用值
 
-The YAML parser's own message quotes the offending source line, which in this document is the secret itself. Every diagnostic therefore carries only the error code and position — a key name is safe to print, a value is not.
+YAML 解析器自己的消息会引用出错的那行源码，而在这份文档里那行就是机密本身。因此每条诊断只携带错误码与位置——键名可以安全打印，值不行。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the provider-level contract is not enough. They move from the seam contract to the environment snapshot, the atomic-write primitive, and the boot-time environment layers.
+当提供方级约定不够用时阅读以下页面。它们从 seam 约定逐步进入环境快照、原子写入原语与启动期环境层。
 
-- [Credential-reference seam](../credentials/README.md) — `resolve`, `describe`, `set`, `unset`, the record operations, and the seam's update events.
-- [Credentials subsystem reference](../../../docs/subsystems/credentials.md) — `CredentialRef`, per-operation resolution, UI-safe `CredentialInfo`, provider layers.
-- [Launch environment snapshot](../../util/launch-environment/README.md) — the frozen layer snapshot resolution reads instead of `process.env`.
-- [Atomic write](../../util/atomic-write/README.md) — the writer lock and atomic replacement every write uses.
-- [App boot and Harness-home layers](../../boot/app-boot/README.md) — how the product CLI loads `.env` into the snapshot and `process.env`.
+- [凭据引用 seam](../credentials/README.zh.md)——`resolve`、`describe`、`set`、`unset`、记录操作与 seam 的更新事件。
+- [凭据子系统参考](../../../docs/subsystems/credentials.zh.md)——`CredentialRef`、按操作解析、对 UI 安全的 `CredentialInfo`、提供方层。
+- [启动环境快照](../../util/launch-environment/README.zh.md)——解析读取的冻结层快照，而非 `process.env`。
+- [原子写入](../../util/atomic-write/README.zh.md)——每次写入所用的写锁与原子替换。
+- [应用启动与 Harness home 各层](../../boot/app-boot/README.zh.md)——产品 CLI 如何把 `.env` 载入快照与 `process.env`。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through the consumers of `ctx.credentials`, which own any model-facing behavior a stored value enables.
+经由 `ctx.credentials` 的消费方间接生效：消费方拥有存储值所启用的全部模型可见行为。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; stored values never enter a request prefix.
+无直接失效；存储值绝不进入请求前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the provider is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
+这些限制说明本提供方何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是任务积压。
 
-- **Same-reference concurrent writes are last-write-wins** — the writer lock and the read-modify-write keep concurrent writers from dropping each other's entries, but two writers editing one reference still resolve to the later write; there is no revision check.
-- **A same-UID process can read the document** — the file-effect sandbox modes do not deny reads, and an OS-keychain provider is deferred.
-- **Environment changes are invisible** — the snapshot is frozen at launch, so a variable exported after startup reaches neither resolution nor `describe`; changing an environment-sourced credential takes a restart.
-- **Atomic, not crash-durable** — inherited from `dsh-atomic-write`; the store re-reads on boot.
+- **同一引用的并发写入是后写胜出**——写锁加读-改-写让并发写入者不会丢掉彼此的条目，但两个写入者编辑同一个引用时仍以较后的写入为准；没有修订检查。
+- **同 UID 进程可以读取该文档**——文件效果沙箱模式不会拒绝读取，OS 钥匙串提供方仍是延后项。
+- **环境变化不可见**——快照在启动时冻结，因此启动之后 export 的变量既不会进入解析，也不会进入 `describe`；要更换来自环境的凭据需要重启。
+- **原子但不具备崩溃持久性**——继承自 `dsh-atomic-write`；存储在启动时重新读取。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为与限制以上文和包代码为准。
 
-An OS-keychain provider — a store the model's processes cannot read — is the deferred answer to the same-UID limitation and belongs beside this provider as a sibling package. The seam shape also leaves room for helper-command- and KMS-backed providers; none is shipped.
+OS 钥匙串提供方——一种模型进程根本无法读取的存储——是同 UID 限制的延后答案，应当作为平级包与本提供方并列。seam 的接口还为辅助命令与 KMS 后端提供方预留了空间；目前没有任何一种随附。
 
 </details>

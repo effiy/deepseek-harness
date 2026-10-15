@@ -1,35 +1,35 @@
 ---
-description: "The shell executor seam for developers and maintainers choosing, composing, or implementing command execution over ctx.shell."
+description: "面向开发者与维护者的 shell 执行器 seam 说明，用于选择、组合或实现基于 ctx.shell 的命令执行。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-shell
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Use `ctx.shell` to run shell commands with bounded output or keep them running as background work. One execution handle supports foreground results and background reads. A profile can select local or sandboxed Bash or PowerShell execution without changing callers. Resolve requests before execution to make the working directory, timeout, and output limits explicit. Command exits, timeouts, and caller aborts return results; only infrastructure failures reject, while the `bash` and `pwsh` tools own model-visible rendering and sandbox guidance.
+使用 `ctx.shell` 运行输出有界的 shell 命令，或让命令作为后台工作继续运行。同一个执行句柄支持前台结果与后台读取。配置文件可以选择本地或沙箱化的 Bash 或 PowerShell 执行方式，而无需更改调用方。执行前解析请求，以显式确定工作目录、超时与输出上限。命令退出、超时和调用方中止都会作为结果返回；只有基础设施故障才会 reject，模型可见的渲染与沙箱指引由 `bash` 和 `pwsh` 工具负责。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Use `ctx.shell` when an agent or an in-process plugin needs to run a shell command and read its output, keep a process running and poll it, or hand a foreground command a way to outlive its deadline. There is one execution method — `execute(spec)` resolves with the prepared handle — and "foreground" is a property of what the caller awaits, not of the spawn. It is the contract every shell executor and the model-facing `bash`/`pwsh` tools build on, so code written against it works over any executor implementation.
+当 agent（智能体）或进程内插件需要运行 shell 命令并读取输出、保持进程运行并轮询它，或让前台命令有办法活过自己的 deadline 时，使用 `ctx.shell`。执行方法只有一个——`execute(spec)` 在准备完成后返回句柄——「前台」是调用方等待什么的属性，而不是 spawn 的属性。它是每个 shell 执行器与面向模型的 `bash`/`pwsh` 工具共同依赖的约定，因此基于它编写的代码可以运行在任意执行器实现之上。
 
-### Foreground commands
+### 前台命令
 
-Await the handle's `result()` projection to run a command in the foreground. The promise resolves when the command finishes: a nonzero exit, an executor timeout kill, or a caller abort kill is a result, never a rejection. `result()` rejects only for infrastructure failures such as an unusable working directory or a missing shell. The result carries the exit code or signal, whether a timeout or an abort cut the run short (first-cause classification), and the collected stdout/stderr with spill-file paths when a stream overflowed its budget.
+等待句柄的 `result()` 投影即可在前台执行命令。promise 在命令结束时 resolve：非零退出、执行器超时终止或调用方中止终止都是结果，绝不是 rejection。`result()` 只在基础设施失败时 reject，例如工作目录不可用或缺少 shell。结果携带退出码或信号、是超时还是中止截断了运行（首因归类），以及收集到的 stdout/stderr；流超出预算时还附带 spill 文件路径。
 
 ```text
 const execution = await ctx.shell.execute(ctx.shell.resolve({ command: 'ls -la' }))
@@ -37,23 +37,23 @@ const result = await execution.result()
 console.log(result.exitCode, result.stdout.text)
 ```
 
-### Background processes
+### 后台进程
 
-Resolve the request with `onExpiry: 'none'` and await `execute` for the prepared handle: no deadline is armed, and the process runs until killed or finished. Read output incrementally with `readOutput()` — consecutive reads never repeat output, and lossy reads point at full-stream spill files. Terminate the provider-managed range with `kill()` (returns `false` once the direct command has finished) and await `done` for direct-command settlement. Job ids, ownership, polling, and notices belong to the generic `ctx.jobs` runtime, where the tool layer registers the handle. `ShellProcess.observed` exposes non-consuming offset readers over the same captured streams — for observers independent of the consuming cursor, such as the job registry's pull sources — including the `spawn failed: …` note a rejected spawn leaves on stderr.
+以 `onExpiry: 'none'` 解析请求并保留句柄：不布置任何 deadline，进程一直跑到被 kill 或自行结束。用 `readOutput()` 增量读取输出——连续读取绝不会重复交付，有损读取会指向完整流的 spill 文件。用 `kill()` 终止由提供方管理的进程范围（直接命令结束后返回 `false`），并等待 `done` 完成直接命令结算。job id、所有权、轮询与通知属于通用 `ctx.jobs` 运行时，工具层会把句柄注册进去。`ShellProcess.observed` 在同一份捕获流上暴露非消费的偏移读取器——供独立于消费游标的观察者使用，例如任务注册表的拉取源——包括被拒绝的 spawn 留在 stderr 上的 `spawn failed: …` 提示。
 
-### Deadlines and bounded waits
+### deadline 与有界等待
 
-The deadline includes asynchronous preparation. Expiry before a process starts returns a settled handle whose result is `timedOut: true`, with empty output. Cancellation or preparation failure rejects `execute` before publication; late preparation cannot spawn a process.
+deadline 包含异步准备耗时。进程启动前到期会返回已结算的句柄，其结果为 `timedOut: true`，输出为空。取消或准备失败会在发布句柄前拒绝 `execute`；迟到的准备结果不会启动进程。
 
-The seam has two expiry policies and no hand-over protocol. `'kill'` stops the command at the deadline and classifies the result `timedOut`; `'none'` arms no deadline, so only the caller's signal and `kill()` stop the command. A caller that wants to wait only for a while runs the command under `'none'` and bounds its own wait: the handle stays valid after the caller stops waiting, and nothing changes hands at that moment. The `bash`/`pwsh` tools do exactly this — with a job registry composed they register every command with `ctx.jobs` as it starts and wait on the job, so a foreground command that outlives its timeout simply keeps running as the job it already was.
+seam 只有两种到期策略，没有任何移交协议。`'kill'` 在 deadline 停下命令并把结果归类为 `timedOut`；`'none'` 不设 deadline，只有调用方的信号和 `kill()` 能停下命令。只想等一段时间的调用方以 `'none'` 运行命令并自己限定等待时长：调用方停止等待后句柄依然有效，那一刻没有任何东西易手。`bash`/`pwsh` 工具正是这样做的——组合中有 job registry 时，每条命令一启动就登记到 `ctx.jobs` 并等待该 job，所以超时后仍在运行的前台命令只是继续作为它本来就是的那个 job 运行。
 
-### Requests and resolved specs
+### 请求与已解析 spec
 
-Every execution starts from a `ShellExecRequest` with optional fields; the executor's `resolve()` turns it into a fully-resolved `ShellExecSpec` with explicit defaults and caps before anything runs. This request/spec split is the repository's template for explicit resolution at package boundaries: callers never rely on hidden defaults inside `execute`. `resolve()` fills the working directory, timeout, and expiry policy (default `'kill'`) from the executor's configuration and the request, caps per-call overrides, and carries optional inputs — `stdin`, ordinary `env`, and the trusted `DSH_*` snapshot — through verbatim.
+每次执行都从带可选字段的 `ShellExecRequest` 开始；执行器的 `resolve()` 在任何东西运行之前，把它变成默认值与上限都已显式填好的 `ShellExecSpec`。这一请求/spec 拆分正是仓库在包边界显式解析的模板：调用方绝不依赖 `execute` 内部隐藏的默认值。`resolve()` 从执行器配置与请求填充工作目录、超时与到期策略（默认 `'kill'`）、对每次调用的覆盖值设上限，并按原样携带可选输入——`stdin`、普通 `env` 与受信任的 `DSH_*` 快照。
 
-### Choosing and composing an executor
+### 选择并组合一个执行器
 
-The seam is not an executor: mount exactly one provider per composition, and the tools work unchanged. On POSIX, `dsh-bash-local` runs commands as fresh `bash -c` processes and `dsh-bash-sandbox` confines every command through the sandbox capability; on Windows, `dsh-pwsh-local` and `dsh-pwsh-sandbox` are the counterparts. The `bash` and `pwsh` tools advertise escalation fields only while a sandboxing executor is mounted. The smallest composition is the executor alone:
+seam 本身不是执行器：每个组合只挂载一个提供方，工具即可不加改动地工作。在 POSIX 上，`dsh-bash-local` 以全新的 `bash -c` 进程运行命令，`dsh-bash-sandbox` 则通过沙箱能力限制每条命令；在 Windows 上，对应实现是 `dsh-pwsh-local` 与 `dsh-pwsh-sandbox`。`bash` 与 `pwsh` 工具只在挂载沙箱执行器时公布升权字段。最小的组合只需执行器本身：
 
 ```yaml
 - id: bash
@@ -62,84 +62,84 @@ The seam is not an executor: mount exactly one provider per composition, and the
     cwd: /path/to/workspace
 ```
 
-### The shared exit-status contract
+### 共享的退出状态约定
 
-Tool results end with a machine-readable exit marker — `[exit code: N]` or `[killed by signal: X]` — so the model can always tell how a command ended. The seam owns that marker format and the `parseExitStatus` helper that splits a rendered result back into its output body and structured exit status, keeping the `bash` and `pwsh` tools from drifting on it.
+工具结果以机器可读的退出标记结尾——`[exit code: N]` 或 `[killed by signal: X]`——模型因此总能知道命令如何结束。seam 拥有该标记格式，以及把渲染结果拆回输出正文与结构化退出状态的 `parseExitStatus` 辅助函数，使 `bash` 与 `pwsh` 两个工具永远不会在此漂移。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design of the seam and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释 seam 的设计并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-The package is one role of a standard capability seam: the Service Definition that names the executor contract, with Service Providers and Consumers split so each role evolves independently (see the [capability-seams note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)). Two decisions anchor the contract:
+本包是标准能力 seam 中的一个角色：命名执行器约定的 Service Definition，Service Provider 与 Consumer 各自拆分，使每个角色都能独立演进（见[能力 seam 笔记](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.zh.md)）。两项决策锚定了该约定：
 
-- **Explicit resolution at the boundary.** `resolve(request)` is the single place defaults and caps are applied; `execute` accepts only resolved specs and never re-defaults, so no hidden fallback lives inside an implementation.
-- **One execution, projected views.** `execute` resolves with the prepared handle; the foreground result and the background cursor reads are projections over the same spawned process, so foreground/background is the caller's choice, never a second spawn path. The handle carries no id or owner; job identity, ownership, and lifecycle belong to the generic `ctx.jobs` runtime, keeping executors independent of sessions.
+- **边界处的显式解析。** `resolve(request)` 是应用默认值与上限的唯一位置；`execute` 只接受已解析的 spec，绝不再次默认化，因此实现内部不会藏有隐藏的兜底值。
+- **一次执行，多个投影。** `execute` 在准备完成后返回句柄；前台结果与后台游标读取都是同一个已 spawn 进程上的投影，前台/后台是调用方的选择，绝不是第二条 spawn 路径。句柄不带 id 或所有者；job 身份、所有权与生命周期属于通用 `ctx.jobs` 运行时，使执行器与会话保持独立。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: abstract `ShellExecutor` service and the shared settings namespace |
-| [`src/types.ts`](src/types.ts) | Request/spec vocabulary, `ShellExecution`, `ShellRunResult`, and sandbox facts |
-| [`src/render.ts`](src/render.ts) | `parseExitStatus`: the exit-status marker contract the shell tools share |
+| [`src/index.ts`](src/index.ts) | 插件入口：抽象 `ShellExecutor` 服务与共享设置命名空间 |
+| [`src/types.ts`](src/types.ts) | 请求/spec 词汇、`ShellExecution`、`ShellRunResult` 与沙箱事实 |
+| [`src/render.ts`](src/render.ts) | `parseExitStatus`：shell 工具共享的退出状态标记约定 |
 
-### Settings namespace
+### 设置命名空间
 
-`SHELL_SETTINGS_NAMESPACE` is exported here rather than by a provider because it names the capability, not an implementation: a host composes exactly one provider of `ctx.shell`, so the providers share one namespace without colliding, and a settings document carried between platforms keeps resolving on both.
+`SHELL_SETTINGS_NAMESPACE` 由此处导出而非由某个提供方导出，因为它命名的是能力而不是实现：一个宿主只组装一个 `ctx.shell` 提供方，因此各提供方共享同一个命名空间而永不冲突，在平台间携带的设置文档也能在两边继续解析。
 
-### Background lifecycle and ownership
+### 后台生命周期与归属
 
-A spawned process belongs to the subprocess service, not to the executor: it survives an executor-only reload and is killed and joined when the composition tears down. Implementations must honor the seam's semantics — `result()` rejects only for infrastructure failures; the handle is published after preparation and its `done` never rejects (provider rejections, synchronous or asynchronous, settle the handle as `killed` with a stage-neutral note on stderr while `result()` carries the same failure as its rejection; a live handle whose rejection follows the execution's own `kill()` or abort settles as its terminal outcome instead); `readOutput` is consuming and lossy reads report spill files.
+已 spawn 的进程属于 subprocess 服务而非执行器：它能在仅重载执行器后存活，并在组合拆解时被终止并 join。实现必须遵守 seam 的语义——`result()` 只在基础设施失败时 reject；句柄在准备完成后发布且其 `done` 绝不 reject（无论同步还是异步的 provider rejection 都把句柄结算为 `killed`、把不声明阶段的提示写入 stderr，同时 `result()` 以同一失败 reject；活句柄在本次执行自己的 `kill()` 或 abort 之后才到来的 rejection 则结算为其终态）；`readOutput` 是消费式的，有损读取会报告 spill 文件。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the seam contract is not enough. They move from the shared subsystem reference to the concrete executors and the model-facing tools.
+当 seam 约定不够用时阅读以下页面。它们从共享子系统参考逐步进入具体执行器与面向模型的工具。
 
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — the request/spec vocabulary, results, and service contract in full.
-- [bash-local](../bash-local/README.md) — the default POSIX executor: fresh `bash -c` processes, budgets, and deadlines.
-- [bash-sandbox](../bash-sandbox/README.md) — the confining executor: sandbox modes, denials, and escalation.
-- [tool-bash](../tool-bash/README.md) — the model-facing `bash` tool over this seam.
-- [Capability seams note](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) — the Service Definition / Provider / Consumer split this seam follows.
+- [Bash 执行器子系统](../../../docs/subsystems/shell.zh.md) —— 请求/spec 词汇、结果与完整的服务约定。
+- [bash-local](../bash-local/README.zh.md) —— 默认 POSIX 执行器：全新的 `bash -c` 进程、预算与 deadline。
+- [bash-sandbox](../bash-sandbox/README.zh.md) —— 沙箱执行器：沙箱模式、拒绝与升权。
+- [tool-bash](../tool-bash/README.zh.md) —— 基于该 seam 的面向模型 `bash` 工具。
+- [能力 seam 笔记](../../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.zh.md) —— 本 seam 遵循的 Service Definition / Provider / Consumer 拆分。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through `dsh-tool-bash`, which turns executor output and sandbox facts into guidance and retained tool-result tokens.
+通过 `dsh-tool-bash` 间接影响；该工具会将执行器输出与沙箱事实转为指引和保留的工具结果 token。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+不会直接导致 KV Cache 失效；请求前缀的任何变更由具名消费方负责。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define what the seam does not provide. They are current package constraints, not a roadmap.
+这些限制说明该 seam 不提供什么。它们是当前包约束，不是路线图。
 
-- **No interactive-input vocabulary** — `stdin` is written once at spawn and closed; the seam has no channel to feed a running task and no PTY session concept.
-- **Foreground timeouts are always executor-owned** — a caller-owned-deadline mode on the seam is explicitly deferred by the [tool-call timeout-policy note](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.md).
+- **没有交互式输入词汇**——`stdin` 只在 spawn 时写入一次并关闭；seam 没有向运行中任务继续输入的通道，也没有 PTY 会话概念。
+- **前台超时始终由执行器负责**——seam 上由调用方负责 deadline 的模式已由[工具调用超时策略笔记](../../../.agents/notes/implemented/architecture/2026-07-07-tool-call-timeout-policy.zh.md)明确延期。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
 None.
 

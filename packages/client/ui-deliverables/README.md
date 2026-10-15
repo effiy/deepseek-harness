@@ -1,130 +1,130 @@
 ---
-description: "Changed files, deliveries, and clickable file references for the Web GUI: the changed-files card and delivery cards a finished turn ends with, the review tab that compares each changed file, and inline-code links in the closing prose; for users and maintainers of the deliverables experience."
+description: "Web GUI 的改动文件、交付文件与可点击文件引用：已完成轮次末尾的改动文件卡片与交付文件卡片、逐个对比改动文件的 review tab，以及收尾正文中的行内代码链接；供产出物体验的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-deliverables
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-This package renders the changed-files card a finished turn ends with — the files the turn changed, with the Host's line counts, each opening the turn's review tab on that file — plus cards for explicitly delivered files, and links matching inline-code references in the closing prose so a mentioned file opens in the right Sidebar. Listed and linked paths come from the recorded summary, successful mutations, and explicit deliveries, never from the prose. Only the shipped Web patch loads this package; removing its cordis.yml entry removes the guidance, cards, and prose links together.
+本包渲染已完成轮次末尾的改动文件卡片——列出本轮改动的文件及 Host 记录的行数，每一行在该文件上打开本轮的 review tab——以及显式交付文件的卡片，并把收尾正文中匹配的行内代码引用转为链接，让被点名的文件在右侧 Sidebar 中打开。列出与链接的路径来自记录的改动摘要、成功的文件修改与显式交付，而非收尾正文。只有正式提供的 Web patch 加载本包；删除其 cordis.yml 条目会同时移除指引、卡片与正文链接。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this plugin alongside `ui-conversation` and the Host [workspace-changes](../../deliverables/workspace-changes/README.md) plugin; a finished turn then ends with the changed-files card between the closing message's body and its action footer. Without a served summary — a turn that changed no file, the plugin composed out, or a Host restarted since the turn ran — the card is absent and only deliveries and prose links remain; outside a git repository the summary lists file-tool edits only.
+与 `ui-conversation` 和 Host 侧的 [workspace-changes](../../deliverables/workspace-changes/README.zh.md) 插件一起挂载本插件；已完成轮次随即以改动文件卡片收尾，位于收尾消息正文与其动作页脚之间。没有可提供的摘要时——本轮没有改动任何文件、该插件被组合出去，或该轮之后 Host 重启过——卡片不出现，只保留交付卡片与正文链接；工作区不在 git 仓库内时摘要只列文件工具的编辑。
 
-Changed-file and delivery entry cards and hover previews follow the [R16 preview-card rule](../../../docs/ui-radius.md#radius-scale); their file-icon tiles use the same rule’s R10 exception. Each retains the same contour on hover.
+改动文件与交付文件的入口卡片和悬停预览浮层遵循 [R16 预览卡片规则](../../../docs/ui-radius.zh.md#radius-scale)；内部文件图标底框采用该规则的 R10 特例。各自的 hover 保持相同轮廓。
 
 <a id="explicit-deliveries"></a>
-### Explicit deliveries
+### 显式交付
 
-The `present` tool's preparing stage is one non-expandable document-icon row. It does not show filenames, create delivery cards, or enable file actions before the recorded call supplies arguments.
+`present` 工具的准备阶段是带文档图标的不可展开单行。记录的调用提供参数前，该行不显示文件名、不创建交付卡片，也不启用文件操作。
 
-The Web `standard`, `ptc`, and `cordis` presets expose `present` for final files accessible through the Session filesystem, including files created through Bash. Call it with `files: [{ path, description? }]` after creating the files. The [present tool](../../deliverables/tool-present/README.md) owns file-count limits and Session declarations. A single delivery fills the row; multiple deliveries form a two-column grid, collapsed after four files. Cards show the basename, description or file type, and a shared native opening control. Delivery and changed-file icon tiles use white at 50% opacity in the light theme and 5% in the dark theme. Icon tiles and single-file changed cards use the same border as delivery cards. Clicking the card previews the file in the right Sidebar. The control opens the default application and lists associated applications, with file reveal last. Matching inline-code references also open Sidebar previews. Duplicate declarations use the last description before the closing reply.
+Web 的 `standard`、`ptc` 与 `cordis` preset 提供 `present`，用于声明会话文件系统可访问的最终文件，包括通过 Bash 创建的文件。创建后以 `files: [{ path, description? }]` 调用。[present 工具](../../deliverables/tool-present/README.zh.md)拥有文件数量限制和会话声明。单个交付占满一行，多个交付使用双列网格，超过四个时默认收起。卡片显示文件名、说明或文件类型，以及共享的原生打开控件。交付和改动文件卡片的图标底块在浅色主题下使用 50% 不透明度的白色，深色主题下为 5%。图标底块与单文件改动卡片的外框使用与交付卡片相同的描边。点击卡片会在右侧 Sidebar 预览文件。控件打开默认应用，并列出关联应用，文件定位始终放在最后。匹配的行内代码引用也打开 Sidebar 预览。重复声明使用收尾回复之前最近一次的说明。
 
-The `present` tool row retains its document icon and recorded result across progress, success, failure, and interruption. Native actions share pending state and publish progress or retryable errors on the card. Successful open or reveal feedback stays visible for five seconds, fades over 200ms, then restores the file description; failures remain visible until another attempt. Desktop metadata is loaded when cards mount and invalidated on connection replacement. Without a Host desktop, cards retain Sidebar preview but omit native controls; failed metadata reads offer Retry. Delivery cards and change review expose `deliverables.file.actions` and `deliverables.review.file.actions`, supplied by [ui-open-in-app](../ui-open-in-app/README.md). Association GET requests and native POST actions both validate the recorded file coordinates and Session filesystem mapping before using the Host desktop.
+`present` 工具行在执行、成功、失败和中断状态下保留文档图标及记录的结果。原生操作共享等待状态，并在卡片显示进度或可重试错误。打开或定位成功的反馈显示五秒后，在 200ms 内淡出并恢复文件说明；失败信息保留到下次尝试。卡片挂载时读取桌面信息，连接更换时清除缓存。Host 没有桌面时，卡片保留 Sidebar 预览并隐藏原生控件；元数据读取失败时提供重试。交付卡片和变更对比页通过 `deliverables.file.actions` 和 `deliverables.review.file.actions` 使用 [ui-open-in-app](../ui-open-in-app/README.zh.md) 提供的控件。关联应用 GET 查询与原生 POST 操作都会先校验记录中的文件坐标及会话文件系统映射，再调用 Host 桌面。
 
-### The changed-files card
+### 改动文件卡片
 
-Coding Tools must be enabled to show this card or request its summary. Turning the preference off removes the card immediately while explicit delivery cards, inline file links, and recorded workspace changes remain available.
+只有开启代码工作工具才展示此卡片并请求其摘要。关闭该偏好会立即隐藏卡片，同时保留显式交付卡片、行内文件链接和已记录的工作区改动。
 
-The card renders the summary the Host serves for the turn's latest `workspace/changes` announcement, read once per announcement through the authenticated summary route; while the read is pending, once the Host answers that the summary is gone, or when it lists no file, there is no card. A single changed file shows “Edited” and its basename with its file-type icon, without a file list; its header retains the counts or binary/oversized status and the file’s accessible full path. Multiple files use a code-file icon and a header naming the complete changed-file count and summed added and deleted lines; hovering or focusing it replaces the counts with “Preview in sidebar”. Each row shows one file's display path in the regular UI font with its own monospace counts, “binary” for a binary file, or “too large” for a file the Host did not capture. Rows appear in the recorded display order, so repository files above the working directory and files outside it sort first. Four rows show before a fold; the control reveals every recorded file and, once expanded, collapses the list again from the bottom. Each row opens the turn's review in the right Sidebar on that file, and the header opens it on the first file. Hovering a file row or the single-file header for 500ms opens a scrollable, single-column preview of the comparison, independent of the Sidebar’s view. Its full path uses muted monospace text and scrolls horizontally when needed. File-status notes accompanying code and hunk headers are hidden in the preview; comparisons without hunks retain their status text. Each row exposes the full path as its accessible description. The preview is 48px narrower than the card, inset 24px on each side, and at most 420px high, further constrained by the viewport. The whole preview fades in and out over 100ms. Moving into the preview keeps it open; leaving it, pressing Escape, or activating the row by pointer or keyboard dismisses it. Comparisons load only when the preview opens and share the review tab’s cache and retry states.
+卡片渲染 Host 为本轮最新一条 `workspace/changes` 宣告提供的摘要，每条宣告通过经过认证的摘要路由读取一次；读取尚未完成、Host 答复摘要已不存在，或摘要没有列出任何文件时，没有卡片。仅改动一个文件时，标题显示“已编辑”和文件名，配合对应的文件类型图标，不展示文件列表；标题保留增删行数或二进制/过大状态，并通过无障碍描述提供完整路径。多个文件使用代码文件图标，标题给出改动文件总数与增删行数合计；鼠标悬停或键盘聚焦时，统计信息替换为“在侧边栏预览”。每一行使用普通界面字体显示文件路径，增删行数保留等宽字体，二进制文件显示“二进制”，Host 没有捕获的文件显示“过大”。行按记录的展示顺序排列，因此仓库内位于工作目录之上的文件与工作区外的文件排在最前。折叠前显示四行；控件展开全部记录文件，展开后从底部收起列表。每一行在右侧 Sidebar 中打开本轮的 review 并选中该文件，标题则在第一个文件上打开它。 在文件行或单文件标题上悬停 500ms 后，会出现可滚动的单列改动浮层，不受 Sidebar 视图设置影响。顶部完整路径使用较浅的等宽字体，超出宽度时可横向滚动。浮层不显示代码旁的文件状态说明和 hunk 头；没有 hunk 的对比仍显示状态文字。每行通过无障碍描述提供完整路径。浮层比卡片窄 48px，左右各内缩 24px，高度最多 420px，并受视口可用空间限制。整个浮层的淡入和淡出各持续 100ms。鼠标移入浮层后保持打开；移出、按 Escape 或通过鼠标和键盘激活文件行会关闭浮层。对比只在浮层打开时加载，与 review tab 共用缓存及重试状态。
 
-### The review tab
+### review tab
 
-A row opens the turn's `changes-review` tab, addressed by the viewed Session and the announcing event's sequence and titled by the turn, on that row's file; another row of the same card reveals the same tab on its file. The header's file selector lists every recorded file with its counts and switches the comparison. A new tab selects the side-by-side view without wrapping. Comparisons containing only additions or only deletions render in one column, including surrounding context, without changing the selected view; mixed changes use the selected view. Its controls switch between unified and side-by-side comparison, toggle line wrapping, open the whole current file in the Sidebar, and, with a Host desktop available, open it in the default application with the same pending and retryable-error states as the cards; the view and wrap choices are kept per tab. The tab reads the summary and each comparison once through the authenticated routes. A text comparison lists its hunks with the old and new line numbers of every line, and highlights each rendered hunk side independently with the code preview's filename grammar and Shiki token colours. Additions and deletions use separate code and line-number backgrounds in each theme, with coloured line numbers, signs, and aligned edge markers; plain code text keeps the primary text colour. The tab also shows a note when the file was created or deleted in the turn, when both sides hold the same lines, when the Host's line comparison timed out and every line shows as replaced, or when the tab stopped drawing at 5,000 lines. A binary or oversized file, a comparison the Host no longer serves, and a failed read each show one line instead; a failed read offers Retry. The comparison is the turn's snapshot of the file, not its current content.
+行在该行的文件上打开本轮的 `changes-review` tab，其地址由当前查看的 Session 和宣告事件的序号组成，以轮号作标题；同一张卡片的另一行会在其文件上显示同一个 tab。头部的文件选择器列出所有记录的文件及其行数，用于切换对比。新 tab 默认选择不换行的左右对比。只有新增或只有删除的对比（包括周围的上下文行）使用单栏展示，不改变所选视图；同时包含增删的对比按所选视图展示。其控件用于切换单栏或左右对比、切换自动换行、在 Sidebar 中打开当前完整文件，并在 Host 有桌面时用默认应用打开文件；原生打开的等待与可重试错误状态与卡片一致，视图和换行选择按 tab 保留。tab 通过经过认证的路由各读取一次摘要和每个对比。文本对比逐个列出 hunk，每一行带旧侧和新侧的行号，并按代码预览的文件名 grammar 与 Shiki token 色分别高亮每个已渲染 hunk 的两侧。新增与删除在各主题下使用独立的代码区与行号区底色，并为行号、增删符号和对齐的左侧色条着色；普通代码文字保留主文本色。文件是本轮新建或删除、两侧内容相同、Host 的逐行对比超时而按整文件替换显示，或 tab 在 5000 行处停止绘制时，tab 还会给出一行说明。二进制或过大的文件、Host 已不再提供的对比，以及读取失败各显示一行提示；读取失败时提供重试。对比是本轮对该文件的快照，不是它当前的内容。
 
-The selected-file title uses the shared `ui-primitives` [`PathLabel`](../ui-primitives/README.md#component-catalog): complete and left-aligned when it fits, otherwise clipped at the left with a fade that preserves trailing characters and the extension. Directories use subdued text, the filename uses primary text, and hovering reveals the complete displayed path. Resizing the pane or selecting another file updates the fade; the dropdown arrow, line counts, and toolbar actions retain their space.
+当前文件标题使用 `ui-primitives` 的共享组件 [`PathLabel`](../ui-primitives/README.zh.md#component-catalog)：空间足够时完整靠左显示，否则从左侧裁剪并渐隐，保留尾部字符和扩展名。目录使用弱化颜色，文件名使用主色，悬停显示完整路径。调整面板宽度或切换文件时更新渐隐；下拉箭头、行数和工具栏操作保留各自的空间。
 
-Without wrapping, the two columns synchronize vertical scrolling and horizontal offsets up to each side’s available range. Line backgrounds, including empty alignment rows, cover each column’s full scrollable width. Both columns suppress elastic edge feedback and scroll chaining on both axes; the browser retains control of native momentum within each column’s scrollable range. Both horizontal scrollbars remain at the bottom of the visible comparison; scrolling vertically preserves a long line’s horizontal offset when the other side fits without horizontal scrolling.
+关闭自动换行时，两列同步纵向滚动，横向偏移同步到各自可滚动范围内。各行背景（包括用于对齐的空行）覆盖所在列的完整可滚动宽度。两列在双轴上都禁用弹性边缘反馈和向外层传递滚动；各列可滚动范围内的原生惯性仍由浏览器控制。两侧横向滚动条始终位于可见对比区域底部；如果只有一侧需要横向滚动，上下滚动会保留该侧的横向偏移。
 
-### Inline-code links
+### 行内代码链接
 
-The closing prose links produced or delivered paths: an inline-code token resolves by exact target, by an exact argument recorded for that target, or by a unique basename. Every matching fact must identify the same file; ambiguous arguments and basenames stay inert. No suffix or current-directory guess is used. A resolved mention keeps its code chip and takes the markdown sheet's link language, with the full path as its title.
+收尾正文链接产出或已交付的路径：行内代码 token 可按精确目标路径、为该目标记录的精确参数，或唯一 basename 解析。所有匹配事实必须指向同一文件；有歧义的参数与 basename 保持不可点击。不使用后缀或当前目录猜测。解析成功的提及保留代码标签，并采用 Markdown 样式表的链接样式，完整路径作为其 `title`。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The Node half registers the static `ui:deliverable-file-references` system-prompt section described under [Model Experience](#model-experience). Explicit Markdown links use the shared [Markdown renderer](../ui-primitives/README.md); inline-code matching remains limited to produced or delivered files. The browser half registers a wrapper around the changed-files card and explicit deliveries into the chat view's `conversation.chat.turnTail` list alongside other feature artifacts. `deliverablesDefinition` folds the sequence of each Turn's latest validated `workspace/changes` announcement into `DeliverablesTurnData.changes`, whose summary the card reads from the Host and caches until the connection is replaced, its `deliverables/presented` events into deliveries, and the successful first-party mutation calls of `write`, `edit`, and mutating `str_replace_editor` commands into recorded file targets and exact argument aliases after validating their raw arguments; the produced paths feed only the prose mention resolver. Successful absolute `meta.path` values identify those targets. Root results without that field retain the legacy argument fallback; malformed relative targets contribute no guessed path. Reads, deletes, unsupported tools, malformed calls, malformed events, and failed results contribute nothing. Each row opens `dsh-resource://changes-review/session/<sessionId>/<seq>/<turn>` through `ctx.sidebarRight.openResource` with the file's index as the `changes-review` navigation parameter; the package registers the `changes-review` tab type at the `builtin` band for that pattern and its body under the keyed `sidebar.right.pane.tab` seat with an exclusive store of per-tab choices, and the body reads the summary and the comparisons through the authenticated routes into stores cleared on connection replacement. The package also provides the `chatFileMentions` service the chat view consults per closing message; composing the plugin out removes every surface and leaves the view's empty list at zero cost.
+Node 半部注册[模型体验](#model-experience)所述的静态 `ui:deliverable-file-references` 系统提示词段。显式 Markdown 链接使用共享的 [Markdown 渲染器](../ui-primitives/README.zh.md)；行内代码匹配仍仅限产出或交付文件。浏览器半部把组合改动文件卡片与显式交付的包装组件注册进 chat 视图的 `conversation.chat.turnTail` 列表，与其他功能产物并列。`deliverablesDefinition` 把每个轮次最新且通过校验的 `workspace/changes` 宣告的序号折叠进 `DeliverablesTurnData.changes`，卡片按它向 Host 读取摘要并缓存到连接被替换为止，把 `deliverables/presented` 事件折叠为交付，并根据 `write`、`edit` 和有修改作用的 `str_replace_editor` 命令中经过校验的原始参数与结果记录的绝对 `meta.path` 把成功的第一方修改调用折叠为产出路径及精确参数别名；产出路径只供正文提及解析器使用。不带该字段的成功根调用保留历史参数回退；格式错误的相对目标不产生猜测路径。读取、删除、不受支持的工具、格式错误的调用、格式错误的事件和失败结果不贡献任何条目。每一行通过 `ctx.sidebarRight.openResource` 打开 `dsh-resource://changes-review/session/<sessionId>/<seq>/<turn>`，并以文件下标作为 `changes-review` 的导航参数；本包在 `builtin` 档为该模式注册 `changes-review` tab 类型，把其 body 连同一个按 tab 保存选择的独占 store 注册到按键的 `sidebar.right.pane.tab` 座位下，body 通过经过认证的路由把摘要和对比读进连接更换时清空的 store。本包还提供 chat 视图按收尾消息查询的 `chatFileMentions` 服务；把插件组合出去会移除全部表面，视图的空列表以零成本留下。
 
-Native opening uses an authenticated POST addressed by the viewed Session, event sequence, and original file index; the review tab's native open of a changed file uses the same coordinates. For a declaration the Host reads the viewed Session header with the event and passes its cwd, or the deployment workspace root when absent, to `workspaceFiles.stat`; for a changed file it passes the working directory the served summary carries. This uses the same composed filesystem as Sidebar previews and does not activate an Agent, including for child Sessions. Native actions require the canonical process path to map from a Host path back to that same process path. Providers without this mapping return 422, after which the review tab hides its native open; a same-named Host file is insufficient. The same configured desktop availability governs metadata and execution. Edits affect subsequent opens; deletion returns an error. No file-content copy or attachment is created. Plugin disposal cancels and awaits pending native-open requests.
+原生打开使用经过认证的 POST，通过当前查看的会话、事件序号和原始文件索引定位声明；review tab 对改动文件的原生打开使用同一组坐标。对声明，Host 读取事件及当前查看的会话 header，将其中的 cwd 传给 `workspaceFiles.stat`，未记录 cwd 时使用部署的工作目录；对改动文件，传的是所提供摘要携带的工作目录。它与侧栏预览使用同一组合文件系统，无需启动 Agent，子会话也适用。原生操作要求规范化的进程路径能从 Host 路径映射回同一进程路径。提供方没有这种映射时返回 422，之后 review tab 隐藏原生打开；Host 上存在同名文件并不足够。同一份桌面可用性配置同时约束信息查询和实际执行。编辑会影响后续打开的内容；删除后返回错误。不创建文件内容副本或附件。插件释放时取消并等待进行中的原生打开请求。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the deliverables surface is not enough. They move from the card to the Host recorder, the turn-tail hole, and the decisions behind the vocabulary.
+当产出物面不够用时阅读以下页面。它们从卡片进入 Host 记录器、turn-tail 洞与词表背后的决策。
 
-- [workspace-changes](../../deliverables/workspace-changes/README.md) — the Host plugin that records and serves the summary the card renders.
-- [ui-chat](../ui-chat/README.md) — declares the `conversation.chat.turnTail` hole and renders the closing prose.
-- [historical Turn changed-files card](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md) — the decision behind git-recorded summaries replacing the mutation-call row.
-- [historical Workspace file links](../../../.agents/notes/archived/feature/2026-07-31-web-workspace-file-links.md) — the decision behind the earlier produced-files row; its Host open path is superseded by the [right Sidebar](../../../.agents/notes/implemented/feature/2026-09-04-right-sidebar-docking-infrastructure.md).
-- [Inline file mentions](../../../.agents/notes/archived/feature/2026-08-07-web-inline-file-mentions.md) — the decision behind clickable mentions in the closing prose.
-- [Client package map](../README.md) — adjacent browser UI packages.
+- [workspace-changes](../../deliverables/workspace-changes/README.zh.md)——记录并提供卡片所渲染摘要的 Host 插件。
+- [ui-chat](../ui-chat/README.zh.md)——声明 `conversation.chat.turnTail` 洞并渲染收尾正文。
+- [历史本轮改动文件卡片](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md)——用 git 记录的摘要取代修改调用行背后的决策。
+- [历史工作区文件链接](../../../.agents/notes/archived/feature/2026-07-31-web-workspace-file-links.md)——早先产出文件行背后的决策；其 Host 打开路径已被[右侧 Sidebar](../../../.agents/notes/implemented/feature/2026-09-04-right-sidebar-docking-infrastructure.zh.md)取代。
+- [行内文件提及](../../../.agents/notes/archived/feature/2026-08-07-web-inline-file-mentions.md)——收尾正文可点击提及背后的决策。
+- [客户端包映射](../README.zh.md)——相邻的浏览器 UI 包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Clickable file-reference guidance
+### 可点击文件引用指引
 
-#### What the model sees
+#### 模型看到的内容
 
-The guidance prefers primary results in the final reply: inline images support explanations and comparisons, image links serve references and file lists, and image file cards serve separate deliverables. File destinations use angle brackets, including paths with spaces. It recommends separate `present` cards for complete file deliverables, especially Office files, usually selecting the most important one or two, with at most four files per call when more are needed. It discourages cards solely for code edits and extra commands to inspect diff visibility. This guidance applies even with Coding Tools disabled: it accepts fewer file surfaces to avoid duplicate presentation and unnecessary tool calls. It asks the model to link every existing-file mention outside commands, configuration expressions, and code blocks, including repeats and tables. Labels default to filenames or clear aliases, with only enough parent directories to distinguish files. Precise references display `filename:24` or `filename:24–30`; their destinations retain full relative or absolute paths with `#L24` or `#L24-L30` anchors. The display suffix contains neither `#` nor `L`.
+提示词建议在最终回复中展示主要结果：内嵌图片用于讲解与对比，图片链接用于引用和文件列表，图片文件卡片用于独立交付。文件目标路径使用尖括号包裹，包括含空格的路径。对于需要完整文件的交付，尤其是 Office 文件，建议使用独立的 `present` 卡片，通常选最重要的一两项，需要时可以更多，但每次调用最多四项。提示词建议避免仅为列出代码改动生成卡片，也不为确认 diff 是否显示额外运行命令。代码工作工具关闭时仍采用这条建议，接受较少的文件展示入口，以减少重复展示和不必要的工具调用。文件引用要求链接命令、配置表达式和代码块以外的每次现有文件提及，包括重复提及和表格。标签默认使用文件名或清楚的别名，仅添加足以区分文件的父目录。精确引用显示为 `filename:24` 或 `filename:24–30`；目标保留完整相对路径或绝对路径，以及 `#L24` 或 `#L24-L30` 锚点。显示后缀不含 `#` 或 `L`。
 
-#### Token effect
+#### Token 影响
 
-One fixed paragraph containing output-selection, rendering, and file-reference guidance whenever this package is loaded. The [present tool](../../deliverables/tool-present/README.md#model-experience) owns the delivery schema and result text.
+加载本包时增加一段包含产出选择、渲染效果和文件引用指导的固定提示词。[present 工具](../../deliverables/tool-present/README.zh.md#model-experience)拥有交付 schema 和结果文本。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-The section is static at first-party order 9000 for the lifetime of the package mount, so it remains in the reusable prompt prefix and does not change across Turns.
+该段落在本包挂载期间始终以 first-party 顺序 9000 保持静态，因此留在可复用的提示词前缀中，不会随轮次改变。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define the current deliverables vocabulary. They are current package constraints, not a general file-linking comparison or a task backlog.
+这些限制界定了当前产出物词表。它们是当前包约束，不是通用文件链接对比或任务积压。
 
-- **Inline local images require an HTTP(S) page**: Desktop’s `dsh-app:` pages do not support this file route. POSIX absolute paths and Windows drive-letter paths are supported; relative Chat image paths require the viewed Session’s workspace root. Separate image file links are optional.
-- **Mention matching uses exact paths, unique argument aliases, or unique basenames only** — a suffix mention stays inert; widening the matcher is deferred until a real closing-message shape needs it.
-- **Terminal-created files require explicit delivery** — the card lists them once git records the change, but delivery cards and inline-code references require `present`; explicit Markdown links can reference existing files directly.
-- **Declarations do not preserve file contents** — reopening or transferring a Session requires source files accessible through the viewed Session’s filesystem. Missing files, directories, and final symbolic links return 404.
-- **Native opening needs a Host desktop** — without one the review tab offers no native open; the comparison itself needs only the Host that recorded the turn.
-- **Comparison highlighting is hunk-local** — each rendered old and new hunk side is tokenized independently because omitted source lines are unavailable; unknown suffixes remain plain, and the tab draws at most 5,000 lines before saying so.
-- **Comparisons carry whole file text** — the comparison route serves a listed file's complete text wherever the Host recorded it, including ignored files and files outside the workspace root the Sidebar previews are confined to.
-- **Files outside the workspace open by absolute path only** — the recorded path is the Host path at recording time; a moved workspace or a different viewing Session cannot relocate it.
+- **本地行内图片要求 HTTP(S) 页面**：Desktop 的 `dsh-app:` 页面不支持此文件路由。支持 POSIX 绝对路径与 Windows 盘符路径；Chat 中的相对图片路径需要当前查看的 Session 工作区根目录。图片的独立文件链接是可选的。
+- **提及匹配只认精确路径、唯一参数别名或唯一 basename**——后缀式提及保持惰性；等真实的收尾消息形态产生需求后再放宽匹配规则。
+- **终端创建的文件需要显式交付**——git 记录到改动后卡片会列出它们，但交付卡片和行内代码引用需要调用 `present`；显式 Markdown 链接可以直接引用现有文件。
+- **声明不保存文件内容**：重新打开或转移 Session 后，源文件仍需能被当前查看的 Session 文件系统访问。文件缺失、为目录或最终路径为符号链接时返回 404。
+- **原生打开需要 Host 桌面**——没有桌面时 review tab 不提供原生打开；对比本身只需要记录了该轮的 Host。
+- **对比高亮使用 hunk 内上下文**——省略的源码行不可用，因此每个已渲染 hunk 的新旧两侧分别分词；未知后缀保持纯文本，tab 最多绘制 5000 行并给出提示。
+- **对比携带整个文件的文本**——对比路由会送出所列文件在 Host 上记录时的完整文本，包括被忽略的文件和 Sidebar 预览所限定的工作区根目录之外的文件。
+- **工作区外的文件只按绝对路径打开**——记录的路径是记录时的 Host 路径；工作区移动或换一个查看 Session 都无法重新定位它。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

@@ -1,39 +1,39 @@
 ---
-description: "Run your existing Codex hooks.json hook config during agent runs — block prompts and tools, attach context, or force continuation — for users and maintainers of the bridge."
+description: "在 agent 运行期间使用你现有的 Codex hooks.json 钩子配置——阻塞提示词与工具、附加上下文或强制继续——供本桥接的用户与维护者阅读。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-hooks-codex
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-hooks-codex` runs command hooks from an existing Codex `hooks.json` during agent runs, so prompt and tool gates work without being rewritten. It supports five Codex hook points: session start, prompt submission, before and after tool execution, and stop. Hooks can block prompts or tool calls with model-visible reasons, add conversation context, or force another agent step. Choose this package to reuse Codex command hooks in the harness; use a native plugin for behavior outside this supported subset.
+`dsh-hooks-codex` 在 agent（智能体）运行期间执行现有 Codex `hooks.json` 中的 command 钩子，让提示词与工具把关逻辑无需重写即可生效。它支持 5 个 Codex hook 点：会话开始、提示词提交、工具执行前后以及停止。钩子可以用模型可见的原因阻塞提示词或工具调用、添加对话上下文，或强制 agent 再执行一步。需要在 harness 中复用 Codex command 钩子时选择本包；超出这一受支持子集的行为应使用原生插件。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Hook processes and their payload `cwd` use the Session's current working directory when each hook point starts.
+每个钩子事件开始时，钩子进程及其载荷中的 `cwd` 均使用 Session 的当前工作目录。
 
-Mount this package, point `configPath` at your `hooks.json`, and the hooks you already have start firing at the corresponding moments in agent runs. There is nothing else to set up before the first hook works.
+挂载本包并把 `configPath` 指向你的 `hooks.json`，你已有的钩子就会在 agent 运行中的对应时刻开始触发。在第一个钩子生效之前无需其他设置。
 
-### When to choose it
+### 何时选择
 
-Use it when you own a Codex `hooks.json` and its command hooks should gate prompts, tools, and turns. Skip it for behavior with no Codex equivalent: a native plugin has the full harness API, while this bridge runs only the reference tool's command-hook subset.
+当你持有 Codex `hooks.json`、且其中的 command 钩子需要把关提示词、工具与轮次时，使用它。没有 Codex 对应物的行为请跳过它：原生插件拥有完整的 harness API，而本桥接只运行参考工具的 command hook 子集。
 
-### Smallest working setup
+### 最小配置
 
 ```yaml
 - name: '@deepseek-ai/dsh-hooks-codex'
@@ -42,149 +42,149 @@ Use it when you own a Codex `hooks.json` and its command hooks should gate promp
     model: deepseek-v4
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `configPath` | required | Path to a Codex `hooks.json` |
-| `model` | `''` | Model name stamped on every payload (Codex includes `model` on each event) |
-| `defaultTimeoutMs` | `600,000` | Per-hook timeout when a hook sets none (the Codex default) |
-| `stderrSummaryMaxChars` | `500` | Character cap on the persisted `hook/result` stderr summary |
+| `configPath` | 必填 | Codex `hooks.json` 的路径 |
+| `model` | `''` | 写入每个 payload 的模型名称（Codex 在每个事件中都包含 `model`） |
+| `defaultTimeoutMs` | `600,000` | hook 未设置时的每 hook 超时（即 Codex 默认值） |
+| `stderrSummaryMaxChars` | `500` | 持久化 `hook/result` stderr 摘要的字符上限 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-hooks-codex) is the exhaustive source for every accepted field.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-hooks-codex)是每个受支持字段的穷尽式真源。
 
-### What your hooks can do
+### 你的钩子能做什么
 
-| Your hook | When it runs | What it can do |
+| 你的钩子 | 运行时机 | 能做什么 |
 |---|---|---|
-| `SessionStart` | when a session starts | attach context the model sees in that session |
-| `UserPromptSubmit` | when the agent receives a prompt | block the prompt, or attach extra context |
-| `PreToolUse` | before a tool runs | block the tool |
-| `PostToolUse` | after a tool runs | block the result with feedback, or attach extra context |
-| `Stop` | when the run is about to stop | force another step with a reason |
+| `SessionStart` | 会话开始时 | 附加该会话中模型可见的上下文 |
+| `UserPromptSubmit` | agent 收到提示词时 | 阻塞提示词，或附加上下文 |
+| `PreToolUse` | 工具运行前 | 阻塞工具 |
+| `PostToolUse` | 工具运行后 | 带反馈阻塞结果，或附加上下文 |
+| `Stop` | 运行即将停止时 | 带原因强制再执行一步 |
 
-### How hooks run and fail
+### 钩子如何运行与失败
 
-- Hooks run in the agent's current Session directory; `pwd`, payload `cwd`, and relative paths agree.
-- One config applies to the whole process: it is read once at startup, and a relative `configPath` resolves from the directory that launched the process.
-- Only synchronous command hooks run; an `async: true` or non-command hook is skipped with a warning.
-- Hooks on the same event run one after another, in config order.
-- If the config cannot be read or parsed, the bridge logs a warning and runs no hooks — the agent still starts.
-- A hook that fails to run (a bad command or a crash) is logged, and the agent continues.
+- 钩子在 agent 的 Session 当前目录中运行；`pwd`、载荷中的 `cwd` 与相对路径保持一致。
+- 一份配置应用于整个进程：启动时只读取一次，相对 `configPath` 从启动进程的目录解析。
+- 只运行同步 command 钩子；`async: true` 或非 command 钩子会被跳过并给出警告。
+- 同一事件上的钩子按配置顺序逐个运行。
+- 如果配置无法读取或解析，桥接会记录警告且不运行任何钩子——agent 仍会启动。
+- 运行失败的钩子（命令错误或崩溃）会被记录，agent 继续运行。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the bridge and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释桥接背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Hook point mapping
+### Hook 点映射
 
-Each supported event programs against one harness extension point: `SessionStart` adds context through awaited `agent/created` initialization before the first turn, `UserPromptSubmit` and `PreToolUse` are waterfalls that can reject the incoming action (`agent/pre-step`, `tools/pre-execute`), `PostToolUse` is a waterfall that can block with feedback or add context to the downstream decision (`tools/post-execute`), and `Stop` is a serial listener whose blocking result forces another step through `steer()` (`agent/turn-stopping`). Context-only hooks always delegate via `next()` before folding a sourced message into the downstream decision, so a later listener can still reject or rewrite; blocking decisions map to `deny` (`PreToolUse` has no `allow` or `ask`). The per-event wiring lives in [`src/index.ts`](src/index.ts).
+每个受支持事件都面向一个 harness 扩展点：`SessionStart` 在首个轮次前通过需等待的 `agent/created` 初始化加入上下文，`UserPromptSubmit` 与 `PreToolUse` 是能拒绝传入动作的 waterfall（瀑布式事件）（`agent/pre-step`、`tools/pre-execute`），`PostToolUse` 是能带反馈阻塞或向下游决策添加上下文的 waterfall（`tools/post-execute`），`Stop` 是串行监听器，其阻塞结果通过 `steer()` 强制再执行一步（`agent/turn-stopping`）。仅提供上下文的 hook 总是先通过 `next()` 委托，再把带来源的消息折叠进下游决策，因此后续监听器仍可拒绝或改写；阻塞决策映射为 `deny`（`PreToolUse` 没有 `allow` 或 `ask`）。逐事件接线位于 [`src/index.ts`](src/index.ts)。
 
-### Payloads and environment
+### 载荷与环境
 
-Payloads are Codex-shaped: snake_case with `turn_id` on turn-scoped events, `model` and `permission_mode: "default"` on every event, and stdin written without a trailing newline. A tool call's payload carries the real `tool_name` and the `tool_input: { command }` shape (the `command` argument when present, else `''`), so non-shell tool arguments are not faithfully exposed. The base payload carries `session_id` and `transcript_path`; the latter keeps the Codex `string | null` shape but is always `null` — the persistence seam exposes no artifact paths, and the default-zstd session log is not readable by hook scripts. Codex performs no command substitution and injects no plugin environment.
+payload 采用 Codex 形状：snake_case，轮次事件带 `turn_id`，每个事件都带 `model` 与 `permission_mode: "default"`，stdin 写入时不带尾随换行符。工具调用的 payload 携带真实 `tool_name` 与 `tool_input: { command }` 形状（存在 `command` 参数时使用该值，否则使用 `''`），因此非 shell 工具参数不会被如实公开。基础 payload 携带 `session_id` 与 `transcript_path`；后者保留 Codex `string | null` 形状但始终为 `null`——持久化 seam 不暴露产物路径，且默认 zstd 压缩的会话日志无法被 hook 脚本读取。Codex 不进行命令替换，也不注入插件环境。
 
-### Matcher subjects and serial execution
+### Matcher subject 与串行执行
 
-The matcher subject is the tool name (`PreToolUse` / `PostToolUse`) or the session source (`SessionStart`); `UserPromptSubmit` and `Stop` ignore matchers. Codex matchers are always unanchored regexes. Matched hooks run serially in config order, which keeps each hook's `hook/invoked` / `hook/result` pair adjacent in the log, and the most-restrictive fold is order-independent (`deny > ask > allow`).
+matcher subject 是工具名称（`PreToolUse`／`PostToolUse`）或会话源（`SessionStart`）；`UserPromptSubmit` 与 `Stop` 忽略 matcher。Codex matcher 始终是未锚定正则。匹配 hook 按配置顺序串行运行，这使每个 hook 的 `hook/invoked`／`hook/result` 对在日志中相邻，且最严格折叠与顺序无关（`deny > ask > allow`）。
 
-### Detached runs and disposal
+### 脱离运行与释放
 
-`SessionStart` is the one emit point and runs detached — no extension point awaits it. Each run chain is tracked, and disposing the bridge aborts a still-running hook process, then drains the continuation before the dispose resolves (`createDetachedRuns` in `dsh-hook-protocol`).
+`SessionStart` 是唯一的 emit 点，它脱离运行——没有扩展点等待它。每条运行链都会被跟踪，对桥接执行 dispose（资源释放）时会中止仍在运行的 hook 进程，并在 dispose 完成前排空 continuation（`createDetachedRuns`，位于 `dsh-hook-protocol`）。
 
-### Design philosophy
+### 设计理念
 
-- **A compatibility adapter, not a power tool.** The bridge exists to run the explicitly supported subset of an existing Codex config; bespoke behavior belongs in a native plugin on the same extension points.
-- **Adding context is not a veto.** A context-only hook delegates via `next()` before folding its message into a downstream enter decision, so a later `agent/pre-step` or `tools/post-execute` listener can still reject or rewrite.
-- **Containment at every failure.** Config read/parse failures and invalid matchers register nothing; a throwing detached inject is caught and logged instead of breaking session boot or the loop.
-- **Dispose reaches quiescence.** Detached runs are tracked and drained on disposal so no hook process or late callback outlives the fiber.
-- **Dialect-shaped, not maximal.** Payloads stay snake_case with `turn_id` / `model`, stdin carries no trailing newline, and the bridge implements no pre-tool approval or rewrite path — the protocol's shape is preserved even where the harness could do more.
+- **兼容适配器，而非强力工具。** 桥接的存在意义是运行现有 Codex 配置中显式受支持的子集；定制行为应放在同一批扩展点上的原生插件中。
+- **添加上下文不是否决。** 仅提供上下文的 hook 会先通过 `next()` 委托，再把其消息折叠进下游 enter 决策，因此后续 `agent/pre-step` 或 `tools/post-execute` 监听器仍可拒绝或改写。
+- **每个失败点都受控。** 配置读取／解析失败与无效 matcher 不注册任何内容；抛异常的脱离注入会被捕获并记录，而不是破坏会话启动或循环。
+- **dispose 必须达到完全停稳。** 脱离运行会被跟踪并在释放时排空，因此不会有 hook 进程或迟到回调超出 fiber 存活。
+- **保持方言形状，而非最大化。** payload 保持 snake_case 并带 `turn_id`／`model`，stdin 不带尾随换行符，桥接也不实现工具前审批或改写路径——即使 harness 本可以做得更多，也保留协议的形状。
 
-The [hook-bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) records the bridge design and the deferred gaps; the [hook-protocol-lib Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md) records the shared-versus-per-dialect split.
+[hook-bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) 记录了桥接设计与延期缺口；[hook-protocol-lib Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-protocol-lib.md) 记录了共享与逐方言的划分。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config validation, listener registration, per-event payloads, decision mapping |
-| [`src/config.ts`](src/config.ts) | Codex config parsing: the five supported events, matcher validation, skip reasons |
+| [`src/index.ts`](src/index.ts) | 插件入口：配置校验、监听器注册、逐事件 payload、决策映射 |
+| [`src/config.ts`](src/config.ts) | Codex 配置解析：五个受支持事件、matcher 校验、跳过原因 |
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the shared protocol to the bridge design and the extension points it programs against.
+当包级约定不够用时阅读以下页面。它们从共享协议进入桥接设计，以及桥接所面向的扩展点。
 
-- [Hooks group map](../README.md) — the sibling group page and its package table.
-- [Hook protocol library](../hook-protocol/README.md) — the shared hook rules this bridge applies.
-- [Hook bridges Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md) — the bridge design, decision mapping, and deferred gaps.
-- [Interception extension-points reference](../../../docs/tool-execution-pipeline.md) — the typed-Decision surface the bridge maps onto.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-hooks-codex) — every accepted config field and its source declaration.
+- [hooks 组地图](../README.zh.md)——同级组页面及其包表。
+- [hook 协议库](../hook-protocol/README.zh.md)——本桥接应用的共享钩子规则。
+- [钩子桥接 Agent Note](../../../.agents/notes/archived/feature/2026-06-30-hook-bridges.md)——桥接设计、决策映射与延期缺口。
+- [拦截扩展点 参考](../../../docs/tool-execution-pipeline.zh.md)——桥接所映射的类型化 Decision 接口面。
+- [生成的配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-hooks-codex)——每个受支持配置字段及其源声明。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Hook-provided context
+### Hook 提供的上下文
 
-#### What the model sees
+#### 模型看到什么
 
-`SessionStart`, accepted prompt, and post-tool hooks can add source-attributed context messages; a blocking `Stop` hook adds its reason as next-step steering.
+`SessionStart`、已接受提示词与工具后 hook 可以添加带源归因的上下文消息；阻塞 `Stop` hook 将原因添加为下一步 steering（中途引导）。
 
-#### Token effect
+#### Token 影响
 
-No cost when hooks return no context. Hook text is data-dependent, logged, and resent in later conversation requests until compaction.
+hook 不返回上下文时没有成本。Hook 文本取决于数据，会被记录，并在后续会话请求中重发，直到压缩（compaction）。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
 
-### Blocked prompt or tool outcome
+### 已阻塞提示词或工具结果
 
-#### What the model sees
+#### 模型看到什么
 
-Provider-supplied reasons pass through verbatim. When absent, a denied tool becomes `Error: blocked by PreToolUse hook`, blocked post-tool feedback is exactly `blocked by PostToolUse hook`, and a blocking stop adds steering exactly `continue: blocked by Stop hook`; a blocked prompt is discarded with no model-visible message, ending the turn as `blocked`. Codex `systemMessage` is not surfaced.
+提供方提供的原因逐字传递。缺失原因时，已拒绝工具变为 `Error: blocked by PreToolUse hook`，已阻塞工具后反馈精确为 `blocked by PostToolUse hook`，阻塞 stop 则精确添加 steering `continue: blocked by Stop hook`；已阻塞提示词不会产生任何模型可见消息，而是以 `blocked` 结束该轮次。Codex `systemMessage` 不会呈现。
 
-#### Token effect
+#### Token 影响
 
-Blocking a prompt removes that prompt's request tokens; denial or feedback adds the retained fallback or provider text; forced continuation pays another full request.
+阻塞提示词不会产生该提示词对应的模型请求 token；拒绝或反馈会添加保留的回退或提供方文本；强制 continuation 需要另一个完整请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-A blocked prompt sends no request and invalidates nothing. Denial, feedback, and forced-continuation context append after the reusable prefix without rewriting it.
+已阻塞提示词不发送请求，不会导致失效。拒绝、反馈与强制 continuation 上下文会追加在可复用前缀之后，不改写前缀。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits describe what your Codex hooks cannot do through this bridge yet, and where behavior differs from the reference tool. They are current package constraints, not a task backlog.
+这些限制描述你的 Codex 钩子目前还无法通过本桥接做到的事情，以及行为与参考工具的差异。它们是当前包约束，而非任务积压。
 
-- **Unsupported hook events (5 of Codex's current 10)** — `PermissionRequest`, `PreCompact`, `PostCompact`, `SubagentStart`, and `SubagentStop`. Config for these events is silently dropped during parsing. The comparison baseline is Codex's [official hook reference](https://learn.chatgpt.com/docs/hooks).
-- **`SessionStart` is partial** — plain stdout and JSON `additionalContext` work, but the hook runs detached, so context can miss the first request.
-- **`UserPromptSubmit` is partial** — blocking plus plain-stdout or JSON context work, but the common `systemMessage` and `{"continue": false}` controls are not enforced.
-- **`PreToolUse` is partial** — blocking works, but `additionalContext`, `permissionDecision: "allow"`, and `updatedInput` are ignored. Every tool is represented as `tool_input: { command }`, so non-shell tool arguments are not faithfully exposed to the hook.
-- **`PostToolUse` is partial** — blocking feedback and JSON `additionalContext` work, but `{"continue": false}` is not enforced, non-shell tool arguments are reduced to `{ command }`, and structured tool output is flattened to text in `tool_response`.
-- **`Stop` is partial** — blocking forces another model turn, but `stop_hook_active` is always `false`, `last_assistant_message` is always `null`, and `{"continue": false}` is not enforced. An unconditionally blocking hook therefore force-continues every step unless it self-limits.
-- **Common payload and output fields are partial** — every mapped event reports the statically configured `model` and `permission_mode: "default"` instead of current Codex runtime values, and `transcript_path` is never populated: it is always `null`, because the persistence seam exposes no artifact paths and the default-zstd session log is not readable by hook scripts. `systemMessage` is logged + warned but not surfaced, and `{"continue": false}` is recorded but does not apply Codex's event-specific stop behavior.
-- **Config loading and execution are partial** — one process-level `configPath` is parsed at load; Codex's active user, project, session, system/managed, and plugin layers, trust controls, and inline `config.toml` hook form are not implemented. Only synchronous `command` handlers run, current metadata such as `statusMessage` and `commandWindows` is ignored, and matching handlers run serially rather than with Codex's concurrent launch semantics.
+- **不支持的 hook 事件（Codex 当前 10 项中的 5 项）**——`PermissionRequest`、`PreCompact`、`PostCompact`、`SubagentStart` 与 `SubagentStop`。这些事件的配置会在解析期间静默丢弃。比较基线是 Codex [官方 hook 参考](https://learn.chatgpt.com/docs/hooks)。
+- **`SessionStart` 只支持部分功能**——支持纯 stdout 与 JSON `additionalContext`，但 hook 脱离运行，因此上下文可能错过第一个请求。
+- **`UserPromptSubmit` 只支持部分功能**——支持阻塞加纯 stdout 或 JSON 上下文，但不会强制执行通用 `systemMessage` 与 `{"continue": false}` 控制。
+- **`PreToolUse` 只支持部分功能**——支持阻塞，但会忽略 `additionalContext`、`permissionDecision: "allow"` 与 `updatedInput`。每个工具都表示为 `tool_input: { command }`，因此非 shell 工具参数不会被如实公开给 hook。
+- **`PostToolUse` 只支持部分功能**——支持阻塞反馈与 JSON `additionalContext`，但不会强制执行 `{"continue": false}`，非 shell 工具参数会缩减为 `{ command }`，结构化工具输出会在 `tool_response` 中展平为文本。
+- **`Stop` 只支持部分功能**——阻塞会强制另一个模型轮次，但 `stop_hook_active` 始终为 `false`，`last_assistant_message` 始终为 `null`，且不会强制执行 `{"continue": false}`。因此，无条件阻塞 hook 会在每个步骤中强制 continuation，除非它自我限制。
+- **通用 payload 与输出字段只支持部分功能**——每个已映射事件都报告静态配置的 `model` 与 `permission_mode: "default"`，而非当前 Codex 运行时值，且 `transcript_path` 永不填充：它始终为 `null`，因为持久化 seam 不暴露产物路径，且默认 zstd 压缩的会话日志无法被 hook 脚本读取。`systemMessage` 会被记录 + 警告但不呈现，`{"continue": false}` 会被记录但不会应用 Codex 的事件特定停止行为。
+- **配置加载与执行只支持部分功能**——一个进程级 `configPath` 会在加载时解析；尚未实现 Codex 的活动用户层、项目层、会话层、系统／托管层与插件层、信任控制以及内联 `config.toml` hook 形态。只运行同步 `command` handler，`statusMessage` 与 `commandWindows` 等当前元数据会被忽略，匹配 handler 串行运行，而非使用 Codex 的并发启动语义。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-This Dev Note is working context for maintainers: open questions and directions that are not decided. It is explicitly non-authoritative — shipped behavior, limits, and accepted rationale live in the sections above, the package code, and the linked Agent Notes.
+本开发备注是维护者的工作上下文：开放问题与尚未决定的探索方向。它明确不具权威性——已交付的行为、限制与既定理由以上文、包代码和相关 Agent Note 为准。
 
-The deferred gaps above are the working queue: per-session hook-config discovery, a session-start delivery gate, a stop loop-guard, and a run-level halt for `continue: false`. None has a design yet; the official Codex reference is the baseline for closing any of them.
+上面的延期缺口就是工作队列：按会话的 hook 配置发现、会话启动投递门、stop 循环防护，以及 `continue: false` 的运行级停止。目前均无设计；官方 Codex 参考是实现其中任何一项的基线。
 
 </details>

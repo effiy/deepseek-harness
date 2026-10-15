@@ -1,51 +1,51 @@
 ---
-description: "The subprocess group map: the shared child-process service and its local host provider, for users and maintainers navigating the group."
+description: "subprocess 组地图：共享的子进程服务及其本地宿主提供方，供浏览本组的用户与维护者阅读。"
 kind: "package-group"
 ---
 
-# subprocess/ — subprocess capability family
+# subprocess/：子进程能力家族
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-Every child process and terminal session the harness runs — bash commands, language servers, persistent shells, and out-of-process subagent backends — is started, observed, and terminated through one shared service (`ctx.subprocess`), with a local provider running them on the host machine. It is not a standalone product feature: the consuming capability seams decide what each process means, and command semantics, deadlines, and model-facing presentation stay with them. The group provides executable lookup, bounded output capture with spill recovery, provider-managed process ranges with disclosed weaker fallbacks, and a scrubbed starting environment for every child.
+harness 运行的每个子进程与终端会话——bash 命令、语言服务器、持久 shell 与进程外 subagent 后端——都经由一个共享服务（`ctx.subprocess`）启动、观察与终止，并由一个本地提供方在宿主机器上执行。它不是独立的产品功能：消费方能力 seam 决定每个进程的含义，命令语义、时限与面向模型的呈现仍归它们所有。本组提供可执行文件查找、带 spill 恢复的有界输出捕获、由提供方管理且明确披露较弱 fallback 的进程范围，以及每个子进程起步时所用的清理后环境。
 
-## Table of Contents
+## 目录
 
-- [Packages](#packages)
-- [Related documentation](#related-documentation)
-- [Dev Note](#dev-note)
+- [包](#packages)
+- [相关文档](#related-documentation)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="packages"></a>
-## Packages
+## 包
 
-| Package | Role | ctx key |
+| 包 | 职责 | ctx 键 |
 |---|---|---|
-| [`subprocess`](subprocess/README.md) | Defines the child-process service: executable lookup, managed process spawns, and real terminal sessions | `ctx.subprocess` |
-| [`subprocess-local`](subprocess-local/README.md) | Runs host processes and terminals with native managed ranges where supported and explicit weaker fallbacks elsewhere | registers on `ctx.subprocess` |
-| [`win32-process`](win32-process/README.md) | Owns shared Win32 bindings for sandbox and ordinary process creation, stdio, Job assignment, polling, waits, and handle cleanup | library — no ctx key |
+| [`subprocess`](subprocess/README.zh.md) | 定义子进程服务：可执行文件查找、受管进程 spawn 与真实终端会话 | `ctx.subprocess` |
+| [`subprocess-local`](subprocess-local/README.zh.md) | 在支持的平台上以原生受管范围运行宿主进程与终端，其他平台使用明确披露的较弱 fallback | 注册到 `ctx.subprocess` |
+| [`win32-process`](win32-process/README.zh.md) | 负责维护 sandbox 与普通进程创建、stdio、Job 分配、轮询、等待与句柄清理所用的共享 Win32 绑定 | 库，不使用 ctx key |
 
-The service keeps process lifetime across consumer reloads; consumers own what a process means (a bash command, a language server) and every default that shapes one.
+即使消费方重载，进程生命周期仍由服务负责管理；消费方负责定义进程的含义（一条 bash 命令、一个语言服务器），以及决定塑造该进程的每一项默认值。
 
 -----
 
 <a id="related-documentation"></a>
-## Related documentation
+## 相关文档
 
-- [Subprocess subsystem](../../docs/subsystems/subprocess.md) — spawn specs, output readers, outcomes, and the managed `DSH_*` environment.
-- [Subprocess seam Agent Note](../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md) — why the process half of the bash executors became its own seam.
+- [子进程子系统](../../docs/subsystems/subprocess.zh.md)——spawn spec、输出读取器、结果与受管的 `DSH_*` 环境。
+- [subprocess seam Agent Note](../../.agents/notes/archived/architecture/2026-07-26-subprocess-seam.md)——bash 执行器的进程部分为何成为独立的 seam。
 
 -----
 
 <a id="dev-note"></a>
-## Dev Note
+## 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

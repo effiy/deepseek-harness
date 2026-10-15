@@ -1,148 +1,148 @@
 ---
-description: "The process-local background-job registry for users and maintainers composing, sizing, or debugging in-process jobs: per-owner admission, lifecycle, and teardown."
+description: "进程本地后台任务注册表，供组合、容量评估或排查进程内任务的用户与维护者阅读：按所有者的准入、生命周期与销毁。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-jobs-local
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-jobs-local` runs background jobs inside the harness process while the agent continues. The owning agent can read, wait on, list, and cancel its jobs; mounting `dsh-tool-jobs` also delivers completion notices in-session. Configurable concurrency and output-retention limits bound resource use. Producers can supply output for periodic reading or append it directly; users can observe retained output without consuming the agent's unread output. Jobs end when their owner or the harness shuts down.
+`dsh-jobs-local` 在 agent（智能体）继续推进时，于 harness 进程内运行后台任务。拥有任务的 agent 可以读取、等待、列出和取消任务；同时挂载 `dsh-tool-jobs` 时，还会收到会话内完成通知。可配置的并发与输出保留上限约束资源使用。生产方可以提供供定期读取的输出，也可以直接追加；用户可以观察保留的输出，而不消耗 agent 尚未读取的内容。任务在拥有者或 harness 关闭时结束。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Load this plugin when a composition needs in-process background jobs: long-running tools register their work, and the owning agent reads, waits on, lists, and cancels it without blocking its own turn. It implements the [`dsh-jobs`](../jobs/README.md) contract; the model-facing `job_output`, `job_list`, and `job_kill` tools come from [`dsh-tool-jobs`](../tool-jobs/README.md).
+当组合需要进程内后台任务时加载本插件：长时间运行的工具注册其工作，拥有它的 agent 在不阻塞自身轮次的情况下读取、等待、列出和取消。它实现 [`dsh-jobs`](../jobs/README.zh.md) 约定；模型侧的 `job_output`、`job_list` 与 `job_kill` 工具来自 [`dsh-tool-jobs`](../tool-jobs/README.zh.md)。
 
-### When to choose it
+### 何时选择
 
-Choose it when jobs should live in the harness process and die with it. Avoid it when work must survive a restart or span processes: records are in-memory, so a durable or cross-process backend must implement the same contract differently.
+当任务应存活于 harness 进程内、并随进程终止时选择它。当工作必须跨重启存活或跨进程存在时避免它：记录保存在内存中，持久或跨进程后端必须以不同方式实现同一约定。
 
-### Minimal configuration
+### 最小配置
 
-Loading the plugin registers `ctx.jobs`; every field is optional.
+加载插件即注册 `ctx.jobs`；每个字段都是可选的。
 
 ```yaml
 - name: '@deepseek-ai/dsh-jobs-local'
 ```
 
-| Field | Default | Meaning |
+| 字段 | 默认值 | 含义 |
 |---|---|---|
-| `maxConcurrentJobsPerOwner` | `10` | Maximum `running` plus `stopping` jobs per exact owner, or in the shared unowned bucket |
-| `retainBytes` | `262144` | Live ring retention per job, in UTF-8 bytes |
-| `settledRetainBytes` | `16384` | Ring retention kept after a job settles, in UTF-8 bytes; bytes the model has not read stay until its first terminal read |
-| `pumpPollMs` | `150` | Poll interval for a job's pull sources, in milliseconds |
+| `maxConcurrentJobsPerOwner` | `10` | 每个精确所有者，或共享的无主桶中，`running` 加 `stopping` 任务的最大数量 |
+| `retainBytes` | `262144` | 每个任务输出环的运行期保留量，UTF-8 字节 |
+| `settledRetainBytes` | `16384` | 任务结算后保留的环容量，UTF-8 字节；模型尚未读取的字节保留到它的首次终态读取 |
+| `pumpPollMs` | `150` | 任务拉取源的轮询间隔，毫秒 |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-jobs-local) is the exhaustive source for the accepted fields.
+生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-jobs-local)是每个受支持字段的穷尽式真源。
 
-### What each owner gets
+### 每个所有者得到什么
 
-The limit counts the exact owner's `running` and `stopping` records; all unowned jobs share one separate service-level bucket. Terminal history does not occupy capacity, and only a producer's `done` settlement releases a stopping job's place. At capacity, `start()` fails before the producer runs, with an error that names the limit and tells the agent to kill an unneeded job, wait for it to finish, and retry — the registry neither queues nor preempts.
+上限统计精确所有者的 `running` 与 `stopping` 记录；所有无主任务共享另一个独立的服务级桶。终止历史不占用容量，只有生产方的 `done` 结算才释放一个停止中任务的名额。达到上限时，`start()` 会在生产方运行前失败，错误会指出上限并告诉 agent 终止一个不需要的任务、等它结束后再重试——注册表既不排队也不抢占。
 
-### Lifecycle
+### 生命周期
 
-Jobs belong to their owner and backend, not to the producer tool, so producer or controller reloads do not stop them. When an agent that owns jobs is disposed, its jobs are cancelled, their producers awaited, and their snapshots removed; service disposal does the same for every remaining job. A cancellation that throws during teardown force-fails the record and warns that the work may be orphaned, so teardown never deadlocks.
+任务属于其所有者和后端，而非生产方工具，因此重载生产方或控制器不会停止任务。拥有任务的 agent 被释放时，其任务会被取消、生产方会被等待、快照会被移除；服务释放对每个剩余任务执行同样的操作。销毁期间抛出的取消会强制失败记录并警告工作可能成为孤立工作，因此销毁永远不会死锁。
 
-### What can go wrong
+### 可能出什么问题
 
-Starting work fails without a controller that serves the owner — loading `dsh-tool-jobs` attaches one, and `start()` otherwise refuses with a message naming it. A producer cancel that returns without settling `done` stays indistinguishable from a slow stop and can stall teardown while holding one capacity slot. Every record disappears when the harness process exits.
+没有服务于所有者的控制器时无法启动工作——加载 `dsh-tool-jobs` 即附加一个，否则 `start()` 会以指出它的消息拒绝。返回但始终未结算 `done` 的生产方取消与缓慢停止无法区分，可能使销毁停滞并持续占用一个容量名额。每条记录都会在 harness 进程退出时消失。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design decisions behind the registry and points at the code that realizes them; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释注册表背后的设计决策，并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design philosophy
+### 设计理念
 
-- **In-memory records, fresh projections.** `LocalJobRegistry` keeps one `TrackedJob` per job — lifecycle state, the output ring, and the model cursor — and projects a new read-only view or chunk copy per call; callers never receive live state.
-- **Retention is bounded per ring.** Appends past the live cap drop the oldest retained chunks (a single oversized chunk keeps its UTF-8-safe tail); a reader below the retained window gets a lossy read, never an error. Settlement trims to the settled cap but never below the bytes the model cursor has not consumed, so a job that finishes before its first `job_output` hands over everything the live cap retained; that terminal read then trims to the settled cap.
-- **Owner-relative layers, one process-wide registry.** Controllers and `{ owners: 'scope' }` subscriptions are filed into the scope that registered them (`ScopedLayers`), and reads union the global layer with the owner's scope chain — so one preset's job controls never hold `start()` open for an agent whose own composition loads none, and a scoped settlement reaches only the listeners its owner's composition registered.
-- **Preflight before start.** `start()` checks controller service, spec validity, live ownership, and capacity before invoking the producer, so a rejection leaves no job id or execution resource; registration commits without a later failable step.
-- **First-wins settlement, event last.** The earliest terminal outcome records once, waits for the pump's final drain, trims the ring, releases waiters, and then delivers one `settled` event with per-listener containment, followed by the ring's final `output` signal.
-- **Teardown never deadlocks.** A throwing cancel force-fails the record and reports a possible orphan instead of stalling disposal.
+- **内存记录、全新投影。** `LocalJobRegistry` 为每个任务保存一份 `TrackedJob`——生命周期状态、输出环与模型游标——每次调用都投影新的只读视图或块副本；调用方永远拿不到实时状态。
+- **环的保留量有界。** 追加超出运行期上限时丢弃最老的保留块（单个超限块保留其 UTF-8 安全尾部）；低于保留窗口的读取得到 lossy 结果而非错误。结算时裁剪到结算上限，但绝不低于模型游标尚未消费的字节数，因此在首次 `job_output` 之前结束的任务会交出运行期上限保留的全部输出；那次终态读取之后才裁剪到结算上限。
+- **按所有者分层，一个进程级注册表。** 控制器与 `{ owners: 'scope' }` 订阅归档到注册方所在的 scope（`ScopedLayers`），读取把全局层与所有者的 scope 链求并集——因此某个 preset 的任务控制绝不会为自身组合未加载任何控制器的 agent 保持 `start()` 可用，一次带 scope 的结算也只会抵达其所有者所属组合注册的监听器。
+- **启动前先预检。** `start()` 在调用生产方之前检查控制器服务、spec 有效性、仍存活的所有权与容量，因此拒绝不会留下 job id 或执行资源；注册一旦提交，后续不再有可失败步骤。
+- **结算首次优先，事件最后。** 最早的终止结果只记录一次，等待泵的最后一次排干，裁剪环，释放等待方，然后投递一次带逐监听器隔离的 `settled` 事件，再跟上环的最终 `output` 信号。
+- **销毁永不死锁。** 抛出的取消会强制失败记录并报告可能的孤立工作，而不是让释放停滞。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, `LocalJobRegistry`, admission, lifecycle, teardown |
-| [`src/events.ts`](src/events.ts) | Scope-layered event routing: `{ owner }`, `{ owners: 'all' }`, and `{ owners: 'scope' }` subscriptions |
-| [`src/ring.ts`](src/ring.ts) | The bounded per-job output ring: append, retention trim, offset reads |
-| [`src/pump.ts`](src/pump.ts) | The registry-owned pull pump: one timer per job, final drain before settlement |
+| [`src/index.ts`](src/index.ts) | 插件入口：`Config` schema、`LocalJobRegistry`、准入、生命周期、销毁 |
+| [`src/events.ts`](src/events.ts) | 按 scope 分层的事件路由：`{ owner }`、`{ owners: 'all' }` 与 `{ owners: 'scope' }` 订阅 |
+| [`src/ring.ts`](src/ring.ts) | 每个任务的有界输出环：追加、保留裁剪、按偏移读取 |
+| [`src/pump.ts`](src/pump.ts) | 注册表拥有的拉取泵：每个任务一个定时器，结算前最后一次排干 |
 
-### Scope layers
+### scope 分层
 
-`attachController` and `{ owners: 'scope' }` subscriptions register into the calling context's scope layer; `{ owner }` and `{ owners: 'all' }` subscriptions are unscoped. The controller question (`servesOwner`) and scoped delivery walk the same chain: global layer first, then each scoped layer along the owner's chain. Registrations are anonymous tokens so duplicate labels stay independently disposable.
+`attachController` 与 `{ owners: 'scope' }` 订阅注册到调用上下文所在的 scope 层；`{ owner }` 与 `{ owners: 'all' }` 订阅不带 scope。控制器问题（`servesOwner`）与带 scope 的投递走同一条链：先是全局层，再沿所有者的链逐层。注册是无名 token，因此重复标签仍可独立释放。
 
-### Admission and settlement
+### 准入与结算
 
-`activeJobCount` counts authoritative records per exact owner or in the shared unowned bucket. `settle` records the terminal outcome once (merging a recorded kill reason into a `killed` detail), clears the progress line, trims the ring to the settled cap (keeping every byte the model cursor has not consumed), resolves every waiter, then emits `settled` with its cause and the ring's final `output` signal. The cause is `kill` after `JobRegistry.kill`, `teardown` after an owner or service cancel, and `producer` otherwise; `dsh-tool-jobs` uses it to skip notices nobody can read.
+`activeJobCount` 按精确所有者或共享无主桶统计权威记录。`settle` 只记录一次终止结果（把记录下来的 kill 原因合并进 `killed` 的 detail），清除进度行，把环裁剪到结算保留量（保留模型游标尚未消费的全部字节），解析每个等待方，然后发出带原因的 `settled` 与环的最终 `output` 信号。原因在 `JobRegistry.kill` 之后为 `kill`，在所有者或服务取消之后为 `teardown`，否则为 `producer`；`dsh-tool-jobs` 据此跳过没人能读的通知。
 
-### Teardown
+### 销毁
 
-Owner disposal (`disposeOwned`) cancels the owner's jobs, awaits their settlement, removes their records, and announces each removal — the one visible-set change no per-job record carries. Service disposal (`disposeAll`) cancels all live jobs, awaits settlement, removes every record (announcing each removal, so a subscriber mounted outside the service drops its rows), then detaches the cross-fiber owner-cleanup effects.
+所有者释放（`disposeOwned`）会取消该所有者的任务、等待其结算、移除其记录，并逐条宣布移除——这是任何逐任务记录都无法表达的可见集变更。服务释放（`disposeAll`）会取消所有存活任务、等待结算、移除每条记录（逐条宣布移除，让挂载在服务之外的订阅者丢掉它的行），然后分离跨 fiber 的所有者清理 effect。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the package-level contract is not enough. They move from the registry contract to the model-facing controls and the design records.
+当包级约定不够用时阅读以下页面。它们从注册表约定逐步进入模型侧控制与设计记录。
 
-- [Background task runtime subsystem](../../../docs/subsystems/jobs.md) — the job types, projection fields, and `ctx.jobs` Cordis surface.
-- [jobs group map](../README.md) — the sibling group page and its package table.
-- [Registry contract](../jobs/README.md) — the abstract `ctx.jobs` service this package implements.
-- [Model-facing job controls](../tool-jobs/README.md) — the `job_output`, `job_list`, and `job_kill` tools and completion notices.
-- [Generic long-running tool runtime reference](../jobs/README.md) — the design behind the background-job runtime.
-- [job-registry seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md) — the owner-fenced registry contract and its rationale.
+- [后台任务运行时子系统](../../../docs/subsystems/jobs.zh.md)——任务类型、投影字段与 `ctx.jobs` 的 Cordis 接口面。
+- [jobs 组映射](../README.zh.md)——同级组页面及其包表格。
+- [注册表约定](../jobs/README.zh.md)——本包实现的抽象 `ctx.jobs` 服务。
+- [模型侧任务控制](../tool-jobs/README.zh.md)——`job_output`、`job_list` 与 `job_kill` 工具及完成通知。
+- [通用长时间运行工具运行时 reference](../jobs/README.zh.md)——后台任务运行时背后的设计。
+- [任务注册表 seam Agent Note](../../../.agents/notes/archived/architecture/2026-07-26-job-registry-seam.md)——按所有者隔离的注册表约定及其理由。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through producer plugins and `dsh-tool-jobs`, to which the registry backend delegates all model rendering.
+通过生产方插件与 `dsh-tool-jobs` 间接影响模型，注册表后端把全部模型渲染委托给它们。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; the named consumers own any request-prefix changes.
+不会直接导致 KV Cache 失效；请求前缀变更由上述消费方负责。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when the registry is a poor fit. They are current package constraints, not a task backlog.
+这些限制说明注册表何时不合适。它们是当前包约束，不是任务积压。
 
-- **Jobs are process-local** — records die with the harness process; durable or cross-restart execution needs a separate backend implementing the seam.
-- **A silently ineffective cancel can stall teardown and hold capacity** — if `cancel` returns without settling `done`, the registry cannot distinguish it from a slow stop; the job keeps one bucket slot for the rest of the service lifetime, and only an explicit throw can be force-failed safely.
+- **任务只存在于进程本地**——记录会随 harness 进程终止而消失；持久或跨重启执行需要一个单独实现该 seam 的后端。
+- **静默无效的取消可能使销毁停滞并持续占用容量**——如果 `cancel` 返回后始终未结算 `done`，注册表就无法将其与缓慢停止区分开；该任务会在服务剩余生命周期内持续占用一个桶名额，只有显式抛出异常才能安全地强制标为失败。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

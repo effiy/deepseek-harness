@@ -1,0 +1,35 @@
+{
+  "name": "@deepseek-ai/dsh-llm-xingrui",
+  "description": "Zero-config Cordis plugin: intercepts LLM API requests at the globalThis.fetch layer, extracts API Keys from any header format, and injects unified Authorization: Bearer",
+  "version": "0.2.1-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/llm/dsh-llm-xingrui"
+  },
+  "type": "module",
+  "main": "src/index.js",
+  "types": "src/types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/types.d.ts",
+      "default": "./src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/index.js",
+    "src/core.js",
+    "src/types.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "workspace:~"
+  }
+}

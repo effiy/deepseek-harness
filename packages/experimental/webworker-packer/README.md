@@ -1,73 +1,73 @@
 ---
-description: "Browser-worker VFS image packaging for maintainers building or debugging the experimental preview deployment."
+description: "面向构建或排查实验性预览部署的维护者，说明浏览器 worker 虚拟文件系统（VFS）镜像打包。"
 kind: "package-library"
 ---
 
 # `@deepseek-ai/dsh-experimental-webworker-packer`
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The VFS image packer: turns one composed profile into the gzip-compressed base tar the browser worker mounts as its filesystem, and opaque data trees into ordered overlay tars ([experimental group](../README.md)). Nothing is compiled from source — the base image carries the repository's real build products, so a preview deployment debugs exactly what the served deployment ships. Read this page when packaging a preview image or diagnosing its contents.
+VFS 镜像打包器：把一份合成 profile 变成浏览器 worker 挂载为文件系统的 gzip 压缩基础 tar，并把不透明数据目录变成按序应用的 overlay tar（[实验组](../README.zh.md)）。不做任何源码编译——基础镜像携带仓库真实构建产物，预览部署调试的正是 served 部署交付的字节。打包预览镜像或排查镜像内容时，请阅读本页。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-The public npm package exposes `packVfsImage` and `packVfsOverlay` through its library entry. Callers supply the composition, package directories, and resolution root; no profile layer is installed. The runtime's library entry supplies the module-proxy and replacement tables used during packing.
+公开 npm 包通过库入口导出 `packVfsImage` 和 `packVfsOverlay`。调用方提供合成配置、包目录和解析根目录；本包不安装 profile 层。运行时的库入口提供打包所用的模块代理表与替换表。
 
-The packer owns the internal `dsh.configTrees` declaration, its validation, and source directory resolution in [`src/repository.ts`](src/repository.ts). This field is not part of the public plugin manifest API.
+打包器在 [`src/repository.ts`](src/repository.ts) 中拥有内部 `dsh.configTrees` 声明、校验和源目录解析。该字段不属于公共插件 manifest API。
 
-The pack is a three-layer standard stack:
+打包是三层标准栈：
 
-1. **Roster** — the composed profile's plugin rows (standard YAML parse under Include's dialect, `!!js` intact), plus the rows of every config tree the CLI declares in its `package.json` `dsh.configTrees` (agent presets), materialized as a Node-style dependency closure. External peer edges never bind the worker; workspace peers stay on the chain.
-2. **Publish view** — each workspace or vendored package contributes its built npm slice (`files` through picomatch) without source or workspace `dist/`. External packages retain published JavaScript under both `src/` and `dist/` because their `main` or `exports` may point there; only generic test, map, declaration, and archive exclusions apply.
-3. **Reachability sweep** — the runtime loader's own resolution walks from every non-wildcard workspace runtime export plus the worker assembly's seeds (`IMAGE_ENTRY_SEEDS`), lowering each reached module to the wrapper contract at pack time. Declaration-only condition trees do not seed the sweep; runtime requests for those exports still fail. The transform reports statically named imports, re-exports, and dynamic imports; calls through `require`; and module-scope direct calls of the form `createRequire(import.meta.url)('pkg')` through a named import from `node:module` or `module`, including an import alias. Page assets (`lib/client.js` behind `./client` exports) ship verbatim; an unresolvable request from our own code fails the pack, third-party ones are tolerated to fail loud at require time.
+1. **Roster**——合成 profile 的插件行（标准 YAML 解析、Include 方言、`!!js` 原样保留），加上 CLI（命令行界面）在 `package.json` `dsh.configTrees` 里声明的每棵配置树（agent（智能体） presets）的行，按 Node 式依赖闭包物化。外部 peer 边绝不会绑定到 worker，workspace peer 保留在链上。
+2. **发布视图**——每个 workspace 或 vendored 包贡献其构建后的 npm 切片（`files` 走 picomatch），不带源码和 workspace `dist/`。外部包的 `main` 或 `exports` 可能指向 `src/` 或 `dist/`，因此两处发布 JavaScript 都会保留，只应用通用的测试、map、声明与归档排除规则。
+3. **可达性 sweep**——用运行时加载器自己的解析, 从全部不含通配符的 workspace 运行时导出加 worker 装配种子 (`IMAGE_ENTRY_SEEDS`) 出发, 打包时把每个可达模块转换为符合包装层约定的形式. 仅含类型声明的条件树不作为扫描入口; 运行时代码请求这些导出仍会失败. 该转换会报告名称可静态确定的 import、re-export 与动态 import、经 `require` 发起的调用, 以及通过 `node:module` 或 `module` 具名导入 (含导入别名) 在模块作用域直接发起的 `createRequire(import.meta.url)('pkg')` 调用. 页面资产 (`./client` 导出背后的 `lib/client.js`) 原样直发; 自家代码的不可解析请求会让打包失败, 第三方不可解析请求则允许延后到 require 时明确失败.
 
-`repository.ts` owns the repo-shaped inputs (workspace scan of `vendor/`, `packages/`, `native/system/packages/`, and `apps/`; profile composition through the real CLI dump path); `pack.ts` owns none of them, so the same library packs a different tree by being called differently. The native scan makes the Landlock entry package an ordinary published-view dependency while its executable remains a Worker platform implementation. The CLI is `dsh-pack-vfs-image --out <file> [--profile web]`; `apps/web`'s `build:preview` runs it after the preview shell build.
+`repository.ts` 拥有仓库形态输入（`vendor/`、`packages/`、`native/system/packages/` 与 `apps/` 的 workspace 扫描；经真 CLI dump 路径合成 profile）；`pack.ts` 一概不拥有，同一库换参即可打另一棵树。Native 扫描使 Landlock 入口包成为普通发布视图依赖，其可执行文件仍由 Worker 平台实现。CLI 为 `dsh-pack-vfs-image --out <file> [--profile web]`；`apps/web` 的 `build:preview` 在预览壳构建后运行它。
 
-The repository adapter also declares the preview-only fixture trees under `webworker-runtime/tests/fixtures/`. The CLI packs each named fixture into a separate deterministic overlay archive plus a browser-readable manifest. Overlay files bypass npm publish-view and module-reachability exclusions, so dot directories and example source files remain intact; their mounts are limited to `home/` and `workspace/`. `packVfsOverlay` treats all files as opaque bytes.
+仓库适配器还声明 `webworker-runtime/tests/fixtures/` 下仅用于 preview 的 fixture（测试前置数据） tree。CLI 会把每套具名 fixture 打成一份独立的确定性 overlay 归档，并写出浏览器可读的 manifest（元数据清单）。Overlay 文件绕过 npm 发布视图和模块可达性排除规则，因此点目录与示例源码会完整保留；其挂载位置仅限 `home/` 与 `workspace/`。`packVfsOverlay` 将所有文件视为不透明字节。
 
-`packPreviewFixture` prepares the newest canonical raw Session generation in each fixture directory through the [Session format catalog](../../session/session-format-catalog/README.md) in Node. It collects direct-child discovery evidence from the same fixture root before completing historical parent catalogs. It strictly restores the source, encodes and strictly validates the current successor, and packs that successor beside unchanged source files. A malformed, unsupported, or future selected generation refuses the build without falling back. Temporary successors are removed after packing. Browser write-open then uses current data without invoking Node's migration-verification Worker. Projection caches remain owner-validated; an older generation cannot supply a current fold checkpoint.
+`packPreviewFixture` 在 Node 中通过 [Session 格式目录](../../session/session-format-catalog/README.zh.md)准备每个 fixture 目录里最新的规范原始 Session 代际。它从同一 fixture 根目录收集直属子 Session 的发现证据，再补全历史父目录。它严格恢复源文件、编码并严格校验当前后继文件，然后将后继文件与未改变的源文件一同打包。如果选中的代际格式错误、不受支持或属于未来版本，构建会拒绝，不回退。临时后继文件在打包后删除。浏览器以写模式打开时即可使用当前数据，无需调用 Node 的迁移校验 Worker。投影缓存仍由其所属包校验；较早代际不能提供当前折叠检查点。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-None, as this package runs at build time and writes an image file; nothing it produces reaches a model request on its own.
+无：本包在构建期运行并写出镜像文件，其产物本身不进入任何模型请求。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None; this package neither assembles nor sends a provider request.
+无：本包既不组装也不发送提供方请求。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The rule tables are judgement calls** (`rules.ts`: exclude globs, page-asset patterns, entry seeds) pinned by `tests/`; a new asset class the worker must reach needs a table row, not a scanner change.
-- **Reachability infers only exact request forms** — computed `import` and `require` arguments, stored `createRequire` results, CommonJS-obtained `createRequire`, and bases other than `import.meta.url` resolve only at runtime and fail loud if the target was otherwise pruned; a target reachable only through those forms needs an explicit image entry seed.
-- **Vendored package sources (`src/*.ts`) are excluded** — nothing resolves them at runtime; a future in-worker source-inspection feature would need a dedicated include rule.
-- **The packer assumes built `lib/` artifacts are current**: it never compiles, so a stale workspace build packs stale bytes. Run the repository build first.
-- **The CLI requires its original repository location**: `dsh-pack-vfs-image` finds the checkout relative to its own installed file and reads the source CLI, configuration trees, and preview fixtures there. An npm installation supports the parameterized library API; the CLI and repository helpers require a complete, built DeepSeek Harness checkout.
-- **Preview Session inputs use raw JSONL** — `packPreviewFixture` rejects compressed and noncanonical Session generation filenames. Generic overlays remain byte-preserving.
+- **规则表依赖人工判断**（`rules.ts`：exclude glob、页面资产模式、入口种子），由 `tests/` 钉住；worker 需要触达的新资产类别应加表行，而不是改扫描器。
+- **可达性只推断精确请求形式**——计算得到的 `import` 与 `require` 参数、保存下来的 `createRequire` 结果、经 CommonJS 获取的 `createRequire`，以及基准不是 `import.meta.url` 的调用只在运行时解析；若目标已被裁掉就会显式失败。只能通过这些形式触达的目标需要显式镜像入口种子。
+- **vendored 包源码（`src/*.ts`）被排除**——运行时无人解析它们；未来若有 worker 内源码巡检功能需要专门的 include 规则。
+- **打包器假定构建产物 `lib/` 是新鲜的**：它从不编译，工作区构建陈旧就会打包陈旧字节。先跑仓库构建。
+- **CLI 必须位于原有仓库位置**：`dsh-pack-vfs-image` 相对于自身安装文件定位检出目录，并从中读取源码 CLI、配置树和预览 fixture。npm 安装支持参数化的库 API；CLI 和仓库辅助函数需要完整且已构建的 DeepSeek Harness 检出目录。
+- **Preview Session 输入使用原始 JSONL** — `packPreviewFixture` 拒绝压缩文件与不规范的 Session 代际文件名。通用 overlay 仍逐字节保留输入。
 
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

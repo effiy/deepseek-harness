@@ -1,117 +1,117 @@
 ---
-description: "First-message LLM session-title provider for users and maintainers choosing a title strategy or debugging automatic title generation."
+description: "面向用户与维护者的首消息 LLM（大语言模型）会话标题提供方说明，用于选择标题策略或排查自动标题生成。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-session-title-first-prompt-llm
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-session-title-first-prompt-llm` summarizes the first eligible human message through `ctx.llm` as an optional `ctx.sessionTitle` provider. It registers the `first-prompt` cadence, runs automatically only when a fresh non-fork session first creates its fallback, and attributes the result to that message's exact seq. An automatic failure retains the fallback and is retried only through `ctx.sessionTitle.refresh()`. The plugin owns its system instruction, JSON framing, and output parsing; it shares only the [execution module](../session-title-llm/README.md) from `dsh-session-title-llm` with the all-prompts provider. Automatic behavior and configuration come first; the implementation is a small provider strategy over that executor.
+`dsh-session-title-first-prompt-llm` 作为可选的 `ctx.sessionTitle` 提供方，通过 `ctx.llm` 总结第一条符合条件的用户消息。它注册 `first-prompt` 节奏，只在全新非 fork 会话首次创建回退时自动运行，并把结果归因于该消息的确切 seq。自动失败会保留回退，之后只能通过 `ctx.sessionTitle.refresh()` 重试。它拥有自己的系统指令、JSON 封装与输出解析；只与全消息提供方共享 `dsh-session-title-llm` 的[执行模块](../session-title-llm/README.zh.md)。自动行为与配置优先；实现是建立在该执行器之上的小型提供方策略。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this plugin beside the title service when a session should be titled from its first eligible human message. It requires its own `targetWords` and `targetCjkCharacters` plus the shared [execution controls](../session-title-llm/README.md#configuration), all with no defaults.
+当会话应从第一条符合条件用户消息生成标题时，在标题服务旁挂载此插件。它要求自己的 `targetWords` 与 `targetCjkCharacters`，外加共享的[执行控制](../session-title-llm/README.zh.md#configuration)，且全部无默认值。
 
-### When titles are generated
+### 标题生成时机
 
-Automatic generation runs only for a fresh session with no parent and no prior title: after its first eligible human message, the fallback is created and one auxiliary request summarizes that message. Later prompts, explicit user renames, and inherited fork history do not trigger another automatic call. An automatic failure keeps the fallback; `ctx.sessionTitle.refresh()` is the explicit retry. Forks keep their inherited title and never run this provider automatically, even when their seeded first message came from the parent.
+自动生成只对无父会话、也无先前标题的全新会话运行：在其第一条符合条件用户消息之后，创建回退并发出一次辅助请求来总结该消息。后续提示词、显式用户重命名与继承的 fork 历史都不会触发再次自动调用。自动失败会保留回退；`ctx.sessionTitle.refresh()` 是显式重试。fork 会保留继承的标题，绝不会自动运行此提供方，即使其预置的首消息来自父会话。
 
-### Configuration
+### 配置
 
-The plugin requires `targetWords` and `targetCjkCharacters` plus the shared [execution controls](../session-title-llm/README.md#configuration): `maxInputBytes`, `maxOutputTokens`, `timeoutMs`, and the optional paired `provider`/`model` route. Omit both to inherit the exact route from the current logged main request, or set both to route title generation independently. The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-session-title-first-prompt-llm) is the exhaustive source for every accepted field.
+插件要求 `targetWords` 与 `targetCjkCharacters`，外加共享的[执行控制](../session-title-llm/README.zh.md#configuration)：`maxInputBytes`、`maxOutputTokens`、`timeoutMs`，以及可选成对的 `provider`/`model` 路由。同时省略二者，会继承当前已记录主请求的确切路由；同时设置二者，则让标题生成使用独立路由。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-session-title-first-prompt-llm)是每个受支持字段的穷尽式真源。
 
-### Failures and recovery
+### 失败与恢复
 
-A generation that fails — a missing route before any main request, input over `maxInputBytes`, timeout, cancellation, or invalid model output — warns and keeps the current title; only an explicit `refresh()` retries. Automatic work adds no tokens and no latency to the main agent request.
+失败的生成——主请求之前缺少路由、输入超过 `maxInputBytes`、超时、取消或无效模型输出——会发出警告并保留当前标题；只有显式 `refresh()` 会重试。自动工作不会为主 agent（智能体）请求增加 token 或延迟。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the plugin's shape; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释插件形态；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design concept
+### 设计理念
 
-A small provider strategy: it builds the first-message system instruction and JSON input, parses the assembled response into a title, and delegates only route, bounds, cancellation, logging, and assembly to the [shared execution module](../session-title-llm/README.md).
+一个小型提供方策略：它构建首消息系统指令与 JSON 输入，把组装后的响应解析为标题，只把路由、上限、取消、记录与组装委托给[共享执行模块](../session-title-llm/README.zh.md)。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, first-message prompt and framing, output parsing, and direct provider registration |
+| [`src/index.ts`](src/index.ts) | 插件入口：配置 schema、首消息提示词与封装、输出解析与直接提供方注册 |
 
-### Scheduling
+### 调度
 
-The title service schedules automatic work: for the `first-prompt` cadence it starts a revision only when the session has no parent, holds exactly one eligible message, and has no title yet; the provider call begins after the exact main-request route is logged, and a newer revision supersedes older work.
+标题服务负责调度自动工作：对 `first-prompt` 节奏，只有当会话无父会话、恰好拥有一条符合条件消息且尚无标题时才启动修订；提供方调用在确切主请求路由被记录后才开始，较新的修订会取代旧工作。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the provider contract is not enough. They move from the shared execution module to the alternative cadence and the service it plugs into.
+当提供方约定不够用时阅读以下页面。它们从共享执行模块逐步进入替代节奏与它所插入的服务。
 
-- [Shared LLM execution module](../session-title-llm/README.md) — the execution module this provider uses.
-- [All-messages title provider](../../experimental/session-title-all-prompts-llm/README.md) — the cadence that retitles after every new prompt.
-- [Session title service](../session-title/README.md) — fallback behavior, rename, refresh, and provider registration.
-- [Session package map](../README.md) — adjacent persistence, projection, title, and telemetry packages.
+- [共享 LLM 执行模块](../session-title-llm/README.zh.md)——此提供方使用的执行模块。
+- [全消息标题提供方](../../experimental/session-title-all-prompts-llm/README.zh.md)——在每条新提示词后重新生成标题的节奏。
+- [会话标题服务](../session-title/README.zh.md)——回退行为、重命名、刷新与提供方注册。
+- [会话包映射](../README.zh.md)——相邻的持久化、投影、标题与遥测包。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### First-message title request
+### 首消息标题请求
 
-#### What the model sees
+#### 模型看到什么
 
-The title model receives this provider's title instruction and a JSON array containing only the first eligible human message; it never receives a `currentTitle`. Later prompts and inherited fork history do not trigger another automatic call.
+标题模型会收到此提供方的标题指令，以及一个只包含第一条符合条件用户消息的 JSON 数组，永远不会收到 `currentTitle`。后续提示词与继承的 fork 历史不会触发再次自动调用。
 
-#### Token effect
+#### Token 影响
 
-At most one automatic auxiliary request is made for a fresh session, bounded by `maxInputBytes` and `maxOutputTokens`; explicit refreshes may make additional calls. It selects the route's least supported reasoning effort, or leaves effort unspecified when the route exposes none. The main agent request gains zero tokens.
+全新会话最多自动发出一次辅助请求，并受 `maxInputBytes` 与 `maxOutputTokens` 约束；显式刷新可能发出额外调用。它选择路由支持的最低推理强度；路由没有可选强度时不指定。主 agent 请求不会增加 token。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No main-request invalidation. The auxiliary request uses the configured or logged route and has provider-specific cache behavior.
+不会使主请求的 KV Cache 失效。辅助请求使用已配置或已记录路由，其缓存行为由提供方决定。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this provider stops representing the session. They are current package constraints.
+这些限制说明此提供方何时不再代表会话。它们是当前包约束。
 
-- **First message may go stale** — the first message alone may cease to represent a long-running session; use the all-messages provider when later prompts should retitle it.
-- **Forks never retitle automatically** — a fork keeps its inherited title and never runs this provider automatically, even when its seeded first message came from the parent.
+- **首消息可能过时**——对于长期会话，第一条消息可能不再具有代表性；如果后续提示词应触发重新生成标题，请使用全消息提供方。
+- **fork 绝不自动重新生成标题**——fork 会保留继承的标题，绝不会自动运行此提供方，即使其预置的首消息来自父会话。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

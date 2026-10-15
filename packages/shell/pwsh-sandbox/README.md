@@ -1,47 +1,47 @@
 ---
-description: "The sandbox-consuming PowerShell executor for deployments and maintainers choosing, configuring, or debugging confined PowerShell command execution with denial facts."
+description: "面向部署方与维护者的沙箱 PowerShell 执行器说明，用于选择、配置或排查受限 PowerShell 命令执行及其拒绝事实。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-pwsh-sandbox
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-`dsh-pwsh-sandbox` is the sandbox-consuming PowerShell executor: every command runs as a fresh `pwsh -Command` process confined through the `ctx.sandbox` capability, with the selected mode, enforcement, and denial facts stamped on each settled result. On Windows the sandbox seam resolves to the ACL restricted-token runner chain; on Linux and macOS it uses bwrap, Landlock, or Seatbelt. When no runner can enforce a confined mode, the call fails closed with a structured `SANDBOX_UNAVAILABLE` error rather than running unconfined. It is the pwsh twin of `dsh-bash-sandbox`, mirroring it call-for-call.
+`dsh-pwsh-sandbox` 是沙箱消费型 PowerShell 执行器：每条命令都以全新的 `pwsh -Command` 进程运行，经 `ctx.sandbox` 能力隔离，并在每个已结算的结果上标记所选模式、强制执行完整度与拒绝事实。在 Windows 上，沙箱 seam 解析到 ACL 受限令牌 runner 链；在 Linux 与 macOS 上则使用 bwrap、Landlock 或 Seatbelt。当没有 runner 能强制执行受限模式时，调用按失败关闭原则抛结构化 `SANDBOX_UNAVAILABLE` 错误，绝不无隔离地运行。它是 `dsh-bash-sandbox` 的 pwsh 孪生，逐调用镜像。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-Mount this executor instead of `dsh-pwsh-local` when PowerShell commands must not run with the harness process's full file authority. It registers as `ctx.shell`, inherits `dsh-pwsh-local`'s process mechanics, and requires a `ctx.sandbox` provider plus `ctx.sandboxPolicy`.
+当 PowerShell 命令不得以 harness 进程的完整文件权限运行时，用本执行器替代 `dsh-pwsh-local`。它注册为 `ctx.shell`，继承 `dsh-pwsh-local` 的进程机制，并要求一个 `ctx.sandbox` 提供方加上 `ctx.sandboxPolicy`。
 
-### When to choose it
+### 何时选择
 
-Choose it when a deployment needs file-level confinement for PowerShell commands, typically on Windows. The confinement substance is platform-neutral: the sandbox seam picks the platform's runner — the ACL restricted-token chain on Windows, bwrap/Landlock/Seatbelt elsewhere — while this executor owns the pwsh side. The sandbox policy (mode plus workspace root) is not this package's config: it rides each call from `ctx.sandboxPolicy`, with tool calls passing the calling session's resolved policy and direct calls falling back to deployment policy.
+当部署需要为 PowerShell 命令提供文件级隔离时选择它，通常是在 Windows 上。隔离实体本身是平台无关的：沙箱 seam 选择平台的 runner——Windows 上是 ACL 受限令牌链，其他平台是 bwrap/Landlock/Seatbelt——而本执行器只负责 pwsh 侧。沙箱策略（模式加工作区根目录）不是本包的配置：它随每次调用从 `ctx.sandboxPolicy` 而来，工具调用传调用会话解析后的策略，直接调用回退到部署策略。
 
-### Modes and file effects
+### 模式与文件影响
 
-| Mode | File effects |
+| 模式 | 文件影响 |
 |---|---|
-| `read-only` (default) | Writes are denied; the boundary stays partial for the shared hard-link, unconfined-read, and AppContainer-ACL limits |
-| `workspace-write` | Writes under the policy's workspace root plus a private temp directory; `TMP`/`TEMP` are rewritten to it before spawning |
-| `danger-full-access` | No confinement; the provider is never consulted, and results carry `sandbox: { mode, denied: false }` |
+| `read-only`（默认） | 写入被拒绝；边界仍受共享的硬链接、读取不受限与 AppContainer ACL 限制 |
+| `workspace-write` | 只能写入策略的工作区根目录加一个私有临时目录；spawn 前 `TMP`/`TEMP` 会被重写到该目录 |
+| `danger-full-access` | 不作限制；绝不咨询提供方，结果携带 `sandbox: { mode, denied: false }` |
 
-### Minimal configuration
+### 最小配置
 
-On Windows, mount the ACL restricted-token provider; on Linux and macOS, mount the local runner provider instead. The executor's own config is the local pwsh executor's knobs verbatim; the generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-pwsh-sandbox) is the exhaustive source.
+在 Windows 上挂载 ACL 受限令牌提供方；在 Linux 与 macOS 上则改挂本地 runner 提供方。执行器自身的配置与本地 pwsh 执行器的配置项完全相同；生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-pwsh-sandbox)是完整真源。
 
 ```yaml
 - id: sandbox
@@ -55,98 +55,98 @@ On Windows, mount the ACL restricted-token provider; on Linux and macOS, mount t
   name: '@deepseek-ai/dsh-pwsh-sandbox'
 ```
 
-### Denials and escalation
+### 拒绝与升权
 
-A denied command is reported as a fact: the result carries `sandbox: { mode, denied: true }`, and the tool layer converts it into the standard permission-denied surface — the same one the bash tool uses. When escalation is available, the model may retry the exact command once with the narrowest wider mode and a one-sentence justification; the approval prompt asks the user, and nothing executes before approval. This executor never negotiates permissions itself.
+被拒绝的命令作为事实被报告：结果携带 `sandbox: { mode, denied: true }`，工具层把它转成标准的权限拒绝面——与 bash 工具使用同一个。当升权可用时，模型可以使用范围最小的更宽松模式并附上一句理由，对同一条命令重试一次；批准提示会询问用户，获得批准前不会执行任何命令。本执行器自身绝不协商权限。
 
-### Failures and recovery
+### 失败与恢复
 
-If no runner can enforce a confined mode, the foreground call fails with `SANDBOX_UNAVAILABLE` and a background process records a runner-failure fact — never a silent unconfined run. A provider rejection is attributed to the confinement runner only when its `ENOENT`/`EACCES` path or syscall independently names `argv[0]`; otherwise it keeps the local executor's stage-neutral provider-failure semantics.
+如果没有 runner 能强制执行受限模式，前台调用以 `SANDBOX_UNAVAILABLE` 失败，后台进程则记录 runner 失败事实——绝不会静默无隔离运行。只有当提供方拒绝中的 `ENOENT`/`EACCES` 路径或 syscall 独立指向 `argv[0]` 时，才将其归因于隔离 runner；否则仍沿用本地执行器不区分阶段的提供方失败语义。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-This section explains the design of the executor and points at the code that realizes it; the observable behavior is fully covered in [Use this package](#use-this-package).
+本节解释执行器的设计并指出实现它们的代码位置；可观察行为已在[使用本包](#use-this-package)中完整说明。
 
-### Design concept
+### 设计概念
 
-The executor is the pwsh twin of `dsh-bash-sandbox`: it inherits `dsh-pwsh-local`'s process mechanics, consumes its argv-level seam (`argv()`/`executeArgv()`/`onProcessDone()`), and wraps the exact pwsh invocation through `ctx.sandbox.confine()` before spawning. The confinement substance is platform-neutral — the sandbox seam resolves to the platform's runner — while this package owns the pwsh side only: the selected mode, enforcement completeness, and denial classification on results.
+本执行器是 `dsh-bash-sandbox` 的 pwsh 孪生：它继承 `dsh-pwsh-local` 的进程机制，消费其 argv 级 seam（`argv()`/`executeArgv()`/`onProcessDone()`），并在 spawn 前把精确的 pwsh 调用经 `ctx.sandbox.confine()` 包装。隔离实体本身是平台无关的——沙箱 seam 解析到平台的 runner——而本包只负责 pwsh 侧：所选模式、强制执行完整度，以及结果上的拒绝分类。
 
-### Source map
+### 源码地图
 
-| File | Role |
+| 文件 | 职责 |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `SandboxPwshExecutor`, per-process fact retention, execution preparation |
-| [`src/helpers.ts`](src/helpers.ts) | Denial, runner-failure, and runner-spawn-failure classification |
-| `tests/` | Exercised behavior across the ACL and platform runners |
+| [`src/index.ts`](src/index.ts) | 插件入口：`SandboxPwshExecutor`、按进程保留事实、执行准备 |
+| [`src/helpers.ts`](src/helpers.ts) | 拒绝、runner 失败与 runner spawn 失败分类 |
+| `tests/` | 跨 ACL 与平台 runner 演练的行为 |
 
-### Main flow
+### 主要流程
 
-For a confined mode, `resolve()` stamps the per-call policy; `execute` awaits preparation of the pwsh argv through the provider and hands the confined argv to the inherited subprocess path. At settlement the executor classifies the outcome: a runner failure outranks a denial because the command never ran, a failed run whose stderr carries the runner's denial dialect is reported `denied: true`, and every confined run carries its mode and enforcement facts. `danger-full-access` bypasses the provider entirely and stamps `denied: false`.
+对受限模式，`resolve()` 标记每次调用的策略；`execute` 把 pwsh argv 经提供方包装，再把受限 argv 交给继承的子进程路径。结算时执行器对结果分类：runner 失败优先于拒绝（命令从未运行），stderr 携带 runner 拒绝方言的失败运行报告 `denied: true`，每次受限运行都携带模式与强制执行事实。`danger-full-access` 完全绕过提供方，并标记 `denied: false`。
 
-### Invariants
+### 不变式
 
-- **Fail closed** — a confined mode with no usable runner rejects with `SANDBOX_UNAVAILABLE`; unconfined passthrough never happens for a confined policy.
-- **Deny-only at the seam** — this executor never grants permission; the approval flow lives in the tool layer.
-- **Per-process facts** — confinement facts are retained per handle until settlement, because a provider may vary enforcement between overlapping calls.
+- **失败关闭**——受限模式没有可用 runner 时以 `SANDBOX_UNAVAILABLE` 拒绝；受限策略绝不会出现无隔离直通。
+- **seam 只报告拒绝**——本执行器从不授予权限；批准流程位于工具层。
+- **按进程保留事实**——隔离事实在结算前按句柄保留，因为提供方在不同的重叠调用中可能采用不同的强制执行方式。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-Read these pages when the executor contract is not enough. They move from the seam to the confinement backends and the pwsh tool.
+当执行器约定不够用时阅读以下页面。它们从 seam 进入隔离后端与 pwsh 工具。
 
-- [shell seam](../shell/README.md) — the executor contract this provider implements, including the request/spec split.
-- [bash-sandbox](../bash-sandbox/README.md) — the bash twin of this executor, with the shared denial and escalation surface.
-- [pwsh-local](../pwsh-local/README.md) — the process mechanics this executor inherits.
-- [sandbox-windows-acl](../../sandbox/sandbox-windows-acl/README.md) — the Windows restricted-token runner chain.
-- [Bash executor subsystem](../../../docs/subsystems/shell.md) — request/spec vocabulary, results, and the service contract in full.
-- [pwsh executor and tool note](../../../.agents/notes/archived/feature/2026-08-01-pwsh-tool-and-executor.md) — the decision behind the pwsh executor and tool pair.
+- [shell seam](../shell/README.zh.md) —— 本提供方实现的执行器约定，包括请求/spec 拆分。
+- [bash-sandbox](../bash-sandbox/README.zh.md) —— 本执行器的 bash 孪生，共享拒绝与升权面。
+- [pwsh-local](../pwsh-local/README.zh.md) —— 本执行器继承的进程机制。
+- [sandbox-windows-acl](../../sandbox/sandbox-windows-acl/README.zh.md) —— Windows 受限令牌 runner 链。
+- [Bash 执行器子系统](../../../docs/subsystems/shell.zh.md) —— 请求/spec 词汇、结果与完整的服务约定。
+- [pwsh 执行器与工具笔记](../../../.agents/notes/archived/feature/2026-08-01-pwsh-tool-and-executor.md) —— pwsh 执行器与工具这一对背后的决策。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-### Confinement works, denial surfaces as command failure
+### 隔离生效，拒绝以命令失败呈现
 
-#### What the model sees
+#### 模型看到的内容
 
-The confined command's own stderr — for example `Access to the path '...' is denied.` under the Windows ACL runner; the tool layer converts classified denials into the standard permission-denied surface exactly as it does for the bash tool.
+受限命令自身的 stderr——例如 Windows ACL runner 下的 `Access to the path '...' is denied.`；工具层把分类后的拒绝转成标准权限拒绝面，与 bash 工具完全一致。
 
-#### Token effect
+#### Token 影响
 
-No model-visible text beyond the command's stderr and the tool layer's standard denial surface.
+除命令 stderr 与工具层标准拒绝面外，无额外模型可见文本。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-None directly; the denial surface belongs to the tool layer.
+无直接影响；拒绝呈现面属于工具层。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define when this executor is only a partial boundary on Windows. They are current package constraints, not a roadmap.
+这些限制说明本执行器在 Windows 上只是不完整的边界。它们是当前包约束，不是路线图。
 
-- **Reads are unrestricted on Windows** — the ACL runner restricts writes only; the read boundary is documented in `@deepseek-ai/dsh-sandbox-windows-acl`.
-- **Windows workspace-write temp authority is private** — per live session/workspace pair; agentless calls receive a fresh private directory per invocation; the ambient temp root is never granted, and the runner rewrites `TMP`/`TEMP` to the private directory before spawning.
-- **Windows read-only grants no explicit writable root but remains partial** — NTFS hard links alias one file object across paths, reads stay unconfined, and a tree another AppContainer tool has ACL'd with a package SID is unreadable to the Low-integrity child. NUL stays writable in both modes because the device DACL grants Everyone write and carries no higher label; PowerShell's `> $null` redirection still works without opening it.
+- **Windows 上读不受限**——ACL runner 只限写；读边界文档在 `@deepseek-ai/dsh-sandbox-windows-acl`。
+- **Windows workspace-write 的临时权限按每个活跃的会话/工作区对私有**——无 agent（智能体）的调用每次都获得一个新的私有目录；环境临时根目录绝不会被授权，runner 会在 spawn 前将 `TMP`/`TEMP` 重写为该私有目录。
+- **Windows read-only 不授予任何显式可写根目录，但仍为部分强制执行**——NTFS 硬链接会把同一文件对象别名为多个路径、读取仍不受限，且被其他 AppContainer 工具以包 SID 标记过的目录树对 Low 完整性子进程不可读。NUL 在两种模式下仍可写，因为设备 DACL 向 Everyone 授予写权限且不带更高的标签；PowerShell 的 `> $null` 重定向仍然工作，且不会打开 NUL。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>

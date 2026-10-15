@@ -1,131 +1,131 @@
 ---
-description: "Web ask_user_question feature for the dsh web client: the attached question card, timed wait, drafts, late replies, and the plan-review approval card."
+description: "dsh Web 客户端的 ask_user_question 功能：附着式提问卡片、计时等待、草稿、迟到回复与 plan-review 审批卡片。"
 kind: "package-reference"
 ---
 
 # @deepseek-ai/dsh-client-ui-user-questions
 
-English | [中文](README.zh.md)
+[English](README.md) | 中文
 
-## Summary
+## 概述
 
-The Web client shows an agent's question beside the chat input. Users choose options, enter text, skip questions, and submit one answer batch. A timed card counts down; focus pauses it, editing or `Take time` holds it, and expiry lets the agent continue while the question stays answerable. Closing a card linked to a tool call hides it; its tool row reopens it and later shows recorded answers. The Host preserves the question across restart, while this browser preserves unfinished input across reload.
+Web 客户端在聊天输入框旁显示 agent（智能体）的提问。用户可以选择选项、输入文本、跳过问题，并提交一批答案。计时卡片会倒计时；聚焦时暂停，编辑或选择「慢慢回答」后保持等待，到期则放行 agent，而问题仍可回答。关闭关联工具调用的卡片只是隐藏面板；工具调用行可以重新打开它，之后也能展示已记录的回答。Host 重启后仍保留问题；此浏览器重新加载后仍保留未提交的输入。
 
-## Table of Contents
+## 目录
 
-- [Use this package](#use-this-package)
-- [Understand the implementation](#understand-the-implementation)
-- [Further Exploration](#further-exploration)
-- [Model Experience](#model-experience)
-- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
-- [Dev Note](#dev-note)
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [进一步探索](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
 -----
 
 <a id="use-this-package"></a>
-## Use this package
+## 使用本包
 
-When the agent asks a question, the attached card temporarily occupies the composer seat: answer each question, navigate with the pager, or skip it. A first choice marked “Recommended” starts selected, but remains an unsubmitted draft and does not pause a timed countdown. Clicking a single-select choice advances immediately. Enter on a focused option attempts to submit the batch without selecting that option; missing answers return to the first incomplete question. Enter in a text answer continues the flow, while Shift+Enter breaks a line instead (during IME composition Enter only confirms the input candidate without advancing).
+当 agent 提问时，附着式卡片会暂时占用编辑器位置：回答每个问题、用翻页器导航，或跳过它。首个带推荐标记的选项会预先选中，但仍只是未提交的草稿，不会暂停计时倒计时。点击单选选项会立即前进。聚焦选项时按 Enter 会尝试提交整组答案，不会选中该选项；若有缺失答案，则回到第一道未完成的问题。文本答案中的 Enter 会继续流程，Shift+Enter 则换行（IME 组合输入期间按 Enter 只会确认输入候选，不会前进）。
 
-### Answering
+### 作答
 
-A multi-select draft keeps its selected labels while the user opens or edits the custom answer, so its submitted item may carry both `selected` and `custom`; a single-select custom answer remains exclusive. Question detail reuses the assistant-output `MarkdownText` primitive, including its GFM rendering and untrusted-content policy. The capped card keeps its title, navigation, and submission actions fixed while long detail and choices share an internal scroll region. "Skip" retains other drafts and emits the existing blank `{ selected: [] }` result for that item. Close is not an answer: a question the Host named by tool call only leaves the composer seat, and its `ask_user_question` tool call row brings the panel back; a request that carries no tool call has no row to return from, so closing it rejects the whole wait as `ASK_CANCELLED`.
+用户打开或编辑自定义答案时，多选题草稿会保留已选中的标签，因此提交项可以同时携带 `selected` 与 `custom`；单选题的自定义答案仍保持互斥。问题详情复用助手输出的 `MarkdownText` 原语，包括其 GFM 渲染与不受信任内容策略。限高卡片保持标题、导航与提交动作固定，超长的详情与选项共享内部滚动区。「跳过」会保留其他草稿，并为该项发出既有的空 `{ selected: [] }` 结果。关闭不是一种回答：Host 以工具调用命名的问题只是离开编辑器位置，其 `ask_user_question` 工具调用行会把面板带回来；不携带工具调用的请求没有可返回的行，关闭它仍以 `ASK_CANCELLED` 拒绝整个等待。
 
-### Reading a settled question back
+### 回看已结束的问题
 
-Each late reply is shown once, including when it opens a new Turn. Replies follow normal Chat process grouping and whole-Turn folding. Expand the containing Turn and work group to read a reply that has been folded away.
+每条迟到回复只显示一次，包括由它开启新轮次的情况。回复遵循 Chat 原有的过程分组与整轮折叠规则。回复被收起时，展开所属轮次和工作分组即可查看。
 
-A question that already settled opens as a read-only card: the same pager over the recorded answers, marked `Answered`. Every option and text field is disabled, Skip and the submit action are gone, a question the user skipped says so in place of its empty answer, and a free-text field appears only where the recorded answer used one. Closing it removes the card, and the tool call row builds another from the same record.
+已经结束的问题以只读卡片打开：同一个翻页器走过已记录的回答，并标注「已回答」。所有选项与文本框都被禁用，跳过与提交动作消失，用户当时跳过的问题会在空回答处说明这一点，自由文本框只出现在当时确实用过它的回答上。关闭它会移除该卡片，工具调用行会用同一份记录再建一个。
 
-### The plan-review card
+### plan-review 卡片
 
-A `plan-review` intent — set by `dsh-plan-mode` on the `exit_plan_mode` review — renders a compact approval card: a `Plan review` strip with a `View full plan` link, the plan title and a two-line plain-text summary, and `Request changes` / `Approve` actions. The strip uses the shared warning dot and changes it to the ongoing loader while either action settles. The complete plan opens in the sidebar through the link or its permanent Chat card. Approve answers with the asker's approval label; `Request changes` rejects the wait as `ASK_CANCELLED`, returning the composer for the user's feedback without submitting an approval. The card has no separate refusal button.
+`plan-review` 意图——由 `dsh-plan-mode` 在 `exit_plan_mode` 审阅上设置——渲染紧凑审批卡片：顶部为带“查看全文”链接的“计划待审”条带，正文显示计划标题和两行纯文本摘要，底部提供“要求修改”和“同意执行”。条带使用共享 warning 状态点，并在任一操作结算期间切换为 ongoing loading。通过链接或聊天历史中的常驻卡片可在侧边栏阅读完整计划。“同意执行”用提问方的批准标签回答；“要求修改”以 `ASK_CANCELLED` 拒绝等待，让编辑器归位供用户输入反馈，不会提交批准。卡片不单列拒绝按钮。
 
-### Failure and recovery
+### 失败与恢复
 
-An answer field autofocuses only when its answer channel is ready and no countdown exists. Manual focus and blur during the claim handshake are retained: the countdown starts paused only if the answer surface still has focus when the remaining duration arrives.
+回答输入框只有在回答通道就绪且没有倒计时时才自动聚焦。接手握手期间的手动聚焦与失焦会被保留：剩余时长到达时，只有回答区域仍持有焦点，倒计时才以暂停状态开始。
 
-Returning a local answer does not release its foreground claim: the Host closes that stream after accepting the waterfall outcome. The plugin owns the claim through this delivery interval. Explicit delegation releases it before calling the next answerer, and plugin disposal cancels any remaining claims.
+本地返回回答不会释放前台接手记录：Host 接受 waterfall 结果后才关闭该 stream。插件在这段传输期间继续拥有接手记录。显式委托会在调用下一个回答方前释放它，插件卸载则取消剩余接手记录。
 
-The card has two sources. A live Host request creates it and carries the answer back. For a timed request, the Client first opens the question-owned `attachWait` stream and derives a local deadline from its remaining-duration frame. The card remains live while that first frame is pending. The claim lasts until the request settles or the Client disconnects, including while the panel is hidden. The card owns the countdown; at zero it rejects with `ASK_TIMED_OUT` and stays available. Once the projection lists the call as continued, answers use the `answer` Remote method. Card removal follows the projection, and plugin teardown releases its requests and claims.
+卡片有两个来源。Host 的存活请求创建它，回答也经该请求返回。计时请求先由 Client 打开问答业务的 `attachWait` stream，再从剩余时长帧推导本地时钟上的 deadline。等待首帧期间卡片仍保持存活。接手记录持续到请求结算或 Client 断开，收起面板不会释放它。倒计时归卡片所有；到零时以 `ASK_TIMED_OUT` reject，卡片仍可用。投影把调用列为已继续后，回答改用 `answer` Remote 方法。卡片移除遵循投影，插件卸载时释放请求与接手记录。
 
-A submission through the pending request is sent, not confirmed: when another browser settled the same request first, the gateway drops the late outcome silently. The card therefore keeps its draft until the projection closes it, and if the call turns continued while a submission is in flight, the controls re-arm with a hint so the same draft goes through the Remote path. An accepted Remote answer steers the agent at its nearest step. While its steer waits in the durable Inbox, the editable card closes and the question row shows the submitted answers read-only, including after a browser reconnect. Multiple pending steers are admitted together at that boundary; an active tool wait must finish before the agent can read them. Discarding a pending steer leaves the question answerable, and the user can reopen its row to submit again. A second answer while the first remains pending reports `REPLY_QUEUED`. Pristine focus freezes this browser's remaining countdown and blur resumes that remainder. The first answer mutation changes the local wait to indefinite, and `Take time` does the same explicitly. Those choices persist with this browser's draft across Session navigation and, for tool-call-keyed requests, reload. Another browser has its own countdown and can still settle the shared request; the Host projection remains the authority for whether the question is open or continued.
+经挂起请求的提交只算发出，不算确认：另一个浏览器先结算了同一请求时，gateway 会静默丢弃迟到的结果。因此卡片保留草稿直到投影关闭它；若提交在途时该调用变为已继续，控件带提示重新可用，同一份草稿改走 Remote 路径。Remote 接受回答后将回复作为 steer 交给 Agent 的最近一步。steer 在持久 Inbox 中等待期间，可编辑卡片会关闭，问题行会以只读方式显示已提交的答案；浏览器重新连接后也是如此。多个待处理的 steer 会在该步边界一起获准；当前工具等待必须先结束，Agent 才能读取它们。丢弃待处理的 steer 后问题仍可回答，用户可以重新打开问题行提交。第一条回复仍在等待准入时再次提交会收到 `REPLY_QUEUED`。未编辑时聚焦会冻结本浏览器的剩余倒计时，失焦后按该余量恢复。首次修改回答会把本地等待改为无限，「慢慢回答」也会显式执行同样操作。这些选择会随本浏览器草稿跨会话导航保留；对于带工具调用 ID 的请求，重新加载后也会保留。另一浏览器拥有自己的倒计时，仍可结算共享请求；Host projection 继续作为问题处于开放或已继续状态的权威来源。
 
-Each Session and pending request has an independent draft in browser storage. A tool-call-keyed request restores unfinished input after Session navigation, page reload, or browser restart; progress that no longer matches the question batch is ignored. An unnamed legacy request has a unique card key and cannot be restored after reload. A hidden panel keeps its draft for the next opening; a mounted closed card clears its own draft, and the next mounted card prunes drafts no live card owns. Drafts do not synchronize to another browser or device; the Host-projected question does.
+每个会话和待处理请求在浏览器存储中都有独立草稿。带工具调用 ID 的请求在切换会话、重新加载页面或重启同一个浏览器后会恢复未完成输入；与当前问题批次不符的进度会被忽略。没有 ID 的 legacy 请求使用唯一卡片键，重新加载后不能恢复。隐藏的面板会保留草稿供下次打开；已关闭但仍挂载的卡片会清掉自己的草稿，下一张挂载的卡片会修剪没有存活卡片拥有的草稿。草稿不会同步到另一个浏览器或设备，Host 投影的问题会。
 
-A browser that reconnects while the tool call is open receives the pending request again and can still complete it with the remaining time. A Session reopened after the agent or process ended shows the card as continued; submitting resumes the Session's root agent and enters the answer as a new user turn.
+工具调用开放期间重新连接的浏览器会再次收到挂起请求，仍可用剩余时间完成它。在 agent 或进程结束后重新打开的会话把卡片显示为已继续；提交时先恢复会话的根 agent，再把回答作为新的用户轮次送入。
 
-Settled question replies remain compact in chat history. A caret marks the bubble as a disclosure; clicking it reopens the read-only question and answer details, and never reopens the settled tool call for a second submission. Its copy action writes each question with the answer the user gave, the same text whether the bubble is open or closed.
+已结算的问题回复在聊天历史中保持紧凑。气泡以三角标记指示可以展开；点击它会展开只读的问题与回答详情，且不会重新打开已经结算的工具调用，也不会产生第二次提交。它的复制动作写出每个问题与用户当时给出的回答，无论气泡展开还是收起都是同一份文本。
 
 -----
 
 <a id="understand-the-implementation"></a>
-## Understand the implementation
+## 理解实现
 
 <details>
-<summary>Implementation internals — click to expand</summary>
+<summary>实现细节——点击展开</summary>
 
-The package is one ownership rule: rendering a question is a host UI capability, having the tool is an agent capability, so the `tool-ask-user` row belongs to the presets that want it (and to the TUI composition, which has no presets).
+本包是一条归属规则：渲染提问是宿主的 UI 能力，拥有该工具则是 agent 的能力，因此 `tool-ask-user` 行属于需要它的各个 preset（以及没有 preset 的 TUI 组装）。
 
-### Reopening a panel
+### 重新打开面板
 
-This package fills `userQuestionPanels`, the optional capability `dsh-client-ui-tool` declares for its `ask_user_question` row. `reveal(sessionId, callId)` republishes that call's card as the last equal-precedence pending interaction, so the composer seat shows it again, and returns `false` when this Client holds no card for the call — a legacy unkeyed request, another browser's question, or a card the projection already closed. Whether a question still takes an answer comes from the `userQuestions` Session projection, which the row reads directly, so the capability carries no state of its own.
+本包填充 `userQuestionPanels`——`dsh-client-ui-tool` 为其 `ask_user_question` 行声明的可选能力。`reveal(sessionId, callId)` 把该调用的卡片重新发布为同优先级中最后一个待处理交互，编辑器位置于是再次显示它；当本客户端没有该调用的卡片时返回 `false`——例如旧版未命名的请求、另一个浏览器的问题，或投影已关闭的卡片。问题是否仍可回答取自 `userQuestions` 会话投影，由该行直接读取，因此这项能力自身不携带状态。
 
-`review(sessionId, callId, record)` builds a card from the questions and answers the row parsed out of its own transcript, because the projection lists only answerable calls. That card has no answer channel and no countdown, the projection sweep leaves it alone, and closing it removes it rather than parking it in the registry. A call that still holds a live card shows the live one, so a stale copy never replaces a standing request; for the same reason a review card renders the record itself and takes only the page position from a draft its live card left behind.
+投影只列出仍可回答的调用，因此 `review(sessionId, callId, record)` 用该行从自己转录中解析出的问题与回答建卡。这张卡片没有回答通道也没有倒计时，投影清扫不会碰它，关闭它是移除而非留在注册表里。仍持有实时卡片的调用显示实时那张，过期副本不会替换正在进行的请求；同理，只读卡片渲染记录本身，只从实时卡片留下的草稿里取页码。
 
-### Intent surface election
+### 意图界面选择
 
-The card accepts one question declaring the intent, carrying the plan as `detail`, and offering the named approve label, with at most one alternative and no multi-select. Its secondary action returns to the composer for change requests. Larger choices and multi-select questions remain in the generic flow. A plan review exposes `conversation.plan-review.actions` with its request key, full text, and optional invocation identity; the plan plugin opens logged plans from history and unlogged reviews as temporary sidebar previews, and opening a document does not answer or dismiss the review.
+卡片接管声明了意图、以 `detail` 携带计划、提供了被指名的批准标签的单个问题，要求除批准外最多一个选项，且非多选。次要操作返回编辑器供用户提出修改要求。更多选项或多选问题仍由通用流程处理。计划审批通过 `conversation.plan-review.actions` 插槽提供请求键、完整正文和可选的调用标识；计划插件从历史中打开已记录计划，并把没有调用标识的审批作为临时侧边栏预览打开，打开文档不会回答或关闭审批。
 
-### Copy and locale
+### 文案与 locale
 
-Composer chrome copy (pager, buttons, placeholders, validation feedback) is bilingual: the plugin registers zh/en dictionaries under the `question` namespace of `dsh-client-locale` and hands the entry its bound translator plus the locale snapshot source through the inject face, so a locale switch re-renders a mounted composer. Question and option text arrives from the model and renders verbatim; carrier failure messages also display untranslated.
+编辑器外框文案（翻页器、按钮、占位符、校验提示）是双语的：插件在 `dsh-client-locale` 的 `question` 命名空间下注册 zh/en 词典，并通过 inject face 把绑定的翻译函数和 locale 快照源交给该条目，因此切换语言会重新渲染已挂载的编辑器。问题与选项文本来自模型并原样渲染；载体失败消息也不经翻译直接显示。
 
 </details>
 
 -----
 
 <a id="further-exploration"></a>
-## Further Exploration
+## 进一步探索
 
-These pages cover the composer host, the tool seam, and the plan-mode consumer.
+以下页面覆盖编辑器宿主、工具 seam 与 plan-mode 消费方。
 
-- [ui-conversation](../ui-conversation/README.md) — the chat surface owning the `conversation.composer` slot.
-- [ui-tool](../ui-tool/README.md) — the tool call transcript whose `ask_user_question` row reopens a hidden panel.
-- [tool-ask-user](../../interaction/tool-ask-user/README.md) — the model-facing tool whose schema and answers this UI renders.
-- [ui-plan](../ui-plan/README.md) — the plan-mode surface that sets the `plan-review` intent.
-- [user-questions](../../interaction/user-questions/README.md) — the Host-side question seam and its answerer waterfall.
+- [ui-conversation](../ui-conversation/README.zh.md)——拥有 `conversation.composer` slot 的聊天界面。
+- [ui-tool](../ui-tool/README.zh.md)——工具调用记录界面，其 `ask_user_question` 行可重新打开被收起的面板。
+- [tool-ask-user](../../interaction/tool-ask-user/README.zh.md)——面向模型的工具；本 UI 会渲染其 schema 与答案。
+- [ui-plan](../ui-plan/README.zh.md)——设置 `plan-review` 意图的 plan-mode 界面。
+- [user-questions](../../interaction/user-questions/README.zh.md)——Host 侧提问 seam 及其应答方 waterfall（瀑布式事件）。
 
 -----
 
 <a id="model-experience"></a>
-## Model Experience
+## 模型体验
 
-Indirectly, through `dsh-tool-ask-user`, whose model-visible schema and answer rendering this package presents in the Web client.
+间接影响模型体验：本包在 Web 客户端呈现 `dsh-tool-ask-user` 所拥有的模型可见 schema 与答案渲染。
 
-#### KV Cache effect
+#### KV Cache 影响
 
-No direct invalidation; `dsh-tool-ask-user` owns the model-visible tool call and result.
+不会直接失效；模型可见的工具调用与结果由 `dsh-tool-ask-user` 拥有。
 
-## Known Limitations and Deferred Work
+## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
 
 
-These limits define question-card ownership and cross-client behavior; they are current package constraints.
+这些限制定义提问卡片归属与跨客户端行为；它们是当前包约束。
 
-- **Unsubmitted drafts are local to one browser** — Session navigation, page reload, and browser restart preserve them, but another browser or device reconstructs only the Host-stored question.
-- **One request owns the question card at a time** — later pending requests remain in the session snapshot and become visible after the earlier request resolves.
-- **Questions appear in the active Session composer** — durable pending questions do not add a separate sidebar inbox; reopen the owning Session to answer one.
+- **未提交草稿仅保存在一个浏览器中**：切换会话、重新加载页面和重启浏览器后都会保留，但另一个浏览器或设备只会重建 Host 保存的问题。
+- **每次只有一个请求拥有提问卡片**：后续待处理请求仍留在会话快照中，并在较早请求落定后显示。
+- **问题显示在当前会话的编辑器中**：持久待处理问题不会新增独立的侧栏收件箱；请重新打开所属会话进行回答。
 
 <a id="dev-note"></a>
-### Dev Note
+### 开发备注
 
 <details>
-<summary>Working context for maintainers — click to expand</summary>
+<summary>维护者的工作上下文——点击展开</summary>
 
-None.
+无。
 
 </details>
 
-The Host Session projection is authoritative for durable timed questions. Browser storage only preserves unfinished input and never creates or keeps a question open.
+Host 会话投影是持久计时问题的权威来源。浏览器存储只保留未完成输入，绝不会创建问题或让问题继续保持打开。
