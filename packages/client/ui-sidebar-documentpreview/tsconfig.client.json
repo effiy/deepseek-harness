@@ -8,7 +8,8 @@
   "include": [
     "src/client",
     "src/config.ts",
-    "src/css-modules.d.ts"
+    "src/css-modules.d.ts",
+    "src/xlsx-cpexcel.d.ts"
   ],
   "references": [
     {
