@@ -372,7 +372,7 @@ export const InputBar = memo(function InputBar({
         : planActive ? t('placeholder.plan') : t('placeholder.default'))
 
   return (
-    <div className={clsx(css.root, variant === 'hero' && css.hero)}>
+    <section className={clsx(css.root, variant === 'hero' && css.hero)}>
       {toast !== null && (
         <Toast
           key={toast.seq}
@@ -523,6 +523,6 @@ export const InputBar = memo(function InputBar({
           : null}
         {activity ? null : <ContextMeter useProjection={useProjection} t={t} />}
       </div>
-    </div>
+    </section>
   )
 })

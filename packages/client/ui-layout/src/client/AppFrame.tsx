@@ -33,7 +33,7 @@ export type AppFrameProps =
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
-  return <div className={css.centerCol}>{props.children}</div>
+  return <main className={css.centerCol}>{props.children}</main>
 }
 
 /** Subscribe to the main key without subscribing the column frame to each panel id. */
@@ -48,7 +48,7 @@ function MainPanel({ usePanelInfo, renderSlot }: Pick<PropsRuntime<'root'>, 'use
  * moves, so it can hang over the centre when there is no track.
  */
 function RightbarColumn(props: { children?: ReactNode }) {
-  return <div className={css.rightbarCol} data-rightbar-col>{props.children}</div>
+  return <aside className={css.rightbarCol} data-rightbar-col>{props.children}</aside>
 }
 
 /**
@@ -277,18 +277,18 @@ export function AppFrame({
         useSessions={useSessions}
         usePanelInfo={usePanelInfo}
       />
-      <div className={css.sidebarCol}>
+      <aside className={css.sidebarCol}>
         {sidebar}
-      </div>
+      </aside>
       <>
         <CenterColumn>{main}</CenterColumn>
         <RightbarColumn>
           {renderSlot('rightbar', { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 })}
         </RightbarColumn>
       </>
-      <div className={css.bottomRow} data-shell-bottom>
+      <footer className={css.bottomRow} data-shell-bottom>
         {renderSlot('shell.bottom', {})}
-      </div>
+      </footer>
       <div className={css.overlayLayer} data-shell-overlay>
         {overlays}
       </div>

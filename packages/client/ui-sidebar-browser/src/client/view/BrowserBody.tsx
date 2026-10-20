@@ -77,7 +77,7 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
   const submit = (event: FormEvent): void => { event.preventDefault(); loadUrl(tab.id, draft) }
 
   return (
-    <div className={css.root}>
+    <section className={css.root}>
       <form className={css.toolbar} onSubmit={submit}>
         <button type="button" className={css.tool} aria-label={t('back')} title={t('back')} disabled={!frame.canGoBack} onClick={() => { goBack(tab.id) }}><IconChevronLeftOutlineRegular /></button>
         <button type="button" className={css.tool} aria-label={t('forward')} title={t('forward')} disabled={!frame.canGoForward} onClick={() => { goForward(tab.id) }}><IconChevronRightOutlineRegular /></button>
@@ -128,6 +128,6 @@ export function BrowserBody(props: BrowserBodyProps): ReactNode {
         </div>}
       </div>
       {unknown && <p className={css.limit}>{t('address.unknown')}</p>}
-    </div>
+    </section>
   )
 }

@@ -356,7 +356,7 @@ export const ToolRow = memo(function ToolRow({
     variant, bodyText, cardBody, outputText, state,
   ])
   return (
-    <div className={css.root} data-variant={variant} data-tool={toolName} data-state={state}>
+    <section className={css.root} data-variant={variant} data-tool={toolName} data-state={state}>
       {status !== null && <span className={css.visuallyHidden}>{status}</span>}
       <DisclosureRow
         rowClassName={css.row}
@@ -374,6 +374,6 @@ export const ToolRow = memo(function ToolRow({
       >
         {expandedContent}
       </DisclosureRow>
-    </div>
+    </section>
   )
 })

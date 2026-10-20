@@ -32,13 +32,13 @@ export function DefaultConversationViews({
   if (session.blank && conversationPhase(session, conversation) === 'blank') return null
   const viewId = view ?? active?.id
   return (
-    <div className={css.viewArea}>
+    <section className={css.viewArea}>
       {viewId !== undefined && renderSlot('conversation.view', {
         inspectCall,
         viewRequest,
         openView,
         completeViewRequest: actions.completeViewRequest,
       }, { only: viewId })}
-    </div>
+    </section>
   )
 }

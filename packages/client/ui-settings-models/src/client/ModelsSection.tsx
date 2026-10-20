@@ -319,20 +319,20 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     /* v8 ignore next -- an error status always carries text; the fallback satisfies the nullable type */
     const errorText = state.error ?? ''
     return (
-      <div className={styles['section']}>
+      <section className={styles['section']}>
         <p className={styles['error']}>{`${t('loadFailed')}: ${errorText}`}</p>
         <button type="button" className={styles['secondaryButton']} onClick={() => { void controller.load() }}>
           {t('retry')}
         </button>
-      </div>
+      </section>
     )
   }
   if (!hasReadySnapshot && state.status !== 'ready') {
     return (
-      <div className={styles['section']}>
+      <section className={styles['section']}>
         <h2 className={styles['title']}>{t('title')}</h2>
         <p className={styles['intro']}>{t('intro')}</p>
-      </div>
+      </section>
     )
   }
 
@@ -395,7 +395,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     : state.rows.find(row => row.entry.provider === draft.target.provider)
 
   return (
-    <div className={styles['section']}>
+    <section className={styles['section']}>
       <h2 className={styles['title']}>{t('title')}</h2>
       <p className={styles['intro']}>{t('intro')}</p>
       {!state.writable && state.status === 'ready' ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
@@ -715,6 +715,6 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
       >
         {deleteFailure === undefined ? null : <p className={styles['error']}>{deleteFailure}</p>}
       </Modal>
-    </div>
+    </section>
   )
 }

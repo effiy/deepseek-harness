@@ -13,8 +13,8 @@ export type GeneralSectionComponentProps =
  */
 export function GeneralSection({ renderSlot }: GeneralSectionComponentProps) {
   return (
-    <div className={css.section}>
+    <section className={css.section}>
       {renderSlot('settings.general.item', {})}
-    </div>
+    </section>
   )
 }

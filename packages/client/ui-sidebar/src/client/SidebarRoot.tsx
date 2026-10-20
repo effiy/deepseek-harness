@@ -197,7 +197,7 @@ export function SidebarRoot({
   )
 
   return (
-    <div
+    <aside
       ref={column}
       className={clsx(
         css.root, !wide && css.collapsed, !wide && everWide.current && css.railIn,
@@ -213,7 +213,7 @@ export function SidebarRoot({
       {/* macOS hiddenInset titlebar: the strip shares the row with the
           traffic lights and keeps the toggle at the sidebar's top-right. */}
       {darwinDesktop && <div className={css.topStrip} data-window-drag>{toggle}</div>}
-      <div className={css.logoRow} data-window-drag>
+      <header className={css.logoRow} data-window-drag>
         {/* Expanded, the brand doubles as a New Session shortcut — except on
             macOS, where it stays part of the logo row's window-drag surface
             (a button would subtract itself through the global no-drag rule);
@@ -253,7 +253,7 @@ export function SidebarRoot({
             )
         })()}
         {!darwinDesktop && toggle}
-      </div>
+      </header>
 
       {/* The label fades before the hover/focus shortcut, including on translucent backgrounds. */}
       <Tooltip label={t('session.new.label')} shortcutKeys={newShortcut?.keys} delayMs={500} side={captionTooltipSide} disabled={wide}>
@@ -294,22 +294,22 @@ export function SidebarRoot({
 
       {/* The browsing region fills the column between the controls and the
           foot in both states; its rail icon column rides the same slot. */}
-      <div className={css.regionArea}>
+      <section className={css.regionArea}>
         {renderSlot('sidebar.workspaces', {
           wide,
           expandSidebar: () => { if (collapsed) toggleSidebar() },
         })}
-      </div>
+      </section>
 
       {/* Footer actions stack above Settings in both sidebar widths. */}
-      <div className={css.footArea}>
+      <footer className={css.footArea}>
         <div className={css.footerActions}>
           {renderSlot('sidebar.footer.action', { wide })}
         </div>
         <div className={css.settingsArea}>
           {renderSlot('sidebar.settings', { wide })}
         </div>
-      </div>
-    </div>
+      </footer>
+    </aside>
   )
 }

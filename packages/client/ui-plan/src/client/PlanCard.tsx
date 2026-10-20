@@ -44,7 +44,7 @@ export function PlanCards({ turn, usePlans, openPlan, t }: PropsRuntime<'convers
   const plans = usePlans(String(turn.turn))
   if (plans === undefined || plans.length === 0) return null
   return (
-    <div className={css.cards} data-plan-artifacts>
+    <section className={css.cards} data-plan-artifacts>
       {plans.map(plan => <button key={plan.callId} type="button" className={css.card} data-plan-card={plan.callId}
         aria-label={t('preview.openNamed', { title: plan.title })}
         onClick={() => { openPlan(plan.callId) }}>
@@ -55,7 +55,7 @@ export function PlanCards({ turn, usePlans, openPlan, t }: PropsRuntime<'convers
         </span>
         <span className={css.cardOpen}>{t('preview.action')}</span>
       </button>)}
-    </div>
+    </section>
   )
 }
 

@@ -191,8 +191,8 @@ export function FilesBody({
     refresh(tab.id)
   }
   return (
-    <div className={css.root} data-files-state="tree" data-files-root={state.root}>
-      <div className={css.header}>
+    <section className={css.root} data-files-state="tree" data-files-root={state.root}>
+      <header className={css.header}>
         <PathLabel path={state.root} className={css.path} data-files-path />
         <span hidden>
           <button type="button" className={css.tool} aria-label={t('autoRefresh')}
@@ -217,7 +217,7 @@ export function FilesBody({
         {renderSlot('sidebar.right.tab.files.actions', {
           absolutePath: state.root,
         })}
-      </div>
+      </header>
       <div
         ref={bodyRef}
         className={css.body}
@@ -226,6 +226,6 @@ export function FilesBody({
       >
         <ul className={css.level}><Level path={state.root} tree={tree} /></ul>
       </div>
-    </div>
+    </section>
   )
 }

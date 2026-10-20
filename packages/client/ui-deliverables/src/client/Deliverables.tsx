@@ -95,7 +95,7 @@ export function Deliverables({
     {changes !== null && <ChangedFiles changes={changes} cwd={cwd} t={t}
       sessionId={sessionId} useChangesDiff={useChangesDiff} loadChangesDiff={loadChangesDiff}
       openReview={(index) => { openChangesReview({ sessionId, seq: changes.seq, turn: changes.turn }, index) }} />}
-    {matched.presented.length > 0 && <div
+    {matched.presented.length > 0 && <section
       className={css.root}
       data-after-changes={changes !== null || undefined}
     >
@@ -124,6 +124,6 @@ export function Deliverables({
         <span>{t(expanded ? 'presented.collapse' : 'presented.all', { count: matched.presented.length })}</span>
         {expanded ? <IconChevronUpOutlineRegular /> : <IconChevronDownOutlineRegular />}
       </button>}
-    </div>}
+    </section>}
   </>
 }

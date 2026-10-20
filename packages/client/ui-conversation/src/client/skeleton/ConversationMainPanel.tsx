@@ -43,7 +43,7 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
 
   return (
-    <div className={css.root} data-phase={phase}>
+    <section className={css.root} data-phase={phase}>
       {renderSlot('conversation.header', {})}
       {renderFactorySlot('conversation.content', {
         variant: 'main',
@@ -52,6 +52,6 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
       }, {
         slots: CONTENT_SLOTS,
       })}
-    </div>
+    </section>
   )
 }

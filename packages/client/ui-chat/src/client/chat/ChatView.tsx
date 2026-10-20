@@ -205,7 +205,7 @@ export function ChatView({
           t={t}
         />
       )}
-      <div className={css.root} data-chat-following-tail={scroll.followingTail ? '' : undefined}>
+      <section className={css.root} data-chat-following-tail={scroll.followingTail ? '' : undefined}>
         <div ref={scroll.listRef} className={css.scroll}>
           <div ref={scroll.columnRef} className={css.column} data-chat-flow=""
             data-chat-motion={deferCompletedTurns && scroll.initialized
@@ -236,7 +236,7 @@ export function ChatView({
           {/* Fold room is reclaimed by viewport scroll, content-growth, and display-mode policies. */}
           <div className={css.turnSpacer} data-chat-turn-spacer aria-hidden="true" />
         </div>
-      </div>
+      </section>
       {!scroll.followingTail && (
         <div className={css.toBottomSlot}>
           <button

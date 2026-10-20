@@ -186,7 +186,7 @@ export function ConversationContent(props: ConversationContentProps) {
   )
 
   return (
-    <div
+    <section
       ref={setBody}
       className={clsx(css.body, props.variant === 'embedded' && css.embeddedBody)}
       data-conversation-content=""
@@ -199,6 +199,6 @@ export function ConversationContent(props: ConversationContentProps) {
         {composerSeat}
       </div>
       <WidthControls container={body} phase={phase} />
-    </div>
+    </section>
   )
 }

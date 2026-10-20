@@ -132,9 +132,9 @@ function HeroFish({ hovering }: { hovering: boolean }) {
 export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
   const [hovering, setHovering] = useState(false)
   return (
-    <div className={css.root}>
+    <section className={css.root}>
       <div className={css.stack}>
-        <div className={css.headline}>
+        <header className={css.headline}>
           {/* figma 34:10412: fish 34×25 leading the headline, gap 10. */}
           <span
             className={css.fishHitbox}
@@ -151,15 +151,15 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
           </span>
           <span className={css.titleGroup}>
             {/* Own element: keeps the headline text addressable apart from the badge. */}
-            <span>{t('hero.headline')}</span>
+            <h1>{t('hero.headline')}</h1>
             <span className={css.previewBadge}>{t('hero.preview')}</span>
           </span>
-        </div>
+        </header>
         <div className={css.body}>
           {/* The composer remains mounted outside this component. */}
         </div>
       </div>
       {children}
-    </div>
+    </section>
   )
 }
