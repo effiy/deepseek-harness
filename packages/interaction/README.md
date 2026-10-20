@@ -1,28 +1,40 @@
 ---
-description: "人机协作能力族的包映射：斜杠命令、一次性审批、权限预设，以及让运行中的 agent（智能体）暂停等待人类决定的问答 seam。"
-kind: "package-group"
+title: "interaction/：人机协作平面"
+tags: []
+category: "interaction"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# interaction/：人机协作平面
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 `interaction/` 组覆盖用户引导运行中 agent 的各种方式。斜杠命令适合无需模型往返的即时操作；一次性审批用于敏感操作；权限预设可以同时选择沙箱与审批行为；当 agent 需要信息或决定时，它还可以向用户提问。交互式应用向用户提供这些能力；自动化则通过 ACP（Agent Client Protocol）处理自己的审批。下方包映射说明了每项能力的区别，并链接其完整行为与配置。
 
-## 目录
+---
 
-- [包](#packages)
-- [相关文档](#related-documentation)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+「待补充」
 
-<a id="packages"></a>
-## 包
+---
 
-每个包的完整约定以其 README 和对应的子系统参考为准。
+## 📊 指标
+
+「待补充」
+
+---
+
+## 🏛️ 设计
+
+「待补充」
+
+---
+
+## 📁 目录
 
 | 包 | 角色 | ctx 键 |
 |---|---|---|
@@ -32,10 +44,9 @@ kind: "package-group"
 | [`user-questions/`](user-questions/README.zh.md) | 定义经过校验的问题 schema 与作用域 answerer waterfall，agent 可暂停等待 | `ctx.userQuestions` |
 | [`tool-ask-user/`](tool-ask-user/README.zh.md) | 暴露 `ask_user_question` 工具，让模型可以向用户提问并请求其作出决定 | 注册到 `ctx.tools` |
 
------
+---
 
-<a id="related-documentation"></a>
-## 相关文档
+## 🔗 资源
 
 先从子系统参考了解共享词汇，再看相邻的自动化与组合面。
 
@@ -45,12 +56,14 @@ kind: "package-group"
 - [用户交互子系统](../../docs/subsystems/user-questions.zh.md)——问题词汇、answerer waterfall 与待处理问题生命周期。
 - [ACP 组](../acp/README.zh.md)——仅自动化的传输，为其自有 agent 回答审批请求。
 
-<a id="dev-note"></a>
-## 开发备注
+---
 
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
+## 🚀 快速开始
 
-无。
+「待补充」
 
-</details>
+---
+
+## ⚙️ 技术栈
+
+「待补充」

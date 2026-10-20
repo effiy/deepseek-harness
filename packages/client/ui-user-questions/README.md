@@ -1,48 +1,51 @@
 ---
-description: "dsh Web 客户端的 ask_user_question 功能：附着式提问卡片、计时等待、草稿、迟到回复与 plan-review 审批卡片。"
-kind: "package-reference"
+title: "client-ui-user-questions"
+tags: ["deepseek-harness", "client", "ui-user-questions"]
+category: "客户端"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-client-ui-user-questions
+# client-ui-user-questions
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 Web 客户端在聊天输入框旁显示 agent（智能体）的提问。用户可以选择选项、输入文本、跳过问题，并提交一批答案。计时卡片会倒计时；聚焦时暂停，编辑或选择「慢慢回答」后保持等待，到期则放行 agent，而问题仍可回答。关闭关联工具调用的卡片只是隐藏面板；工具调用行可以重新打开它，之后也能展示已记录的回答。Host 重启后仍保留问题；此浏览器重新加载后仍保留未提交的输入。
 
-## 目录
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
+⚡ 功能
 当 agent 提问时，附着式卡片会暂时占用编辑器位置：回答每个问题、用翻页器导航，或跳过它。首个带推荐标记的选项会预先选中，但仍只是未提交的草稿，不会暂停计时倒计时。点击单选选项会立即前进。聚焦选项时按 Enter 会尝试提交整组答案，不会选中该选项；若有缺失答案，则回到第一道未完成的问题。文本答案中的 Enter 会继续流程，Shift+Enter 则换行（IME 组合输入期间按 Enter 只会确认输入候选，不会前进）。
 
-### 作答
 
+---
+
+📊 指标
+间接影响模型体验：本包在 Web 客户端呈现 `dsh-tool-ask-user` 所拥有的模型可见 schema 与答案渲染。
+
+##### KV Cache 影响
+不会直接失效；模型可见的工具调用与结果由 `dsh-tool-ask-user` 拥有。
+
+
+---
+
+🏛️ 设计
+#### 作答
 用户打开或编辑自定义答案时，多选题草稿会保留已选中的标签，因此提交项可以同时携带 `selected` 与 `custom`；单选题的自定义答案仍保持互斥。问题详情复用助手输出的 `MarkdownText` 原语，包括其 GFM 渲染与不受信任内容策略。限高卡片保持标题、导航与提交动作固定，超长的详情与选项共享内部滚动区。「跳过」会保留其他草稿，并为该项发出既有的空 `{ selected: [] }` 结果。关闭不是一种回答：Host 以工具调用命名的问题只是离开编辑器位置，其 `ask_user_question` 工具调用行会把面板带回来；不携带工具调用的请求没有可返回的行，关闭它仍以 `ASK_CANCELLED` 拒绝整个等待。
 
-### 回看已结束的问题
-
+#### 回看已结束的问题
 每条迟到回复只显示一次，包括由它开启新轮次的情况。回复遵循 Chat 原有的过程分组与整轮折叠规则。回复被收起时，展开所属轮次和工作分组即可查看。
 
 已经结束的问题以只读卡片打开：同一个翻页器走过已记录的回答，并标注「已回答」。所有选项与文本框都被禁用，跳过与提交动作消失，用户当时跳过的问题会在空回答处说明这一点，自由文本框只出现在当时确实用过它的回答上。关闭它会移除该卡片，工具调用行会用同一份记录再建一个。
 
-### plan-review 卡片
-
+#### plan-review 卡片
 `plan-review` 意图——由 `dsh-plan-mode` 在 `exit_plan_mode` 审阅上设置——渲染紧凑审批卡片：顶部为带“查看全文”链接的“计划待审”条带，正文显示计划标题和两行纯文本摘要，底部提供“要求修改”和“同意执行”。条带使用共享 warning 状态点，并在任一操作结算期间切换为 ongoing loading。通过链接或聊天历史中的常驻卡片可在侧边栏阅读完整计划。“同意执行”用提问方的批准标签回答；“要求修改”以 `ASK_CANCELLED` 拒绝等待，让编辑器归位供用户输入反馈，不会提交批准。卡片不单列拒绝按钮。
 
-### 失败与恢复
-
+#### 失败与恢复
 回答输入框只有在回答通道就绪且没有倒计时时才自动聚焦。接手握手期间的手动聚焦与失焦会被保留：剩余时长到达时，只有回答区域仍持有焦点，倒计时才以暂停状态开始。
 
 本地返回回答不会释放前台接手记录：Host 接受 waterfall 结果后才关闭该 stream。插件在这段传输期间继续拥有接手记录。显式委托会在调用下一个回答方前释放它，插件卸载则取消剩余接手记录。
@@ -57,70 +60,32 @@ Web 客户端在聊天输入框旁显示 agent（智能体）的提问。用户�
 
 已结算的问题回复在聊天历史中保持紧凑。气泡以三角标记指示可以展开；点击它会展开只读的问题与回答详情，且不会重新打开已经结算的工具调用，也不会产生第二次提交。它的复制动作写出每个问题与用户当时给出的回答，无论气泡展开还是收起都是同一份文本。
 
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
-
 <details>
 <summary>实现细节——点击展开</summary>
 
 本包是一条归属规则：渲染提问是宿主的 UI 能力，拥有该工具则是 agent 的能力，因此 `tool-ask-user` 行属于需要它的各个 preset（以及没有 preset 的 TUI 组装）。
 
-### 重新打开面板
-
+#### 重新打开面板
 本包填充 `userQuestionPanels`——`dsh-client-ui-tool` 为其 `ask_user_question` 行声明的可选能力。`reveal(sessionId, callId)` 把该调用的卡片重新发布为同优先级中最后一个待处理交互，编辑器位置于是再次显示它；当本客户端没有该调用的卡片时返回 `false`——例如旧版未命名的请求、另一个浏览器的问题，或投影已关闭的卡片。问题是否仍可回答取自 `userQuestions` 会话投影，由该行直接读取，因此这项能力自身不携带状态。
 
 投影只列出仍可回答的调用，因此 `review(sessionId, callId, record)` 用该行从自己转录中解析出的问题与回答建卡。这张卡片没有回答通道也没有倒计时，投影清扫不会碰它，关闭它是移除而非留在注册表里。仍持有实时卡片的调用显示实时那张，过期副本不会替换正在进行的请求；同理，只读卡片渲染记录本身，只从实时卡片留下的草稿里取页码。
 
-### 意图界面选择
-
+#### 意图界面选择
 卡片接管声明了意图、以 `detail` 携带计划、提供了被指名的批准标签的单个问题，要求除批准外最多一个选项，且非多选。次要操作返回编辑器供用户提出修改要求。更多选项或多选问题仍由通用流程处理。计划审批通过 `conversation.plan-review.actions` 插槽提供请求键、完整正文和可选的调用标识；计划插件从历史中打开已记录计划，并把没有调用标识的审批作为临时侧边栏预览打开，打开文档不会回答或关闭审批。
 
-### 文案与 locale
-
+#### 文案与 locale
 编辑器外框文案（翻页器、按钮、占位符、校验提示）是双语的：插件在 `dsh-client-locale` 的 `question` 命名空间下注册 zh/en 词典，并通过 inject face 把绑定的翻译函数和 locale 快照源交给该条目，因此切换语言会重新渲染已挂载的编辑器。问题与选项文本来自模型并原样渲染；载体失败消息也不经翻译直接显示。
 
 </details>
 
------
-
-<a id="further-exploration"></a>
-## 进一步探索
-
-以下页面覆盖编辑器宿主、工具 seam 与 plan-mode 消费方。
-
-- [ui-conversation](../ui-conversation/README.zh.md)——拥有 `conversation.composer` slot 的聊天界面。
-- [ui-tool](../ui-tool/README.zh.md)——工具调用记录界面，其 `ask_user_question` 行可重新打开被收起的面板。
-- [tool-ask-user](../../interaction/tool-ask-user/README.zh.md)——面向模型的工具；本 UI 会渲染其 schema 与答案。
-- [ui-plan](../ui-plan/README.zh.md)——设置 `plan-review` 意图的 plan-mode 界面。
-- [user-questions](../../interaction/user-questions/README.zh.md)——Host 侧提问 seam 及其应答方 waterfall（瀑布式事件）。
-
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-间接影响模型体验：本包在 Web 客户端呈现 `dsh-tool-ask-user` 所拥有的模型可见 schema 与答案渲染。
-
-#### KV Cache 影响
-
-不会直接失效；模型可见的工具调用与结果由 `dsh-tool-ask-user` 拥有。
-
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
-
+### 已知限制与延期工作
 这些限制定义提问卡片归属与跨客户端行为；它们是当前包约束。
 
 - **未提交草稿仅保存在一个浏览器中**：切换会话、重新加载页面和重启浏览器后都会保留，但另一个浏览器或设备只会重建 Host 保存的问题。
 - **每次只有一个请求拥有提问卡片**：后续待处理请求仍留在会话快照中，并在较早请求落定后显示。
 - **问题显示在当前会话的编辑器中**：持久待处理问题不会新增独立的侧栏收件箱；请重新打开所属会话进行回答。
 
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
@@ -129,3 +94,31 @@ Web 客户端在聊天输入框旁显示 agent（智能体）的提问。用户�
 </details>
 
 Host 会话投影是持久计时问题的权威来源。浏览器存储只保留未完成输入，绝不会创建问题或让问题继续保持打开。
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+以下页面覆盖编辑器宿主、工具 seam 与 plan-mode 消费方。
+
+- [ui-conversation](../ui-conversation/README.zh.md)——拥有 `conversation.composer` slot 的聊天界面。
+- [ui-tool](../ui-tool/README.zh.md)——工具调用记录界面，其 `ask_user_question` 行可重新打开被收起的面板。
+- [tool-ask-user](../../interaction/tool-ask-user/README.zh.md)——面向模型的工具；本 UI 会渲染其 schema 与答案。
+- [ui-plan](../ui-plan/README.zh.md)——设置 `plan-review` 意图的 plan-mode 界面。
+- [user-questions](../../interaction/user-questions/README.zh.md)——Host 侧提问 seam 及其应答方 waterfall（瀑布式事件）。
+
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

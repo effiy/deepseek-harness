@@ -1,28 +1,24 @@
 ---
-description: "面向构建或排查实验性 Web 预览运行时的维护者，说明浏览器 worker 中的 harness 托管。"
-kind: "package-library"
+title: "`experimental-webworker-runtime`"
+tags: ["deepseek-harness", "experimental", "webworker-runtime"]
+category: "实验性"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# `@deepseek-ai/dsh-experimental-webworker-runtime`
+# `experimental-webworker-runtime`
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 浏览器 worker 宿主：整棵 harness 插件树跑在一个 dedicated Web Worker 里，用于预览部署与打包回归（[实验组](../README.zh.md)）。worker 边下载边解压打包好的 VFS 镜像并挂载进内存，经 CommonJS 包装加载器装载模块，并通过一条讲纯 HTTP 的 postMessage 隧道服务页面。当预览需要在没有 Node 宿主的环境中运行已打包 harness 时，请使用它。
 
-## 目录
 
-- [使用本包](#use-this-package)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
+⚡ 功能
 公开 npm 包在根入口导出运行时库，通过 `./worker` 提供自包含的浏览器 Worker，通过 `./client` 提供页面连接器。部署方通过 [打包器](../webworker-packer/README.zh.md) 单独提供和托管 VFS 镜像；安装此库不会增加 profile 层。根入口还导出打包器所用的模块代理表与替换表。
 
 一条 tsdown 管线产出三个构建产物；另有一层由源码维护的进程实现：
@@ -36,21 +32,20 @@ kind: "package-library"
 
 [已构建 bundle 导入检查](tests/compile/transform-corpus-check.ts)在库构建后检查裸 Node 导入。Dockkit 例外接受 Node 针对任意样式表报告的未知 `.css` 扩展名错误，而不限定某一固定路径；其他扩展名、错误码或消息，以及意外成功的豁免导入，仍然报错。
 
------
 
-<a id="model-experience"></a>
-## 模型体验
+---
 
+📊 指标
 无：本包只在浏览器 worker 里承载插件树并应答它的 `node:*` 调用；所有面向模型的注册都属于它启动的那些插件。
 
-#### KV Cache 影响
-
+##### KV Cache 影响
 无：本包既不组装也不发送提供方请求。
 
-## 已知限制与延期工作
 
-<a id="known-limitations-and-deferred-work"></a>
+---
 
+🏛️ 设计
+### 已知限制与延期工作
 - **worker 组合写明文会话日志**（`compression: 'none'` boot patch）：不带 Zstandard 编解码器，导出日志是 `.jsonl`，不会是 `.jsonl.zstd`。
 - **`node:dns/promises`、`node:vm`、`node:net`、`node:sqlite`、`node:worker_threads` 是结构化 stub**：每次调用在 console 报告拒绝并抛出。需要原生 DNS、真进程或真 realm 隔离的行在此无法运行。
 - **`node:assert/strict` 仅支持真值断言**：对于假值，可调用的默认导出和 `ok` 使用传入的消息或通用文本抛出 `ERR_ASSERTION`，或原样抛出传入的 Error。其他断言 API 未提供。
@@ -66,13 +61,31 @@ kind: "package-library"
 - **shell 进程没有同步文件面**：它靠消息读写宿主的 VFS，因为阻塞等待回帧需要 `SharedArrayBuffer`，而那要求 GitHub Pages 给不了的跨源隔离。因此目录遍历类命令每个条目一次往返，并发的两条命令写入可以交错。
 - **transport、worker-host、页面半的覆盖需要浏览器级 harness**——这些模块未达 per-file 覆盖门；单测覆盖 storage、ALS、transform 与 stub 契约。
 
-
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
 无。
 
 </details>
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+「待补充」
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

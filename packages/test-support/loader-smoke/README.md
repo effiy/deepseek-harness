@@ -1,70 +1,44 @@
 ---
-description: "面向无密钥示例冒烟测试的共享子进程与直接 agent（智能体） harness，供测试作者启动真实 Loader 组合。"
-kind: "package-library"
+title: "@deepseek-ai/dsh-loader-smoke"
+tags: []
+category: "test-support"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-loader-smoke
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 使用 `dsh-loader-smoke` 可从应用 fixture（测试前置数据）的真实可执行文件及其 `cordis.yml` 启动应用，并在隔离的临时目录中捕获输出和完成清理。`runFixtureTurn` 通过已配置的根 agent 驱动一项任务，并返回最终 assistant 文本与 token 用量。测试可以选择零构建的源码执行或已构建包执行，使本地和 CI 冒烟测试分别采用对应环境预期的消费路径。这个支持层库面向测试作者，不用于产品集成。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制说明何时需要对该 harness 特别小心。它们是当前包约束，不是任务积压。
 
-本包以已安装消费方的方式启动应用 fixture，并让测试观察结果：选择源模式或构建模式，从隔离 cwd 用其配置启动可执行文件，然后要么等待干净退出，要么让一项任务通过根 agent。
+- **构建模式需要事先构建**——拥有该配置的包 manifest 还必须声明配置中点名的每个包。
+- **捕获的 stdout 与 stderr 仅受 execa 默认 100 MB `maxBuffer` 约束**——失控子进程在该上限处被终止，而不是在冒烟测试自选的预算处。
+- **超时只终止直接子进程**——有故障的 fixture spawn 的进程树可能比冒烟测试存活更久，需要外部清理。
 
-### 启动应用 fixture
+---
 
-`runLoaderSmoke` 接受可执行文件与配置路径、可选的完整可执行文件参数、环境覆盖、标准输入、运行前准备与清理前检查。它负责隔离工作目录、DSH 主目录、诊断、截止时间、终止、EOF 与清理（只清理自己创建的 cwd，调用方自带的 cwd 原样保留）；进程以零状态退出后返回两个流，失败时则拒绝并附带两个流：
+## 📊 指标
 
-```text
-const result = await runLoaderSmoke({
-  label: 'acp-agent',
-  tempDirPrefix: 'acp-smoke-',
-  binScript: '/abs/path/to/src/bin.ts',
-  configPath: '/abs/path/to/cordis.yml',
-  tsconfigPath: '/abs/path/to/tsconfig.json',
-})
-```
+无，因为测试 harness 仅提交调用方测试的普通用户任务，并将提示词与工具组装交由已加载的树负责。
 
-源码 smoke 测试支持的 `dsh` 启动器时，设置 `sourceImport: 'tsx/esm'`；built 模式忽略此选项。当场景固定一个设计好的失败面——即一次性轮次以错误结果结束——时设置 `expectedExitCode`；以任何其他方式退出（包括成功退出）都会使冒烟测试失败。
+#### KV Cache 影响
 
-### 测试交付 profile
+除已加载树本身的影响外，无其他影响；该 helper 既不更改请求前缀，也不跨运行保留状态。
 
-Profile 集成 driver 使用仅限仓库内部的 `tests/fixtures/production-profile.ts` helper。它通过 `loadProfile` 加载指定的已交付 profile 及其组合包 patch，计算 runtime resolution，并通过 `PluginPackages` 安装它，然后把组合包 patch 与测试 `*.patch.yml` 文件依次交给 `boot` 挂载的根 `cordis:include`。这些 patch 应只包含测试提供方或模型、隔离持久化路径及被测对象专用变更。只需要 agent loop 而不测试 profile 集成的包级单元测试改为在本地挂载 `dsh-agent-loop-testkit`。
+---
 
-### 驱动 fixture 轮次
-
-`runFixtureTurn(ctx, options)` 让一项任务通过恰好一个已配置的根 agent：它等待任务进入持久收件箱，把规范事件转发给你的观察器，刷写会话，并返回最终 assistant 文本与累计用量。示例本地的 driver 继续负责配置、渲染与断言。
-
-### 源模式或构建模式
-
-`resolveExampleLaunch` 选择示例可执行文件从哪个产物启动。`src` 模式在 tsx 下运行可执行文件并设置 `TSX_TSCONFIG_PATH`，使工作区导入通过 tsconfig `paths` 映射解析——这是零构建开发路径。`lib` 模式在普通 Node 下运行构建后的 `lib/` 可执行文件，使裸包插件通过真实包 `exports` 解析，与已安装消费方的解析方式完全一致。模式来自显式值或 `DSH_EXAMPLE_MODE`（CI 设置 `lib`，开发时保持未设置）；其他任何值都会明确报错。
-
-### 可能出什么问题
-
-- **进程永不退出**——冒烟测试强制执行截止时间，并在失败信息中报告捕获的流；会 spawn 自身进程树的故障 fixture 可能比冒烟测试存活更久，需要外部清理。
-- **构建模式需要事先构建**——选择 `DSH_EXAMPLE_MODE=lib` 前先运行 `pnpm run build`；拥有该配置的包 manifest（元数据清单）还必须声明配置中点名的每个包。
-- **捕获输出受 execa 默认 100 MB `maxBuffer` 约束**——失控子进程在该上限处被终止，而不是在冒烟测试自选的预算处。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -85,10 +59,19 @@ harness 建立在一个分离之上：冒烟测试在隔离世界中的子进程
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 模式解析器、`runLoaderSmoke` 子进程 harness、选项与结果类型 |
+| [`src/agent-turn.ts`](src/agent-turn.ts) | `runFixtureTurn` 直接 agent driver 与结果信封 |
+| [`tests/fixtures/production-profile.ts`](tests/fixtures/production-profile.ts) | 仅限仓库内部、供集成 fixture 使用的交付 profile 组装 helper |
+
+---
+
+## 🔗 资源
 
 当包级约定不够用时阅读以下页面。它们从 harness 逐步进入它启动的组合以及它所服务的 fixture。
 
@@ -97,34 +80,30 @@ harness 建立在一个分离之上：冒烟测试在隔离世界中的子进程
 - [测试策略](../../../docs/testing.zh.md)——无密钥快照与冒烟层级。
 - [test-support 组地图](../README.zh.md)——兄弟 harness 与支持包。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-无，因为测试 harness 仅提交调用方测试的普通用户任务，并将提示词与工具组装交由已加载的树负责。
+```ts
+const result = await runLoaderSmoke({
+  label: 'acp-agent',
+  tempDirPrefix: 'acp-smoke-',
+  binScript: '/abs/path/to/src/bin.ts',
+  configPath: '/abs/path/to/cordis.yml',
+  tsconfigPath: '/abs/path/to/tsconfig.json',
+})
+```
 
-#### KV Cache 影响
+启动应用 fixture
 
-除已加载树本身的影响外，无其他影响；该 helper 既不更改请求前缀，也不跨运行保留状态。
-
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
+`runLoaderSmoke` 接受可执行文件与配置路径、可选的完整可执行文件参数、环境覆盖、标准输入、运行前准备与清理前检查。它负责隔离工作目录、DSH 主目录、诊断、截止时间、终止、EOF 与清理（只清理自己创建的 cwd，调用方自带的 cwd 原样保留）；进程以零状态退出后返回两个流，失败时则拒绝并附带两个流：
 
 
-这些限制说明何时需要对该 harness 特别小心。它们是当前包约束，不是任务积压。
 
-- **构建模式需要事先构建**——拥有该配置的包 manifest 还必须声明配置中点名的每个包。
-- **捕获的 stdout 与 stderr 仅受 execa 默认 100 MB `maxBuffer` 约束**——失控子进程在该上限处被终止，而不是在冒烟测试自选的预算处。
-- **超时只终止直接子进程**——有故障的 fixture spawn 的进程树可能比冒烟测试存活更久，需要外部清理。
+源码 smoke 测试支持的 `dsh` 启动器时，设置 `sourceImport: 'tsx/esm'`；built 模式忽略此选项。当场景固定一个设计好的失败面——即一次性轮次以错误结果结束——时设置 `expectedExitCode`；以任何其他方式退出（包括成功退出）都会使冒烟测试失败。
 
-<a id="dev-note"></a>
-### 开发备注
+---
 
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
+## ⚙️ 技术栈
 
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-loader-smoke

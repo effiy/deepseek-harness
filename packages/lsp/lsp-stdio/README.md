@@ -1,83 +1,45 @@
 ---
-description: "ctx.lsp 的 stdio 语言服务器提供方：配置好的服务器命令、扩展名映射与有边界的临时打开查询，供组合本地代码导航的用户与维护者阅读。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-lsp-stdio"
+tags: []
+category: "lsp"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-lsp-stdio
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 使用 `dsh-lsp-stdio` 可让 agent（智能体）从显式配置的本地语言服务器获得定义、引用、实现与悬停信息。它把文件扩展名映射为语言标识符，按需为每个工作区启动一台服务器，并在每次查询时重新读取文件，不在查询之间保留文档状态。语言服务器进程与源文件读取共享已挂载的文件系统和子进程环境。本包不安装服务器，也不提供沙箱；部署方必须提供命令、映射和所需的隔离措施。同一服务器与工作区的查询串行执行，不同工作区可并行运行。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制说明本提供方何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是任务积压。
 
-当部署拥有本地语言服务器——例如 `typescript-language-server`——并希望 harness 通过它们导航代码时，挂载此提供方。它需要位于同一执行世界的文件系统与子进程提供方，以及 `dsh-lsp` seam；若要向模型开放，还需要 `dsh-tool-lsp`。
+- **不提供隔离策略**——本包信任所配置的服务器，不对其进程实施沙箱；受限部署必须提供适当的进程与文件系统提供方，或使用同一执行世界的沙箱包装层。
+- **临时打开兼容性下限**——同步能力省略打开／关闭（或声明 `None`）的服务器不受支持，即使关闭文档查询能够工作；固定的 TypeScript e2e 只建立一项兼容性下限，不代表跨语言承诺。
+- **逐服务器与逐工作区串行化延迟**——共享同一个服务器与工作区的并行 agent 会在一个进程后排队；长生命周期工作区进程会占用内存直到释放。
+- **被强制杀死的 harness 会遗留语言服务器**——`initialize.processId: null` 取消了服务器侧的客户端 PID 监视，因此服务器只能由服务的优雅释放清理；被 SIGKILL 的 harness 会让它们继续运行，直到自行退出。
 
-### 最小配置
+---
 
-`servers` 记录把每个稳定的提供方 id 映射到一条服务器命令。提供方会在清理 credential 后于加载时解析每个可执行文件，因此一个坏配置项会阻止所有提供方注册；进程在第一次匹配查询时惰性启动。
+## 📊 指标
 
-```yaml
-- name: '@deepseek-ai/dsh-fs-local'
-- name: '@deepseek-ai/dsh-subprocess-local'
-- name: '@deepseek-ai/dsh-lsp'
-- name: '@deepseek-ai/dsh-lsp-stdio'
-  config:
-    servers:
-      typescript:
-        command: typescript-language-server
-        args: ['--stdio']
-        extensionToLanguage:
-          '.ts': typescript
-- name: '@deepseek-ai/dsh-tool-lsp'
-```
+通过 `dsh-tool-lsp` 间接影响；该工具呈现此提供方的规范化结果，本主机自身不贡献提示词或 schema。
 
-| 字段 | 默认值 | 含义 |
-|---|---|---|
-| `command` | 必填 | 要 spawn 的可执行文件——绝对路径，或在加载时从子进程 PATH 解析；不使用 shell 启动 |
-| `extensionToLanguage` | 必填 | 小写、以点开头的扩展名 → LSP language id（例如 `{ '.ts': 'typescript' }`） |
-| `args` | `[]` | 传给可执行文件的参数 |
-| `env` | `{}` | 合并到已清理 credential 的环境之上的额外 env；匹配 `KEY`／`PASSWORD`／`SECRET`／`TOKEN` 的变量以及所有 `DSH_*` 名称不会被转发 |
-| `initializationOptions` | `null` | 转发给服务器的静态 `initialize` 选项 |
-| `configuration` | `null` | 每个 `workspace/configuration` 配置项的静态答案 |
-| `maxMessageBytes` | `16000000` | 从服务器接受的单条 framed 消息最大大小 |
-| `maxStderrBytes` | `1000000` | 为诊断保留的 stderr 尾部最大大小 |
-| `maxDocumentBytes` | `4000000` | 该主机可打开的源文件大小上限 |
-| `shutdownTimeoutMs` | `5000` | 升级前用于优雅 `shutdown`／`exit` 的预算 |
-| `killGraceMs` | `2000` | 请求取消及 SIGTERM→SIGKILL 升级的宽限期 |
+#### KV Cache 影响
 
-`servers` 必须至少包含一个配置项，每个 id 都必须非空；定时器预算必须是 Node 定时器范围内的正整数，字节上限必须为正。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-lsp-stdio)是每个受支持字段的穷尽式真源。
+不会直接失效；请求前缀变更由 `dsh-tool-lsp` 负责。
 
-### 查询做什么
+---
 
-首次查询某个工作区时，提供方会为该工作区启动一个服务器进程并放入池中。每次查询通过 `ctx.fs` 读取当前源文件，在服务器中打开它（`textDocument/didOpen`），执行所请求的操作，然后关闭——因此服务器始终看到当前文本，调用之间不会残留任何文档状态。同一服务器与工作区的查询一次只执行一个；不同工作区并行运行。如果池化进程在只读查询之前或期间发生故障，提供方会在新进程上重试该查询一次。
-
-### 可观察的成功与失败
-
-成功的导航返回规范化位置，悬停返回规范化文本或无可悬停提示；空结果是成功的无结果响应。当服务器不支持该操作或临时打开／关闭同步（`LSP_UNSUPPORTED_OPERATION`）、源文件缺失、非普通文件、非 UTF-8、过大或位于规范工作区之外（在服务器启动前被拒绝），或服务器返回格式错误的载荷（`LSP_MALFORMED_RESPONSE`）时，查询会失败。被强制杀死的 harness 会让服务器继续运行直到自行退出——优雅关闭只发生在服务释放时。
-
-### 安全边界
-
-本提供方信任所配置的服务器，不提供任何沙箱隔离；服务器获得的是已挂载执行世界的文件系统与进程权限。它会在服务器启动前拒绝缺失、非普通文件、非 UTF-8、过大或规范化后位于工作区之外的查询源。结果位置可以指向工作区外部，但外部路径永远不能成为查询源。为同一执行世界挂载文件系统与子进程提供方——分裂世界组合无效。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -113,10 +75,24 @@ kind: "package-reference"
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 插件入口：config schema、可执行文件解析、提供方注册、进程池 |
+| [`src/host.ts`](src/host.ts) | 通过 `ctx.fs` 完成工作区规范化与有边界的源读取 |
+| [`src/instance.ts`](src/instance.ts) | 单个服务器进程：initialize 握手、串行化临时打开查询、有边界的释放 |
+| [`src/connection.ts`](src/connection.ts) | JSON-RPC 端点：id 关联、出站请求、入站服务器请求、stderr 上限 |
+| [`src/framing.ts`](src/framing.ts) | `Content-Length` 分帧与有边界的解码器 |
+| [`src/protocol.ts`](src/protocol.ts) | 协议类型子集：能力、位置、悬停、文本文档同步 |
+| [`src/translate.ts`](src/translate.ts) | 能力检查、UTF-16 协商、`Location`／`LocationLink`／hover 规范化 |
+| [`src/abort.ts`](src/abort.ts) | 融合调用方与释放信号的取消辅助 |
+
+---
+
+## 🔗 资源
 
 当包级约定不够用时阅读以下页面。它们从共享的导航模型逐步进入 seam 与工具。
 
@@ -125,35 +101,45 @@ kind: "package-reference"
 - [dsh-tool-lsp](../tool-lsp/README.zh.md)——基于该 seam 的面向模型工具。
 - [lsp 组地图](../README.zh.md)——三个包的家族及其相关文档。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-通过 `dsh-tool-lsp` 间接影响；该工具呈现此提供方的规范化结果，本主机自身不贡献提示词或 schema。
+### 配置
 
-#### KV Cache 影响
+```yaml
+- name: '@deepseek-ai/dsh-fs-local'
+- name: '@deepseek-ai/dsh-subprocess-local'
+- name: '@deepseek-ai/dsh-lsp'
+- name: '@deepseek-ai/dsh-lsp-stdio'
+  config:
+    servers:
+      typescript:
+        command: typescript-language-server
+        args: ['--stdio']
+        extensionToLanguage:
+          '.ts': typescript
+- name: '@deepseek-ai/dsh-tool-lsp'
+```
 
-不会直接失效；请求前缀变更由 `dsh-tool-lsp` 负责。
+### 参数
 
-## 已知限制与延期工作
+| 字段 | 默认值 | 含义 |
+|---|---|---|
+| `command` | 必填 | 要 spawn 的可执行文件——绝对路径，或在加载时从子进程 PATH 解析；不使用 shell 启动 |
+| `extensionToLanguage` | 必填 | 小写、以点开头的扩展名 → LSP language id（例如 `{ '.ts': 'typescript' }`） |
+| `args` | `[]` | 传给可执行文件的参数 |
+| `env` | `{}` | 合并到已清理 credential 的环境之上的额外 env；匹配 `KEY`／`PASSWORD`／`SECRET`／`TOKEN` 的变量以及所有 `DSH_*` 名称不会被转发 |
+| `initializationOptions` | `null` | 转发给服务器的静态 `initialize` 选项 |
+| `configuration` | `null` | 每个 `workspace/configuration` 配置项的静态答案 |
+| `maxMessageBytes` | `16000000` | 从服务器接受的单条 framed 消息最大大小 |
+| `maxStderrBytes` | `1000000` | 为诊断保留的 stderr 尾部最大大小 |
+| `maxDocumentBytes` | `4000000` | 该主机可打开的源文件大小上限 |
+| `shutdownTimeoutMs` | `5000` | 升级前用于优雅 `shutdown`／`exit` 的预算 |
+| `killGraceMs` | `2000` | 请求取消及 SIGTERM→SIGKILL 升级的宽限期 |
 
-<a id="known-limitations-and-deferred-work"></a>
+---
 
+## ⚙️ 技术栈
 
-这些限制说明本提供方何时不合适，或何时需要特别的运维注意。它们是当前包约束，不是任务积压。
-
-- **不提供隔离策略**——本包信任所配置的服务器，不对其进程实施沙箱；受限部署必须提供适当的进程与文件系统提供方，或使用同一执行世界的沙箱包装层。
-- **临时打开兼容性下限**——同步能力省略打开／关闭（或声明 `None`）的服务器不受支持，即使关闭文档查询能够工作；固定的 TypeScript e2e 只建立一项兼容性下限，不代表跨语言承诺。
-- **逐服务器与逐工作区串行化延迟**——共享同一个服务器与工作区的并行 agent 会在一个进程后排队；长生命周期工作区进程会占用内存直到释放。
-- **被强制杀死的 harness 会遗留语言服务器**——`initialize.processId: null` 取消了服务器侧的客户端 PID 监视，因此服务器只能由服务的优雅释放清理；被 SIGKILL 的 harness 会让它们继续运行，直到自行退出。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
-
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-lsp-stdio

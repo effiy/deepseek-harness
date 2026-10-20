@@ -1,77 +1,50 @@
 ---
-description: "面向开发者与维护者的会话投影注册表说明，用于向客户端载体提供日志派生逐会话状态的完整当前值，或维护驱动约定。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-session-projection"
+tags: []
+category: "session"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-session-projection
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 当客户端需要当前的逐会话状态（例如待办事项、目标或对话统计）而不应自行重放原始事件日志时，使用 `dsh-session-projection`。领域根据已提交的会话事件定义同步投影，客户端则通过快照与变更通知接收经过 schema 校验的完整 JSON 值。快照标明所有返回值共同反映到的最后一个事件，因此载体可以把状态与对应的历史切面配对。投影状态可以通过检查点加快冷读，而仅供 host 使用的投影不会暴露给客户端。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
-在客户端载体需要日志派生会话状态的当前值处挂载 `dsh-session-projection`。领域插件注册单元；载体读取快照并订阅变更流；两侧互不相识。
-
-### 何时选择
+### 适用场景
 
 当领域保存客户端应看到、但不应自行重新派生的状态——todo 清单、goal 快照、对话统计——时选择本包。注册表在已提交事件上主动驱动单元，因此任何已注册单元的值按构造即为当前值。当维护的是无客户端读取的 host-only 记账时跳过：不带 `wire` 块的单元保持 host-only。host 读取方要么在插件 `inject` 中声明 `sessionProjections`，要么在注册表或必需 key 缺席时明确失败。贡献方可以继续通过 `ctx.inject(['sessionProjections'], ...)` 保持可选注册。
 
-### 定义投影单元
+### 限制
 
-领域为每个状态键贡献一个 `ProjectionDefinition`：一个 key、状态 schema、初始状态、同步折叠 `apply(state, event)`、可选的 `wire` 块（把状态投影为客户端视图），以及状态字段或折叠语义变化时递增的 `stateVersion`：
+这些限制说明投影注册表在大规模下何时需要特别处理。它们是当前包约束，不是任务积压。
 
-```text
-const definition = {
-  key: 'todo',
-  stateSchema: todoStateSchema,
-  stateVersion: 1,
-  init: (_header, _inheritedEventCount) => ({ items: [] }),
-  apply: (state, event) => event.type === 'todo/upsert'
-    ? { items: event.data.items }
-    : state,
-  wire: {
-    viewSchema: todoViewSchema,
-    view: state => ({ items: state.items }),
-  },
-}
-```
+- **每个尾页携带每个 client-visible key**——尚无逐 key 的 opt-out 或惰性 key 请求形状；在值都是 UI 量级的全量状态时可以接受，若某领域的值变大再重议。
+- **单元表是进程级的，因此 key 是否存在不能当作逐会话的能力信号**——任何 agent preset 注册的 key 都会出现在每个会话的快照里；客户端必须读值，不能把 key 缺席当作功能缺席。
+- **主动驱动逐事件触达每个单元**——按构造开销很低（全量值规则与 state/view 引用闸门），但若出现热点路径，可加按单元的事件类型预过滤。
+- **注册表 cell 只活在内存里**——重启后首次触达时靠折叠日志重建；挂载了 `dsh-session-projection-cache` 的组合改由持久行播种该折叠。
+- **单元同步纪律只有部分可机械把关**——`wire.viewSchema.parse` 能拒绝返回 Promise 的 view，但阻塞的 `apply`、或读取撕裂的非会话状态的 `apply`，只能靠评审把关。
 
-`init(header, inheritedEventCount)` 同时接收轻量元数据与精确的 fork 继承切点；它不得从 `firstLiveSeq` 或 `session/end-seed` 推断该切点。`apply` 必须同步，且对与单元无关的事件必须返回同一个状态引用——引用不变意味着零下游工作。注册表用 `Object.is` 比较相邻的 `wire.view` 原始结果；对象或数组 view 若要在仅内部 state 变化时抑制发布，就必须复用引用，结构相同的新对象仍算变化。携带状态的日志事件必须携带变更后的完整状态，绝不携带裸增量。
+---
 
-### 注册与读取
+## 📊 指标
 
-`register(definition)` 安装单元；具有相同 key 和 `stateVersion` 的注册方共享其 cell，版本不兼容或 `stateVersion` 非法时会 throw。注册是挂在调用方 fiber 上的 effect，因此最后一个注册方卸载后会移除 key 及其缓存 cell。返回的 disposer 可以 yield 到同一 fiber 上的复合 `ctx.effect()` 中，使单元在依赖它的清理完成前保持可用。载体用 `snapshot(session)` 对每个客户端可见单元读取一致的同步切面——`{ asOfSeq, values }`，其中 `asOfSeq` 是所有值共同反映到的最后一个事件的 seq——并用 `onChanged(listener)` 订阅逐变更通知。`stateOf(session, key)` 读取一个单元的实时只读 host 状态，不计算无关视图。
+无——注册表只为已入日志的会话状态提供面向客户端的读模型，不注册任何模型可见内容。
 
-```text
-const dispose = ctx.sessionProjections.register(definition)
-const { asOfSeq, values } = ctx.sessionProjections.snapshot(session)
-```
+#### KV Cache 影响
 
-必须使用投影状态的领域把 `sessionProjections` 声明为 Cordis 服务依赖；可选贡献方可以在 `ctx.inject(['sessionProjections'], …)` 下注册。载体使用 `ctx.get('sessionProjections')`，注册表缺席时省略自己的块或帧。
+无；投影从不组装或发送提供方请求。
 
-### 持久检查点
+---
 
-系统通过 `checkpoint(session)` 为每个单元的状态创建检查点，client-visible 与 host-only 一视同仁；同级包 [session-projection-cache](../session-projection-cache/README.zh.md) 持久化这些检查点，使冷读跳过全量日志加载。检查点水位使用 `SessionSeqCursor`（空日志为 `-1`），回放起点使用 `SessionLogOffset`；`restoreFloor` 与 `restore` 实现读取流程，且不会混淆已有事件与日志间隙。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -95,10 +68,18 @@ const { asOfSeq, values } = ctx.sessionProjections.snapshot(session)
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 插件入口：`SessionProjectionRegistry` 服务、`ProjectionDefinition`、快照与检查点机制 |
+| [`src/types.ts`](src/types.ts) | 可合并扩展的 `SessionProjectionMap` 与 `SessionProjectionStateMap` 类型表 |
+
+---
+
+## 🔗 资源
 
 当包级约定不够用时阅读以下页面。它们从单元约定逐步进入读模型子系统与持久缓存。
 
@@ -108,36 +89,20 @@ const { asOfSeq, values } = ctx.sessionProjections.snapshot(session)
 - [会话包映射](../README.zh.md)——相邻的持久化、标题与遥测包。
 - [会话投影 RFC](../../../.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md)——投影与命令日志的设计理由。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-无——注册表只为已入日志的会话状态提供面向客户端的读模型，不注册任何模型可见内容。
+在客户端载体需要日志派生会话状态的当前值处挂载 `dsh-session-projection`。领域插件注册单元；载体读取快照并订阅变更流；两侧互不相识。
 
-#### KV Cache 影响
+### 何时选择
 
-无；投影从不组装或发送提供方请求。
+当领域保存客户端应看到、但不应自行重新派生的状态——todo 清单、goal 快照、对话统计——时选择本包。注册表在已提交事件上主动驱动单元，因此任何已注册单元的值按构造即为当前值。当维护的是无客户端读取的 host-only 记账时跳过：不带 `wire` 块的单元保持 host-only。host 读取方要么在插件 `inject` 中声明 `sessionProjections`，要么在注册表或必需 key 缺
 
-## 已知限制与延期工作
+...（详见功能章节）
 
-<a id="known-limitations-and-deferred-work"></a>
+---
 
+## ⚙️ 技术栈
 
-这些限制说明投影注册表在大规模下何时需要特别处理。它们是当前包约束，不是任务积压。
-
-- **每个尾页携带每个 client-visible key**——尚无逐 key 的 opt-out 或惰性 key 请求形状；在值都是 UI 量级的全量状态时可以接受，若某领域的值变大再重议。
-- **单元表是进程级的，因此 key 是否存在不能当作逐会话的能力信号**——任何 agent preset 注册的 key 都会出现在每个会话的快照里；客户端必须读值，不能把 key 缺席当作功能缺席。
-- **主动驱动逐事件触达每个单元**——按构造开销很低（全量值规则与 state/view 引用闸门），但若出现热点路径，可加按单元的事件类型预过滤。
-- **注册表 cell 只活在内存里**——重启后首次触达时靠折叠日志重建；挂载了 `dsh-session-projection-cache` 的组合改由持久行播种该折叠。
-- **单元同步纪律只有部分可机械把关**——`wire.viewSchema.parse` 能拒绝返回 Promise 的 view，但阻塞的 `apply`、或读取撕裂的非会话状态的 `apply`，只能靠评审把关。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
-
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-session-projection

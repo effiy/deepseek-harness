@@ -1,10 +1,10 @@
 /** Raw requests must not replace Vite's page-module responses. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { rawMarkdownRoute } from '../../scripts/project-doc-site.ts'
+import { rawMarkdownRoute } from '../../scripts/docs-page.ts'
 import { rawMarkdownMiddleware } from '../raw-markdown.ts'
 
-vi.mock('../../scripts/project-doc-site.ts', () => ({ rawMarkdownRoute: vi.fn() }))
+vi.mock('../../scripts/docs-page.ts', () => ({ rawMarkdownRoute: vi.fn() }))
 
 function request(url: string | undefined, destination?: string, method = 'GET', base = '/') {
   const req = { url, method, headers: { 'sec-fetch-dest': destination } } as IncomingMessage

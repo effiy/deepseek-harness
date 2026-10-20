@@ -1,39 +1,35 @@
 ---
-description: "具名实验性转写 Provider 及取消操作的所有权。"
-kind: "package-reference"
+title: "experimental-speech-to-text"
+tags: ["deepseek-harness", "experimental", "speech-to-text"]
+category: "实验性"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-experimental-speech-to-text
+# experimental-speech-to-text
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 此服务定义通过 `ctx.speechToText` 选择具名语音识别器。消费者先解析请求再执行，Provider 独立注册。
 
-## 目录
 
-- [使用此包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
+⚡ 功能
+「待补充」
 
-<a id="use-this-package"></a>
-## 使用此包
+---
 
-通过[语音输入 Bundle](../voice-input-bundle/README.zh.md)加载，或组合此服务、Provider 与消费者。`defaultProvider` 为必填项，选择确切的注册 id；Bundle 提供 `sensevoice-local`。`language` 提供省略的语言提示。缺失或重复的 Provider 会明确报错。
+📊 指标
+无，因为录音与准备不进入模型请求；之后的文字由普通用户提交拥有。
 
-提供方通过 `downloadSources` 公布准备阶段可用的源。`prepare(id, options)` 为单次任务转发可选的 `downloadSource`；提供方校验选择，并拒绝在准备期间改源。省略时沿用提供方策略。下载源选择不属于持久化的识别偏好。
 
------
+---
 
-<a id="understand-the-implementation"></a>
-## 理解实现
-
+🏛️ 设计
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
@@ -45,38 +41,42 @@ kind: "package-reference"
 
 </details>
 
------
-
-<a id="further-exploration"></a>
-## 进一步探索
-
-[语音输入子系统](../../../docs/subsystems/voice-input.zh.md)
-
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-无，因为录音与准备不进入模型请求；之后的文字由普通用户提交拥有。
-
-#### KV 缓存影响
-
+##### KV 缓存影响
 没有直接影响；普通提交拥有消息内容。
 
-## 已知限制与后续工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
+### 已知限制与后续工作
 - 仅支持完整录音转写。服务没有流式识别或语音合成方法。
 
------
-
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
 无。
 
 </details>
+
+
+---
+
+📁 目录
+### 使用此包
+通过[语音输入 Bundle](../voice-input-bundle/README.zh.md)加载，或组合此服务、Provider 与消费者。`defaultProvider` 为必填项，选择确切的注册 id；Bundle 提供 `sensevoice-local`。`language` 提供省略的语言提示。缺失或重复的 Provider 会明确报错。
+
+提供方通过 `downloadSources` 公布准备阶段可用的源。`prepare(id, options)` 为单次任务转发可选的 `downloadSource`；提供方校验选择，并拒绝在准备期间改源。省略时沿用提供方策略。下载源选择不属于持久化的识别偏好。
+
+
+---
+
+🔗 资源
+[语音输入子系统](../../../docs/subsystems/voice-input.zh.md)
+
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

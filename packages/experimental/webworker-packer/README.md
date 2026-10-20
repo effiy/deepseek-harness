@@ -1,28 +1,24 @@
 ---
-description: "面向构建或排查实验性预览部署的维护者，说明浏览器 worker 虚拟文件系统（VFS）镜像打包。"
-kind: "package-library"
+title: "`experimental-webworker-packer`"
+tags: ["deepseek-harness", "experimental", "webworker-packer"]
+category: "实验性"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# `@deepseek-ai/dsh-experimental-webworker-packer`
+# `experimental-webworker-packer`
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 VFS 镜像打包器：把一份合成 profile 变成浏览器 worker 挂载为文件系统的 gzip 压缩基础 tar，并把不透明数据目录变成按序应用的 overlay tar（[实验组](../README.zh.md)）。不做任何源码编译——基础镜像携带仓库真实构建产物，预览部署调试的正是 served 部署交付的字节。打包预览镜像或排查镜像内容时，请阅读本页。
 
-## 目录
 
-- [使用本包](#use-this-package)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
+⚡ 功能
 公开 npm 包通过库入口导出 `packVfsImage` 和 `packVfsOverlay`。调用方提供合成配置、包目录和解析根目录；本包不安装 profile 层。运行时的库入口提供打包所用的模块代理表与替换表。
 
 打包器在 [`src/repository.ts`](src/repository.ts) 中拥有内部 `dsh.configTrees` 声明、校验和源目录解析。该字段不属于公共插件 manifest API。
@@ -39,21 +35,20 @@ VFS 镜像打包器：把一份合成 profile 变成浏览器 worker 挂载为�
 
 `packPreviewFixture` 在 Node 中通过 [Session 格式目录](../../session/session-format-catalog/README.zh.md)准备每个 fixture 目录里最新的规范原始 Session 代际。它从同一 fixture 根目录收集直属子 Session 的发现证据，再补全历史父目录。它严格恢复源文件、编码并严格校验当前后继文件，然后将后继文件与未改变的源文件一同打包。如果选中的代际格式错误、不受支持或属于未来版本，构建会拒绝，不回退。临时后继文件在打包后删除。浏览器以写模式打开时即可使用当前数据，无需调用 Node 的迁移校验 Worker。投影缓存仍由其所属包校验；较早代际不能提供当前折叠检查点。
 
------
 
-<a id="model-experience"></a>
-## 模型体验
+---
 
+📊 指标
 无：本包在构建期运行并写出镜像文件，其产物本身不进入任何模型请求。
 
-#### KV Cache 影响
-
+##### KV Cache 影响
 无：本包既不组装也不发送提供方请求。
 
-## 已知限制与延期工作
 
-<a id="known-limitations-and-deferred-work"></a>
+---
 
+🏛️ 设计
+### 已知限制与延期工作
 - **规则表依赖人工判断**（`rules.ts`：exclude glob、页面资产模式、入口种子），由 `tests/` 钉住；worker 需要触达的新资产类别应加表行，而不是改扫描器。
 - **可达性只推断精确请求形式**——计算得到的 `import` 与 `require` 参数、保存下来的 `createRequire` 结果、经 CommonJS 获取的 `createRequire`，以及基准不是 `import.meta.url` 的调用只在运行时解析；若目标已被裁掉就会显式失败。只能通过这些形式触达的目标需要显式镜像入口种子。
 - **vendored 包源码（`src/*.ts`）被排除**——运行时无人解析它们；未来若有 worker 内源码巡检功能需要专门的 include 规则。
@@ -61,13 +56,31 @@ VFS 镜像打包器：把一份合成 profile 变成浏览器 worker 挂载为�
 - **CLI 必须位于原有仓库位置**：`dsh-pack-vfs-image` 相对于自身安装文件定位检出目录，并从中读取源码 CLI、配置树和预览 fixture。npm 安装支持参数化的库 API；CLI 和仓库辅助函数需要完整且已构建的 DeepSeek Harness 检出目录。
 - **Preview Session 输入使用原始 JSONL** — `packPreviewFixture` 拒绝压缩文件与不规范的 Session 代际文件名。通用 overlay 仍逐字节保留输入。
 
-
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
 无。
 
 </details>
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+「待补充」
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

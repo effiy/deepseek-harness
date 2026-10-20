@@ -1,30 +1,24 @@
 ---
-description: "用 git 工作树快照和文件工具编辑前后的整文件捕获汇总每个顶层轮次改动的文件，以 workspace/changes Session 事件宣告，并在 Session 存活期间提供摘要和逐文件对比；配置、仓库要求与覆盖规则。"
-kind: "package-reference"
+title: "workspace-changes"
+tags: ["deepseek-harness", "deliverables", "workspace-changes"]
+category: "交付物"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-workspace-changes
+# workspace-changes
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 本插件汇总每个顶层轮次改动了哪些文件、每个文件的行数，并提供每个所列文件在轮次开始与结束时的内容对比。比较轮次开始和结束时的 git 工作树快照；文件工具编辑的每个文件在首次编辑之前和轮次结束时各复制一份整文件，以此覆盖 git 覆盖不到的文件。没有仓库或没有 git 时，只列文件工具的编辑。Session 日志只收到一条写明轮号的 `workspace/changes` 事件；摘要和对比留在 Host 上，直到 Session 释放。Web 的改动文件卡片渲染它们。
 
-## 目录
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
+⚡ 功能
 正式提供的 Web bundle 挂载本插件。任何具备 `subprocess` 能力且 Host 上有 git 可执行文件的组合都可以挂载它：
 
 ```yaml
@@ -47,11 +41,19 @@ kind: "package-reference"
 
 每个文件携带持久的 `path`——位于工作目录内时为相对路径，否则为绝对路径——以及用于排序和标签的 `display` 路径：相对路径，仓库内位于工作目录之上的文件为 `../` 路径，家目录下的文件为 `~` 路径，其余为绝对路径。文件按 `display` 的码元顺序排序，因此上级路径和绝对路径排在工作目录自身文件之前。`workspace/changes` 事件只携带轮号；`ctx.workspaceChanges.summary(sessionId, seq)` 返回该序号的事件宣告的摘要，Session 已释放或本 Host 进程从未记录时返回 undefined。`ctx.workspaceChanges.diff(sessionId, seq, index, signal)` 对比该下标所列的文件：从两棵快照树或两份副本得出带三行上下文的 hunk；git 报告为二进制或某一侧含 NUL 字节时返回 `binary`；某一侧超过 `maxFileBytes` 时返回 `oversized`。逐行对比运行超过 `diffTimeoutMs` 时退化为一个替换全部行的 hunk，并标记 `coarse`。因此 Host 重启后重新打开的对话，先前轮次既没有卡片也没有对比。
 
------
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+---
 
+📊 指标
+无，因为记录器只追加一条仅写日志、只有客户端读取的 `workspace/changes` 事件，不注册任何面向模型的内容。
+
+##### KV Cache 影响
+这里的内容不会进入模型请求，因此不影响提供方缓存复用。
+
+
+---
+
+🏛️ 设计
 <details>
 <summary>实现细节——点击展开</summary>
 
@@ -61,28 +63,7 @@ git 通过 `subprocess` 能力运行，使用净化后的环境、`GIT_CONFIG_CO
 
 </details>
 
------
-
-<a id="further-exploration"></a>
-## 进一步探索
-
-- [Web 产出物](../../client/ui-deliverables/README.zh.md)——读取所提供摘要并打开其文件的改动文件卡片。
-- [子进程能力](../../subprocess/README.zh.md)——git 运行所经过的接缝。
-- [历史本轮改动文件卡片决策](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md)——快照设计、覆盖规则、暂缓的影子仓库与被否决的备选方案。
-
-<a id="model-experience"></a>
-## 模型体验
-
-无，因为记录器只追加一条仅写日志、只有客户端读取的 `workspace/changes` 事件，不注册任何面向模型的内容。
-
-#### KV Cache 影响
-
-这里的内容不会进入模型请求，因此不影响提供方缓存复用。
-
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
+### 已知限制与延期工作
 - 摘要、快照树与捕获的副本只在本 Host 进程内随其 Session 存活；Host 重启后重新打开的对话，先前轮次既没有卡片也没有对比。这是既定行为：Host 已经打不开内容的卡片不显示。
 - 有两个 git 功能在快照期间仍会写入仓库自己的 git 目录：`core.splitIndex` 会写 `sharedindex.*` 文件，git-lfs 会对改动文件运行 clean 过滤器并把对象存到 `.git/lfs` 下。
 - 需要 git 2.13 或更高版本以支持 `rev-parse --absolute-git-dir`；不支持的仓库格式或其他 git 失败会带着警告放弃本轮，而不是被当成普通目录。
@@ -95,12 +76,34 @@ git 通过 `subprocess` 能力运行，使用净化后的环境、`GIT_CONFIG_CO
 - 退化为整文件替换的对比携带两侧的全部行，最多两倍 `maxFileBytes`。
 - Windows 路径在 `path` 中保留原生分隔符；`display` 始终用斜杠分隔。
 
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
 无。
 
 </details>
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+- [Web 产出物](../../client/ui-deliverables/README.zh.md)——读取所提供摘要并打开其文件的改动文件卡片。
+- [子进程能力](../../subprocess/README.zh.md)——git 运行所经过的接缝。
+- [历史本轮改动文件卡片决策](../../../.agents/notes/archived/feature/2026-09-11-turn-changed-files-card.md)——快照设计、覆盖规则、暂缓的影子仓库与被否决的备选方案。
+
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

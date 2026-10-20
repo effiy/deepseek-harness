@@ -1,103 +1,43 @@
 ---
-description: "为必须限制返回上下文量的工具提供有界的面向模型输出：项与文本 retainer，以及标准化的省略页脚。"
-kind: "package-library"
+title: "@deepseek-ai/dsh-output-retention"
+tags: []
+category: "util"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-output-retention
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 使用 `dsh-output-retention` 限制工具返回给模型的项或文本量，并报告省略了什么。`ItemRetainer` 保留有序的头部窗口，并可报告精确的省略项数；`TextRetainer` 保留 head、tail 或 head-and-tail 字节窗口，且不会返回因切割而无效的 UTF-8。`formatRetentionNotice` 添加一致的省略子句，各工具则提供自己的恢复指引。`truncateWithoutSplittingSurrogatePair` 按字符预算截断预览时，不会在切口留下孤立的高位代理项。分组、行号、spill 文件与提供方错误仍归工具负责；消费方直接导入本库，而不通过 `cordis.yml` 加载。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制说明 retainer 刻意不覆盖什么。它们是当前包约束，不是任务积压。
 
-凡是工具必须限制其结果到达模型的数量、并如实报告丢弃内容的地方，都使用 retainer。有序逻辑单元选 `ItemRetainer`，面向字节的流选 `TextRetainer`。
+- **项保留只支持 `head`**——tail、head/tail、分页、分组与提供方完整性语义仍归工具所有。
+- **文本保留面向字节**——`TextRetainer` 以字节计数；字符预算的头部截断走 `truncateWithoutSplittingSurrogatePair`，`read` 分页等行窗口仍需独立渲染器；切割可能丢弃部分 UTF-8 边界字节，以保持返回文本有效。
 
-### 限制项列表
+---
 
-```ts
-import { ItemRetainer } from '@deepseek-ai/dsh-output-retention'
+## 📊 指标
 
-declare const globMaxResults: number
-declare const candidates: AsyncIterable<{ path: string }>
-const retainer = new ItemRetainer<{ path: string }>({ kind: 'head', maxItems: globMaxResults })
-for await (const entry of candidates) {
-  retainer.push(entry)          // keep draining past the cap for an exact count
-}
-const { items, truncated, omitted } = retainer.finish()
-```
+通过渲染保留内容与省略元数据的保留消费方间接影响模型。
 
-`push()` 逐项报告该项是否被保留，`finish()` 返回保留的项与 `omitted`——当调用方持续送入每个已观察单元时，这是一个精确计数。搜索工具可以收集完整结果集用于 spill 文件，同时只为模型保留第一页。
+#### KV Cache 影响
 
-### 限制文本流
+不会直接导致失效；请求前缀的任何变更由保留消费方负责。
 
-```text
-import { TextRetainer } from '@deepseek-ai/dsh-output-retention'
+---
 
-const out = new TextRetainer({ kind: 'headTail', headBytes: headCap, tailBytes: tailCap })
-child.stdout.on('data', (chunk: Buffer) => { out.push(chunk) })
-const { text, omittedBytes } = out.finish()
-```
-
-`head`、`tail` 与 `headTail` 按字节而非字符或行计数：子进程管道与 HTTP 正文都是字节流。`finish()` 会在每个切割处修剪不完整的码点，因此返回的文本绝不会携带由切割引入的替换字符，码点也绝不会跨被省略的中间部分重建。
-
-### 构建省略页脚
-
-```ts
-import { formatRetentionNotice } from '@deepseek-ai/dsh-output-retention'
-
-declare const grepMaxMatches: number
-declare const items: { length: number }
-import type { Omitted } from '@deepseek-ai/dsh-output-retention'
-
-declare const omitted: Omitted
-
-const footer = formatRetentionNotice(
-  { scope: 'grep', strategy: 'head', unit: 'items', limit: grepMaxMatches, kept: items.length, omitted },
-  ({ kept }) => `Results capped at ${kept}. Narrow the pattern, path, or include to see more.`,
-)
-```
-
-库负责标准化省略子句（`Omitted 3 items.`）并把它与工具自有的恢复指引拼接；只有工具知道恢复动作，因此这些措辞由工具提供。
-
-### 按字符预算截断预览
-
-`truncateWithoutSplittingSurrogatePair` 按 UTF-16 码元限制预览文本。切口落在代理对内部时丢弃不成对的半个码元，而不是返回孤立高位代理项，因此保留文本仍是前缀。持久 `bash`、`pwsh` 与 `str_replace_editor` 用它处理各自的字符预算预览；截断提示与 `incomplete` 前缀仍由各工具自行负责。
-
-### `truncated` 意味着什么
-
-`truncated` 是预算事实：retainer 因上限而省略了本可获得的内容。它绝不表示上游不完整——权限失败、跳过二进制文件、提供方部分失败与不可读候选项都留在工具领域字段中，绝不并入 `truncated`。
-
-### 当前工具如何使用它
-
-| 工具 | Retainer | 工具仍负责什么 |
-|---|---|---|
-| `glob` | `ItemRetainer`，`head` | spill 文件收集、路径映射、已跳过候选项、`incomplete` |
-| `grep` | `ItemRetainer`，`head` | spill 文件收集、逐匹配预览截断、分组、排序 |
-| `bash` | `TextRetainer`，`tail` 或 `headTail` | spill 文件、退出状态、信号、超时、后台任务 |
-| `web_fetch` | `TextRetainer`，`head` 或 `headTail` | 提供方与资源上限、错误状态 |
-| `web_search` | `ItemRetainer`，`head` | 「来源已达上限」通知措辞与提供方事实 |
-
-`read` 不属于本库：它的行窗口分页（`offset`/`limit`、行号、`totalLines`）是文件专属渲染器，单个省略计数无法表示该窗口的两侧。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -124,10 +64,17 @@ const footer = formatRetentionNotice(
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | `ItemRetainer`、`TextRetainer`、`describeOmitted`、`formatRetentionNotice` 与 `truncateWithoutSplittingSurrogatePair` |
+
+---
+
+## 🔗 资源
 
 当你需要消费方或库背后的边界决策时，阅读以下页面。
 
@@ -135,33 +82,38 @@ const footer = formatRetentionNotice(
 - [spill 子系统](../../../docs/subsystems/spill.zh.md)——本库预览机制所服务的 spill 词汇。
 - [文件搜索工具](../../fs/tool-fs-search/README.zh.md)——为 spill 收集完整结果的 `ItemRetainer` 消费方。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-通过渲染保留内容与省略元数据的保留消费方间接影响模型。
+```ts
+import { ItemRetainer } from '@deepseek-ai/dsh-output-retention'
 
-#### KV Cache 影响
+declare const globMaxResults: number
+declare const candidates: AsyncIterable<{ path: string }>
+const retainer = new ItemRetainer<{ path: string }>({ kind: 'head', maxItems: globMaxResults })
+for await (const entry of candidates) {
+  retainer.push(entry)          // keep draining past the cap for an exact count
+}
+const { items, truncated, omitted } = retainer.finish()
+```
 
-不会直接导致失效；请求前缀的任何变更由保留消费方负责。
+```ts
+import { TextRetainer } from '@deepseek-ai/dsh-output-retention'
 
-## 已知限制与延期工作
+const out = new TextRetainer({ kind: 'headTail', headBytes: headCap, tailBytes: tailCap })
+child.stdout.on('data', (chunk: Buffer) => { out.push(chunk) })
+const { text, omittedBytes } = out.finish()
+```
 
-<a id="known-limitations-and-deferred-work"></a>
+限制项列表
 
 
-这些限制说明 retainer 刻意不覆盖什么。它们是当前包约束，不是任务积压。
 
-- **项保留只支持 `head`**——tail、head/tail、分页、分组与提供方完整性语义仍归工具所有。
-- **文本保留面向字节**——`TextRetainer` 以字节计数；字符预算的头部截断走 `truncateWithoutSplittingSurrogatePair`，`read` 分页等行窗口仍需独立渲染器；切割可能丢弃部分 UTF-8 边界字节，以保持返回文本有效。
+`push()` 逐项报告该项是否被保留，`finish()` 返回保留的项与 `omitted`——当调用方持续送入每个已观察单元时，这是一个精确计数。搜索工具可以收集完整结果集用于 spill 文件，同时只为模型保留第一页。
 
-<a id="dev-note"></a>
-### 开发备注
+---
 
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
+## ⚙️ 技术栈
 
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-output-retention

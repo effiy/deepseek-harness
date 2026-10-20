@@ -1,54 +1,55 @@
 ---
-description: "为配合取消的工具调用设置协作式时间上限，并在超时流程完成后映射为清晰的模型错误，供选择或排查此插件的用户与维护者阅读。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-tool-call-timeout-policy"
+tags: []
+category: "guard"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-tool-call-timeout-policy
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 使用本包可为工具调用执行其配置的协作式时间上限，并在取消完成后向模型返回清晰的超时错误。按时完成的调用保持不变。忽略或缓慢处理取消的工具仍可能让调用方继续等待，因为本包无法硬性停止下游工作。每个工具分别提供自己的限时；本包无需配置，并随 `dsh` 基础组合包默认启用。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
-常用路径只有一行：把插件加入组合——`dsh` 基础组合包已经包含它。配置了限时的工具会被自动保护；其余工具完全不受影响。
-
-### 何时选择
+### 适用场景
 
 当模型会调用耗时很长的工具、这些工具会遵守 `exec.signal`，且你希望在取消完成后得到可预期的超时答复时，选择它。当工具必须在到达限时后被硬性停止时——插件只能请求工具停止，因此忽略取消的工具会继续运行并让调用方继续等待——以及当你希望为所有工具设置一个统一默认限时时（因为每个工具的限时来自该工具自身的配置），避免使用它。
 
-### 设置
+### 限制
 
-无需任何配置即可挂载插件：
+这些限制说明策略何时不合适。它们是当前包约束，不是任务积压。
 
-```yaml
-- name: '@deepseek-ai/dsh-tool-call-timeout-policy'
-```
+- **协作式，绝不是硬终止**——截止时间只通过 `exec.signal` 通知；忽略该信号的工具不会在超时时停止，包装层仍停留在 `await next()` 内，模型要等下游完成后才可能收到超时结果。
+- **没有统一预算**——只有声明 `timeoutMs` 并将其放在 `ToolDefinition` 上的工具才会获得截止时间；未声明工具（随附的 `bash`、`read`、`write`、`edit` 有意不声明）没有注册表级默认值。
 
-限时在配置工具的位置设置。例如，`dsh-tool-web` 的 `fetchTimeoutMs`／`searchTimeoutMs` 设置（默认 30,000 ms）把限时放到 `web_fetch` 与 `web_search` 上。没有限时的工具——随附的 `bash`、`read`、`write`、`edit`——绝不会被切断。生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-web)列出会产生限时的工具设置。
+---
 
-### 你会得到什么
+## 📊 指标
 
-截止时间触发时，插件会中止派生的 `exec.signal`。下游代码遵守取消且 `next()` 完成后，模型会收到标记为错误的 `Error: tool call timed out after <ms>ms` 工具结果，从而决定重试、调整或放弃。忽略或缓慢处理该信号的工具会让调用方继续等待，并且在自身完成前不会产生超时结果；按时完成的调用保持不变。
+### 条件工具结果
 
------
+#### 模型看到什么
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+此插件不添加提示词或 schema。如果已声明的截止时间先到且下游取消完成，它会用 `Error: tool call timed out after <ms>ms` 与结构化 `TOOL_TIMEOUT` 错误替换提供方结果；否则原结果保持不变。永不完成的下游调用无法产生超时结果。
+
+#### Token 影响
+
+未超时的调用不会增加 token。超时会添加一条会被保留的简短错误结果，并可防止体积更大、较晚返回的提供方结果进入上下文。
+
+#### KV Cache 影响
+
+仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
+
+---
+
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -82,45 +83,6 @@ kind: "package-reference"
 
 -----
 
-<a id="further-exploration"></a>
-## 进一步探索
-
-当包级约定不够用时阅读以下页面。它们从工具调用流水线逐步进入超时库拆分、被执行的限时与 guard 组映射。
-
-- [工具子系统参考](../../../docs/subsystems/tools.zh.md)——本包装层挂钩的 `tools/execute` waterfall（瀑布式事件）与决策形态。
-- [超时截止时间库 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.zh.md)——时序／终止拆分以及截止时间为何只通知。
-- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-web)——策略所执行的 `dsh-tool-web` 的 `fetchTimeoutMs`／`searchTimeoutMs` 预算。
-- [guard 组映射](../README.zh.md)——同组的 guard 包与循环卫生家族。
-
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-### 条件工具结果
-
-#### 模型看到什么
-
-此插件不添加提示词或 schema。如果已声明的截止时间先到且下游取消完成，它会用 `Error: tool call timed out after <ms>ms` 与结构化 `TOOL_TIMEOUT` 错误替换提供方结果；否则原结果保持不变。永不完成的下游调用无法产生超时结果。
-
-#### Token 影响
-
-未超时的调用不会增加 token。超时会添加一条会被保留的简短错误结果，并可防止体积更大、较晚返回的提供方结果进入上下文。
-
-#### KV Cache 影响
-
-仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV Cache 条目失效。
-
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
-
-这些限制说明策略何时不合适。它们是当前包约束，不是任务积压。
-
-- **协作式，绝不是硬终止**——截止时间只通过 `exec.signal` 通知；忽略该信号的工具不会在超时时停止，包装层仍停留在 `await next()` 内，模型要等下游完成后才可能收到超时结果。
-- **没有统一预算**——只有声明 `timeoutMs` 并将其放在 `ToolDefinition` 上的工具才会获得截止时间；未声明工具（随附的 `bash`、`read`、`write`、`edit` 有意不声明）没有注册表级默认值。
-
 <a id="dev-note"></a>
 ### 开发备注
 
@@ -132,3 +94,44 @@ kind: "package-reference"
 `src/index.ts` 中的 FIXME 要求确定 `@deepseek-ai/dsh-timeout-guard` 改名；[改名台账](../../../.agents/notes/archived/architecture/2026-08-11-repository-naming-contract-and-rename-ledger.md) 已把 `@deepseek-ai/dsh-tool-call-timeout-policy` 记录为既定名称，因此该 FIXME 已陈旧，待代码清理。
 
 </details>
+
+---
+
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 插件入口：`TOOL_TIMEOUT`、`name`／`inject`／`apply`、`tools/execute` 包装层 |
+
+---
+
+## 🔗 资源
+
+当包级约定不够用时阅读以下页面。它们从工具调用流水线逐步进入超时库拆分、被执行的限时与 guard 组映射。
+
+- [工具子系统参考](../../../docs/subsystems/tools.zh.md)——本包装层挂钩的 `tools/execute` waterfall（瀑布式事件）与决策形态。
+- [超时截止时间库 Agent Note](../../../.agents/notes/implemented/architecture/2026-07-06-timeout-deadline-library.zh.md)——时序／终止拆分以及截止时间为何只通知。
+- [生成配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-tool-web)——策略所执行的 `dsh-tool-web` 的 `fetchTimeoutMs`／`searchTimeoutMs` 预算。
+- [guard 组映射](../README.zh.md)——同组的 guard 包与循环卫生家族。
+
+---
+
+## 🚀 快速开始
+
+### 配置
+
+```yaml
+- name: '@deepseek-ai/dsh-tool-call-timeout-policy'
+```
+
+### 参数
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 插件入口：`TOOL_TIMEOUT`、`name`／`inject`／`apply`、`tools/execute` 包装层 |
+
+---
+
+## ⚙️ 技术栈
+
+**npm**: @deepseek-ai/dsh-timeout-policy

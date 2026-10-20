@@ -1,39 +1,35 @@
 ---
-description: "通过带认证的 Web Remote 提供有界临时转写。"
-kind: "package-reference"
+title: "experimental-api-speech-to-text"
+tags: ["deepseek-harness", "experimental", "api-speech-to-text"]
+category: "实验性"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-experimental-api-speech-to-text
+# experimental-api-speech-to-text
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 `speech` Remote 将浏览器录音连接至 `ctx.speechToText`，提供 Provider 发现和完整录音转写调用。
 
-## 目录
 
-- [使用此包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与后续工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
+⚡ 功能
+「待补充」
 
-<a id="use-this-package"></a>
-## 使用此包
+---
 
-与语音服务定义和 Typert 组合。`maxAudioBytes` 与 `maxDurationSeconds` 限制接收的录音。浏览器 UI 启用时挂载本包生成的 `/remote` 贡献。
+📊 指标
+无，因为录音与准备不进入模型请求；之后的文字由普通用户提交拥有。
 
-`prepare(providerId, { downloadSource })` 将公布的一个下载源转发给提供方，省略时保留其配置策略。目录通过 `downloadSources` 提供选择器选项。提供方拒绝不可用的源，以及对进行中任务的源变更。
 
------
+---
 
-<a id="understand-the-implementation"></a>
-## 理解实现
-
+🏛️ 设计
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
@@ -43,38 +39,42 @@ kind: "package-reference"
 
 </details>
 
------
-
-<a id="further-exploration"></a>
-## 进一步探索
-
-[语音输入子系统](../../../docs/subsystems/voice-input.zh.md)
-
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-无，因为录音与准备不进入模型请求；之后的文字由普通用户提交拥有。
-
-#### KV 缓存影响
-
+##### KV 缓存影响
 没有直接影响；普通提交拥有消息内容。
 
-## 已知限制与后续工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
+### 已知限制与后续工作
 - 不提供文件上传、持久化转写历史或流式协议。Base64 会增加传输开销；录音受公布的限制约束。
 
------
-
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者信息 — 点击展开</summary>
 
 无。
 
 </details>
+
+
+---
+
+📁 目录
+### 使用此包
+与语音服务定义和 Typert 组合。`maxAudioBytes` 与 `maxDurationSeconds` 限制接收的录音。浏览器 UI 启用时挂载本包生成的 `/remote` 贡献。
+
+`prepare(providerId, { downloadSource })` 将公布的一个下载源转发给提供方，省略时保留其配置策略。目录通过 `downloadSources` 提供选择器选项。提供方拒绝不可用的源，以及对进行中任务的源变更。
+
+
+---
+
+🔗 资源
+[语音输入子系统](../../../docs/subsystems/voice-input.zh.md)
+
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

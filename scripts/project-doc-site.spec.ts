@@ -10,11 +10,12 @@ import { gfm } from 'micromark-extension-gfm'
 import type { Nodes } from 'mdast'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { cleanDocSiteOutput, docSiteBuildOptions } from '../website/build.ts'
-import { docsPages, landingLink, routeLink, sectionSpec, type DocsPage } from '../website/docs.ts'
 import {
-  addProjectionFrontmatter, emitRawMarkdownPages, llmsTxt, projectedPageContent, publishableImage,
-  rawMarkdownFiles, rawMarkdownPageContent, rawMarkdownRoute, resolveRepositoryRef, rewriteMarkdown,
-} from './project-doc-site.ts'
+  addProjectionFrontmatter, docsPages, emitRawMarkdownPages, landingLink, llmsTxt,
+  projectedPageContent, publishableImage, rawMarkdownFiles, rawMarkdownPageContent,
+  rawMarkdownRoute, resolveRepositoryRef, rewriteMarkdown, routeLink, sectionSpec,
+  type DocsPage,
+} from './docs-page.ts'
 
 const roots: string[] = []
 const repositoryRoot = resolve(import.meta.dirname, '..')
@@ -656,7 +657,7 @@ describe('rawMarkdownPageContent', () => {
     // The twin pass is the first place an ordinary page's frontmatter is
     // parsed, so an anonymous error would leave 168 routes to search.
     expect(() => rawMarkdownPageContent('---\nlayout: false\n', 'docs/broken.md'))
-      .toThrow('project-doc-site: "docs/broken.md" has unclosed YAML frontmatter')
+      .toThrow('docs-page: "docs/broken.md" has unclosed YAML frontmatter')
   })
 })
 

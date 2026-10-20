@@ -1,28 +1,40 @@
 ---
-description: "共享工具家族的包映射：原子文件写入、品牌化 id、双端队列、JSON 值、harness 主目录路径、启动环境、原生命令、输出保留、时区与超时。"
-kind: "package-group"
+title: "util/：共享工具"
+tags: []
+category: "util"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# util/：共享工具
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 `util/` 组为能力包提供共享的机制原语，避免重复实现。它涵盖原子写入、品牌化 id、双端队列、无损 JSON 值、UUID、Harness home 路径、启动环境、出站代理策略、原生命令、输出保留、时区规范化和超时处理。这里的每个根入口都是库：它不注册产品服务或事件，业务语义仍由消费它的能力负责。
 
-## 目录
+---
 
-- [包](#packages)
-- [相关文档](#related-documentation)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+「待补充」
 
-<a id="packages"></a>
-## 包
+---
 
-每个包提供一个原语；打开对应包页面了解如何使用。
+## 📊 指标
+
+「待补充」
+
+---
+
+## 🏛️ 设计
+
+「待补充」
+
+---
+
+## 📁 目录
 
 | 包 | 职责 |
 |---|---|
@@ -44,21 +56,22 @@ kind: "package-group"
 | [`time/`](time/README.zh.md) | 校验并规范化调用方所报的 IANA 时区 |
 | [`timeout/`](timeout/README.zh.md) | 截止时间运算、信号融合与超时和取消分类 |
 
------
+---
 
-<a id="related-documentation"></a>
-## 相关文档
+## 🔗 资源
 
 - [根包映射](../README.zh.md)——`util/` 在所有包组中的位置。
 - [生成配置目录](../../docs/config-catalog.zh.md)——本组所属的库包索引。
 - [添加包实操手册](../../docs/cookbook/adding-a-package.zh.md)——新的共享原语如何落入本组。
 
-<a id="dev-note"></a>
-## 开发备注
+---
 
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
+## 🚀 快速开始
 
-无。
+「待补充」
 
-</details>
+---
+
+## ⚙️ 技术栈
+
+「待补充」

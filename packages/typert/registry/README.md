@@ -1,56 +1,44 @@
 ---
-description: "运行时 Typert 注册表：保存生成的包反射、惰性 Zod schema factory 与 Remote 调用描述符，并按需为消费方解析。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-typert-registry"
+tags: []
+category: "typert"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-typert-registry
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 `dsh-typert-registry` 让生成的 Typert 产物在运行时可按需查询：每个包的反射、惰性 Zod schema factory 与 Remote 调用描述符都保存在稳定键下。消费方首次请求 schema 时才会物化并缓存它。注册是原子且按 fiber 作用域的：贡献要么整体落地要么完全不落地，并在注册组件卸载时自动撤销。同一服务还托管 Remote 调用所经由的 lookup 与作用域 Context 提供方注册表。它不执行 TypeScript 分析，也不生成 schema；这些由生成器与 loader 负责。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制说明注册表存储与拒绝什么；它们是当前包约束，不是任务积压。
 
-在存储或消费生成 Typert 产物的任何 Host 或 Client 组合中挂载本注册表；它提供 `ctx.typert`。没有配置。
+- **不合并图**——注册表按 face 存储生成的反射，但不合并宿主侧与客户端侧的图，也不解析 TypeScript 引用；这些是分析器与生成器的事。
+- **schema 键不含 face**——宿主侧与客户端侧在不同上下文中运行，因此在同一上下文中注册来自两个 face 的同名 schema 会被作为重复项拒绝。
+- **JSON Schema 投影不缓存**——`toJSONSchema()` 每次调用都返回全新文档；需要重复投影的消费方自行负责缓存。
 
-### 最小设置
+---
 
-加载注册表插件；Client face 由 Client 运行时自身的元数据以同样方式安装，两个 face 运行同一实现：
+## 📊 指标
 
-```yaml
-- name: '@deepseek-ai/dsh-typert-registry'
-```
+无，因为该运行时类型注册表的消费方（cordis_inspect、wire faces、门禁）拥有注册表内容的任何模型可见投影。
 
-### 查询 schema 与反射
+#### KV Cache 影响
 
-消费方用 `get(key)`、`resolve(key)` 或 `list(filter?)` 读取 schema，用 `getPackage(name, face?)` 或 `listPackages(filter?)` 读取包反射。首次读取会物化一个进程 realm 内的 schema 实例，后续读取复用该实例。`resolve()` 能区分格式错误的键、未注册的包，以及已注册但未以该名称提供 schema 的包，各自给出不同的错误。`toJSONSchema(key)` 把已物化的 Zod schema 投影为 JSON Schema，但不缓存该投影。
+无直接影响；把反射或 schema 放入请求的消费方负责由此产生的前缀变化。
 
-### 注册贡献
+---
 
-生成产物在 Loader 组合中通过 [loader](../loader/README.zh.md) 注册；其他所有者直接调用 `ctx.typert.register(contribution)`，并获得撤销它的同一资源释放函数。重复的包与 face 组合键、schema 键、调用 id 或端点会在提交任何内容之前拒绝整个批次。
-
-### Lookup 与 Context 提供方
-
-Remote 调用通过 `ctx.typert.lookups` 与 `ctx.typert.contexts` 解析 Host 对象与作用域 Context。`registerHost()` 安装 Host wire 声明及其 wire 到 Context 的 resolver，`configureHost()` 只替换该 resolver。`registerClient()` 为同一个 merge-declared kind 安装双向 Client adapter。Host 到 Client 的事件源显式携带领域 identity，而不从 Context 反向投影。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -84,10 +72,19 @@ Remote 调用通过 `ctx.typert.lookups` 与 `ctx.typert.contexts` 解析 Host �
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/service.ts`](src/service.ts) | `TypertRegistry` 服务、存储、校验、effect 接线 |
+| [`src/types.ts`](src/types.ts) | 贡献、记录与过滤器类型 |
+| [`src/client/index.ts`](src/client/index.ts) | 安装同一注册表的 Client face |
+
+---
+
+## 🔗 资源
 
 当包级约定不够用时阅读以下页面；它们从注册表逐步进入供给它与消费它的内容。
 
@@ -97,34 +94,26 @@ Remote 调用通过 `ctx.typert.lookups` 与 `ctx.typert.contexts` 解析 Host �
 - [Typert 子系统参考](../../../docs/subsystems/typert.zh.md)——字面的 `ctx.typert` 约定。
 - [API Gateway 参考](../../../docs/api-gateway.zh.md)——调用描述符与提供方的主要消费方。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-无，因为该运行时类型注册表的消费方（cordis_inspect、wire faces、门禁）拥有注册表内容的任何模型可见投影。
+### 配置
 
-#### KV Cache 影响
+```yaml
+- name: '@deepseek-ai/dsh-typert-registry'
+```
 
-无直接影响；把反射或 schema 放入请求的消费方负责由此产生的前缀变化。
+### 参数
 
-## 已知限制与延期工作
+| 文件 | 职责 |
+|---|---|
+| [`src/service.ts`](src/service.ts) | `TypertRegistry` 服务、存储、校验、effect 接线 |
+| [`src/types.ts`](src/types.ts) | 贡献、记录与过滤器类型 |
+| [`src/client/index.ts`](src/client/index.ts) | 安装同一注册表的 Client face |
 
-<a id="known-limitations-and-deferred-work"></a>
+---
 
+## ⚙️ 技术栈
 
-这些限制说明注册表存储与拒绝什么；它们是当前包约束，不是任务积压。
-
-- **不合并图**——注册表按 face 存储生成的反射，但不合并宿主侧与客户端侧的图，也不解析 TypeScript 引用；这些是分析器与生成器的事。
-- **schema 键不含 face**——宿主侧与客户端侧在不同上下文中运行，因此在同一上下文中注册来自两个 face 的同名 schema 会被作为重复项拒绝。
-- **JSON Schema 投影不缓存**——`toJSONSchema()` 每次调用都返回全新文档；需要重复投影的消费方自行负责缓存。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
-
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-registry

@@ -1,28 +1,40 @@
 ---
-description: "Web GUI Host 侧的包映射：HTTP 与 SPA 服务器、工作区目录选择实现、open-in-app 启动路由、插件清单投影和显式产品事件上报。"
-kind: "package-group"
+title: "host/ — Web GUI 宿主侧"
+tags: []
+category: "host"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# host/ — Web GUI 宿主侧
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 `host/` 组提供 Web GUI 的 HTTP(S) 服务器、服务已构建 Web 壳的 SPA dist 服务器、带原生／浏览／自适应组合包的工作区目录选择 seam、open-in-app 的应用探测与启动路由，只读的插件清单投影以及显式产品事件上报。这些包都是产品包；浏览器传输位于 [`client/`](../client/README.zh.md)，组合应用是 [`apps/cli`](../../apps/cli/README.zh.md)，它启动 [`dsh-base` 组合包](../bundle/base/cordis.patch.yml) 来提供 `apps/web/` 下的 Web 应用。选择器后端可在共享 seam 后互相替换。
 
-## 目录
+---
 
-- [包](#packages)
-- [相关文档](#related-documentation)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+「待补充」
 
-<a id="packages"></a>
-## 包
+---
 
-各包分别承担 Host 角色；各包的 README 拥有自己的约定与配置。
+## 📊 指标
+
+「待补充」
+
+---
+
+## 🏛️ 设计
+
+「待补充」
+
+---
+
+## 📁 目录
 
 | 包 | 职责 | ctx 键 |
 |---|---|---|
@@ -36,10 +48,9 @@ kind: "package-group"
 | [`plugin-inventory/`](plugin-inventory/README.zh.md) | 当前 Loader 条目的只读投影 | Remote `pluginInventory/list` |
 | [`product-telemetry-otel/`](product-telemetry-otel/README.zh.md) | 通过 OTLP/HTTP 显式上报产品使用事件 | `ctx.productTelemetry` |
 
------
+---
 
-<a id="related-documentation"></a>
-## 相关文档
+## 🔗 资源
 
 先从传输与工作区记录的子系统参考读起，再看 Web Client 背后的分层决策。
 
@@ -48,12 +59,14 @@ kind: "package-group"
 - [Web 配置树启动与传输分层](../boot/app-boot/README.zh.md)——Web 传输各层的所有权。
 - [产品埋点](../../docs/subsystems/product-telemetry.zh.md)——显式提交分析事件。
 
-<a id="dev-note"></a>
-## 开发备注
+---
 
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
+## 🚀 快速开始
 
-无。
+「待补充」
 
-</details>
+---
+
+## ⚙️ 技术栈
+
+「待补充」

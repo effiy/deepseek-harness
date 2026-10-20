@@ -1,30 +1,70 @@
 ---
-description: "通过独立发布的 LibreOffice kit 在 Host 转换 Office 文档。"
-kind: "package-reference"
+title: "office-to-pdf"
+tags: ["deepseek-harness", "document", "office-to-pdf"]
+category: "文档"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-office-to-pdf
+# office-to-pdf
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 在宿主计算机上将 Office 文档转换为 PDF。声明了原生 LibreOffice 引擎的目标使用原生引擎，其余目标使用 Node WASM。提供方支持 DOC、DOCX、XLS、XLSX、PPT 和 PPTX。OOXML 转换返回缺失字体名称；二进制 Office 转换返回空列表。
 
-## 目录
 
-- [使用此包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [延伸阅读](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延后工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
+⚡ 功能
+「待补充」
 
-<a id="use-this-package"></a>
-## 使用此包
+---
 
+📊 指标
+无，因为此包仅转换字节，不提供面向模型的工具、消息或 Session 事件。
+
+##### KV Cache effect
+无；转换不会构造或修改模型请求。
+
+
+---
+
+🏛️ 设计
+<details>
+<summary>实现内部细节 — 点击展开</summary>
+
+引擎元数据无效、必需资源缺失和转换错误会拒绝请求，不会切换引擎。共享的 WASM 引擎使用 LibreOffice 的 CPU 图像过滤器。原生转换使用独立的平台引擎。
+
+每个并发槽按需创建并复用一个 kit 转换器。提供方将已授权输入写入私有临时目录，读取有大小上限的普通 PDF 文件，并在完成前删除目录。取消已准入的读取方不会阻塞后续排队工作。读取方取消只会释放该读取方；最后一个读取方和提供方卸载会取消共享工作。卸载向未完成读取方报告 `unavailable`，并等待转换及转换器清理结束。
+
+Remote 文件读取在查询转换缓存前重新检查内容读取授权和源版本。延迟读取在取得转换容量后执行，并在读取后验证源版本。源读取失败直接传递；转换失败返回 `document-render/failed` 及分类原因，不暴露引擎诊断。卸载会取消并等待授权读取、Remote 请求和转换工作全部结束。
+
+</details>
+
+### 延伸阅读
+- [Office 转 PDF](../../../docs/subsystems/office-to-pdf.zh.md) — 组合与输入、结果所有权。
+- [工作区文件](../../api/workspace-files/README.zh.md) — Session 文件授权与有界读取。
+
+### 已知限制与延后工作
+- 转换保真度和已安装的原生/WASM 资产由 `@deepseek-ai/libreoffice-kit` 负责；此提供方不查找系统 LibreOffice，也不在运行时下载引擎。
+- `timeoutMs` 仅在 kit 开始转换时计时，不限制队列等待时间。
+
+#### 开发备注
+<details>
+<summary>维护者工作上下文 — 点击展开</summary>
+
+无。
+
+</details>
+
+
+---
+
+📁 目录
+### 使用此包
 [Web bundle](../../bundle/web-app/README.zh.md)以 `office-to-pdf` 条目挂载此提供方。独立组合通过 `cordis.yml` 条目挂载 `@deepseek-ai/dsh-office-to-pdf`。
 
 调用方通过 `ctx.officeToPdf.convert()` 提交已授权源的标识、版本、可选字节数、延迟的有界读取、Office 扩展名和调度优先级。源版本变化会拒绝转换。结果包含调用方拥有的 PDF 字节、缺失字体、缓存键和转换 generation；配置替换后 generation 随之改变。取消以原因为拒绝值，转换失败使用 `OfficeToPdfError`。
@@ -52,54 +92,18 @@ kind: "package-reference"
 
 默认保留 8 个 PDF、128 MiB 和 64 个源别名，准入 32 个读取方与 8 个排队任务，最多预留 100 MiB 源字节，并允许一个后台转换。这些限制约束拥有的请求和二进制载荷，不约束引擎 RSS、multipart 封装、调用方保留的结果或 PDF.js 页面渲染。
 
------
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+---
 
-<details>
-<summary>实现内部细节 — 点击展开</summary>
+🔗 资源
+「待补充」
 
-引擎元数据无效、必需资源缺失和转换错误会拒绝请求，不会切换引擎。共享的 WASM 引擎使用 LibreOffice 的 CPU 图像过滤器。原生转换使用独立的平台引擎。
+---
 
-每个并发槽按需创建并复用一个 kit 转换器。提供方将已授权输入写入私有临时目录，读取有大小上限的普通 PDF 文件，并在完成前删除目录。取消已准入的读取方不会阻塞后续排队工作。读取方取消只会释放该读取方；最后一个读取方和提供方卸载会取消共享工作。卸载向未完成读取方报告 `unavailable`，并等待转换及转换器清理结束。
+🚀 快速开始
+「待补充」
 
-Remote 文件读取在查询转换缓存前重新检查内容读取授权和源版本。延迟读取在取得转换容量后执行，并在读取后验证源版本。源读取失败直接传递；转换失败返回 `document-render/failed` 及分类原因，不暴露引擎诊断。卸载会取消并等待授权读取、Remote 请求和转换工作全部结束。
+---
 
-</details>
-
------
-
-<a id="further-exploration"></a>
-## 延伸阅读
-
-- [Office 转 PDF](../../../docs/subsystems/office-to-pdf.zh.md) — 组合与输入、结果所有权。
-- [工作区文件](../../api/workspace-files/README.zh.md) — Session 文件授权与有界读取。
-
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-无，因为此包仅转换字节，不提供面向模型的工具、消息或 Session 事件。
-
-#### KV Cache effect
-
-无；转换不会构造或修改模型请求。
-
-## 已知限制与延后工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
-- 转换保真度和已安装的原生/WASM 资产由 `@deepseek-ai/libreoffice-kit` 负责；此提供方不查找系统 LibreOffice，也不在运行时下载引擎。
-- `timeoutMs` 仅在 kit 开始转换时计时，不限制队列等待时间。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者工作上下文 — 点击展开</summary>
-
-无。
-
-</details>
+⚙️ 技术栈
+「待补充」

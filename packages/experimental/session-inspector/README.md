@@ -1,29 +1,24 @@
 ---
-description: "原始 Session 日志与 Chat group/node 虚拟表格，支持流式分片子行、分页和更新高亮。"
-kind: "package-reference"
+title: "experimental-session-inspector"
+tags: ["deepseek-harness", "experimental", "session-inspector"]
+category: "实验性"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-experimental-session-inspector
+# experimental-session-inspector
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 通过可选的[开发者工具组合包](../inspector-profile/README.zh.md)检查原始 Session 日志与 Chat 结构。从 Sidebar 的新建 tab 菜单或引导页打开**会话数据诊断**，再从左上角选择**原始数据**或**对话分组**。可以沿对象引用查看 Node、Turn 和 Step，也可以将选中 Node 定位到 Chat。流式分片显示为子行，Chat 更新时对应行短暂高亮。两种展示均支持更早历史和可调整高度的详情，不显示 composer。
 
-## 目录
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
+⚡ 功能
 开发者工具组合包以 `session-inspector` 配置行挂载本插件。它为 Sidebar 当前 Session 注册 `session-inspector-log` 页面，不注册 Conversation View 或 header 标签。下拉框初始展示会话日志，旁边保留当前行数。切换展示形式会重置局部选中、类型筛选和滚动状态。本插件不需要调试参数，不接受配置，也不改变 Session 数据。
 
 点击类型列表头的筛选图标，输入类型片段。候选从所有已加载记录中异步更新。Enter 或**确认筛选**确认输入的片段；点击候选，或用方向键选中候选后按 Enter，则确认该类型。匹配忽略大小写，默认包含匹配：`delta` 和 `*delta*` 都能匹配 reasoning 与 tool-call delta。仅编辑不会改变表格。Esc、取消或点击外部会放弃草稿；清空后确认恢复全部类型。
@@ -58,11 +53,19 @@ Assistant 日志将原始带时间分片放到对应的 `block-start` 下，包�
 
 父级行按嵌套层次依次吸顶，位于表头下方，并使用不透底的主题底色；每一级依据未被表头及前面吸顶行遮挡的首行选择。block 自动闭合时，可见行或仍存在的父级保持原屏幕位置，空白只留在数据下方；新行先填入尾部空白，填满后恢复正常跟随末尾。手动调整折叠会保持被点击组头在视口中的实测位置并暂停跟随，只保留让它可见所需的尾部空白。**跟踪最新**清除预留空白并恢复跟随。向上滚动或点击**加载更早**也会暂停跟随。原始数据显示 UTC 时间戳，保留服务端的毫秒精度；对话分组不显示时间列。
 
------
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+---
 
+📊 指标
+无，因为此 Inspector 不增加模型可见输入。
+
+##### KV Cache 影响
+无；本包不修改模型请求。
+
+
+---
+
+🏛️ 设计
 <details>
 <summary>实现内部细节 — 点击展开</summary>
 
@@ -72,21 +75,7 @@ Assistant 日志将原始带时间分片放到对应的 `block-start` 下，包�
 
 </details>
 
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-无，因为此 Inspector 不增加模型可见输入。
-
-#### KV Cache 影响
-
-无；本包不修改模型请求。
-
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
+### 已知限制与延期工作
 - **已加载历史** — 表格检查 Session 已加载窗口；更早记录需要分页。从实时流延续到持久化日志的行身份在窗口重建时保留，行离开窗口后释放。
 - **Projection 控制帧** — 会话日志不展示 projection 控制流更新。
 - **发布节奏** — 高亮跟随已发布的 Node 变化，不表示两次发布之间的每次内部修改。原始数据不脱敏。
@@ -94,12 +83,31 @@ Assistant 日志将原始带时间分片放到对应的 `block-start` 下，包�
 - **实时候选** — 类型候选刷新会重置键盘选中项，即使候选列表未改变；确认前需要重新选中或点击候选。
 - **Chat DOM 依赖** — 定位和选取依赖现有 Slot/Chat 属性及可搜索折叠行为，要求被检查 Session 的 Chat 已显示在主区域；不会切换 View 或 Session、加载历史或渲染不存在的业务 Node。近似定位无法还原未渲染消息的精确位置。
 
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
 无。
 
 </details>
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+「待补充」
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

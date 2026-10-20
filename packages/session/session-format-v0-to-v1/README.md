@@ -1,55 +1,53 @@
 ---
-description: "冻结的已发布 v0 会话标头、事件与打包行解码器，以及到 v1 的恒等转换。"
-kind: "package-library"
+title: "@deepseek-ai/dsh-session-format-v0-to-v1"
+tags: []
+category: "session"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-session-format-v0-to-v1
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 本包逐个物理行解码已发布的 v0 会话 JSONL，并生成共享布局的 v1 格式，以还原历史会话。除把版本从 0 改为 1 外，它会保留经过校验的标头与事件，并仅应用 v0 持久化接受的有限旧格式规范化。畸形或不支持的历史记录会在当前还原器运行前使迁移失败，同时保留源文件以便恢复。该迁移只接受冻结的第一方事件清单，且不发布或选择后续格式迁移。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
-### 何时使用
+### 适用场景
 
 持久化通过 `dsh-session-format-catalog` 获取该迁移边；功能组合不会挂载它。只有在装配或测试静态已发布格式目录时，才直接导入本包。
 
-### 入口
+### 限制
 
-```text
-const decoder = releasedV0SessionFormatCodec.createDecoder(physicalHeader, 'recoverable')
-for (const row of physicalRows) decoder.decodeRow(row, migrationContext)
-const inheritedEventCount = decoder.finish(migrationContext)
-const stage = sessionFormatV0ToV1.createStage(stageInput)
-stage.transformEvent(event, migrationContext)
-const targetInheritedEventCount = stage.finish(migrationContext)
-```
+- **封闭的第一方清单**——按照当前 Alpha 策略，未知的外部插件事件会使迁移失败。
+- **单个相邻迁移边**——本包不执行发布，也不选择后续迁移。
 
-`releasedV0SessionFormatCodec` 读取精确的 v0 header 与物理行，包括打包的 Assistant 增量和范围编码的来源序号。它的 decoder 通过 `emitEvent()` 与 `emitRun()` 发出单个事件或 codec 自有的紧凑 run。`sessionFormatV0ToV1` 为每次还原创建一个有状态 Stage；静态 catalog 连接该 decoder 与 Stage，使迁移无需保留物理行数组。`releasedV1SessionFormatCodec` 为 v1 物理布局暴露相同的逐行 decoder，同时不冻结普通事件词表。
+---
 
-Alpha 迁移边会拒绝冻结清单之外的所有事件类型，包括带有 `ignorable: true` 标记的未知事件。它也会拒绝意外的 payload 成员。`tool/result.meta` 与嵌套 PTC `arguments` 是显式的不透明 JSON 字段；迁移会原样保留它们，不把其中的数字解释为会话序号。内容块中未知的 `type` 分支、消息来源中未知的 `kind` 分支、assistant 结束原因中未知的 `kind` 分支与 `turn/end` 原因中未知的 `kind` 分支保持 owner-opaque JSON，已知分支则接受结构校验。
+## 📊 指标
 
-有限的历史规范化会把 `steering/message` 转换为 `user/message`、把 `compact/*` 事件重命名为 `compaction/*`、移除 `turn/start.trigger`、转换已停用的 `turn/end` reason、添加当前消息包装层，并为旧消息、retry chain 与压缩（compaction）组补充确定性 id，同时移除已停用且重复的 `request/header.header.messagePrefix`。已停用的 `request/header-delta`、`mode/set` 和 `request/header` fallback reason 会使迁移失败。除此之外，任何事件、引用、来源或 payload 事实都不得改变。
+### 历史还原
 
------
+#### 模型看到什么
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+没有直接内容。还原后，`deriveMessages()` 会看到在 v1 下保持不变的规范已发布 v0 事件；有限历史结构会通过规定的当前包装层产生相同的模型可见内容。
+
+#### Token 影响
+
+不直接产生 token。
+
+#### KV Cache 影响
+
+对规范 v0 历史没有直接影响。有限 normalizer 会在生成当前包装层与确定性标识时保留模型可见内容。
+
+---
+
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -67,47 +65,35 @@ Alpha 迁移边会拒绝冻结清单之外的所有事件类型，包括带有 `
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+「待补充」
+
+---
+
+## 🔗 资源
 
 - [迁移机制](../session-format/README.zh.md)——纯迁移链与编解码约定。
 - [静态目录](../session-format-catalog/README.zh.md)——由构建负责的装配。
 - [会话子系统](../../../docs/subsystems/session.zh.md)——当前逻辑会话语义。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-### 历史还原
+```ts
+const decoder = releasedV0SessionFormatCodec.createDecoder(physicalHeader, 'recoverable')
+for (const row of physicalRows) decoder.decodeRow(row, migrationContext)
+const inheritedEventCount = decoder.finish(migrationContext)
+const stage = sessionFormatV0ToV1.createStage(stageInput)
+stage.transformEvent(event, migrationContext)
+const targetInheritedEventCount = stage.finish(migrationContext)
+```
 
-#### 模型看到什么
+---
 
-没有直接内容。还原后，`deriveMessages()` 会看到在 v1 下保持不变的规范已发布 v0 事件；有限历史结构会通过规定的当前包装层产生相同的模型可见内容。
+## ⚙️ 技术栈
 
-#### Token 影响
-
-不直接产生 token。
-
-#### KV Cache 影响
-
-对规范 v0 历史没有直接影响。有限 normalizer 会在生成当前包装层与确定性标识时保留模型可见内容。
-
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
-- **封闭的第一方清单**——按照当前 Alpha 策略，未知的外部插件事件会使迁移失败。
-- **单个相邻迁移边**——本包不执行发布，也不选择后续迁移。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
-
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-session-format-v0-to-v1

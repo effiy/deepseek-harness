@@ -1,29 +1,39 @@
 ---
-description: "dsh Web 客户端右侧 Sidebar 的文件树 tab 类型：通过网络逐层列出会话工作区根目录，按资源地址把文件打开到 Sidebar。"
-kind: "package-reference"
+title: "client-ui-sidebar-files"
+tags: ["deepseek-harness", "client", "ui-sidebar-files"]
+category: "客户端"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-client-ui-sidebar-files
+# client-ui-sidebar-files
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 浏览 Session 的工作区目录树，并在 Sidebar 预览中打开文件。根目录与已展开目录通过直接子项监听自动刷新，手动重新读取仍可用。该 tab 从引导页进入，不认领资源地址。
 
-## 目录
 
-- [注册了什么](#what-it-registers)
-- [树](#the-tree)
-- [模型体验](#model-experience)
-- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
+⚡ 功能
+「待补充」
 
-<a id="what-it-registers"></a>
-## 注册了什么
+---
 
+📊 指标
+无，因为本包在浏览器里绘制工作区文件树，不注册任何面向模型的内容。
+
+##### KV Cache 影响
+无；目录列表经 Remote 传输，不会组装模型请求。
+
+
+---
+
+🏛️ 设计
+### 注册了什么
 命令 `workspace.files` 在焦点分栏内打开或聚焦文件页；从聊天区触发时使用当前会话的活动停靠分栏。文件页替换开始页，同一分栏内重复打开仍保留一个文件页。桌面默认键为 Mod+P。开始页入口显示有效快捷键；Windows 和 macOS Web 使用[快捷键服务的平台默认值](../shortcuts/README.zh.md)；Linux Web 默认不绑定此命令。
 
 - **类型**：`ctx.sidebarRightTabs.register(...)`，kind 为 `files`，id 为 `@deepseek-ai/dsh-client-ui-sidebar-files`，档位 `builtin`，没有 patterns，另有一个打开该类型的引导页入口（order 10，标题与描述取自 `sidebarFiles` 命名空间，图标为黄色文件夹）。
@@ -32,9 +42,7 @@ kind: "package-reference"
 
 `src/client/` 下的源文件：`definition.tsx`（类型是什么）、`store.ts`（它保存什么）、`face.ts`（Remote 读取与监听）、`directory-node.ts`（打开的目录及其生命周期）、`FilesBody.tsx`（它画什么，含排序与失败行两个辅助函数）、`FilesTitle.tsx`（标签页标题）、`locales.ts`（它说什么）、`index.ts`（接线）。
 
-<a id="the-tree"></a>
-## 树
-
+### 树
 根是会话的工作目录，读自 `useSessions().byId[sessionId].cwd`。`/` 和 Windows 盘根等文件系统根路径均可作为树的根。每一层以绝对路径为键；子路径是父路径以 `/` 拼上条目名。一层在首次展开时经 `@deepseek-ai/dsh-api-workspace-files` 命名空间的 `remote.workspaceFiles.list(sessionId, absolutePath)` 列出；适配器保留列表的条目与截断标志，丢弃其工作区相对路径。行序为目录优先，其后按自然序、不分大小写的名称排列；dotfiles 与其他条目一样显示。
 
 | 条目类型 | 行 |
@@ -49,24 +57,11 @@ kind: "package-reference"
 
 每个打开的 `DirectoryNode` 在 Tab 生命周期内持有自己的目标监听；折叠关闭该节点及其不可见后代。祖先恢复期间的展开状态变化会更新存储和待恢复节点，后代恢复时遵循最新展开偏好。自动刷新默认开启；独立开关暂时隐藏，状态、文案、样式与切换逻辑保留。目录读取期间或收尾时收到的变化仍会留待下一次刷新。
 
-<a id="model-experience"></a>
-## 模型体验
-
-无，因为本包在浏览器里绘制工作区文件树，不注册任何面向模型的内容。
-
-#### KV Cache 影响
-
-无；目录列表经 Remote 传输，不会组装模型请求。
-
-## 已知限制与暂缓事项
-
-<a id="known-limitations-and-deferred-work"></a>
+### 已知限制与暂缓事项
 - **只有列目录。**没有搜索、产物过滤、拖拽、重命名、右键菜单或当前文件高亮。
 - **只有一个根。**树以会话工作目录为根；没有办法浏览到它之上，而 Host 本来也拒绝工作区根之外的路径。
 
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
@@ -75,3 +70,24 @@ kind: "package-reference"
 页面刷新快捷键通过常规目录读取器刷新聚焦的文件树。重新读取控件在悬停和键盘聚焦时显示有效绑定。
 
 </details>
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+「待补充」
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

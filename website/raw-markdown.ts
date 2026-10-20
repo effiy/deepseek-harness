@@ -1,6 +1,6 @@
 /** Development responses for published Markdown and the documentation index. */
 import type { Connect } from 'vite'
-import { rawMarkdownRoute } from '../scripts/project-doc-site.ts'
+import { rawMarkdownRoute } from '../scripts/docs-page.ts'
 
 /**
  * Serve published source text while preserving Vite's Markdown module imports.

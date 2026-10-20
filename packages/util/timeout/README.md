@@ -1,86 +1,45 @@
 ---
-description: "共享超时运算、截止时间融合与超时和取消分类，供需要限制调用方超时提示、启动 deadline 并在之后区分二者的能力使用。"
-kind: "package-library"
+title: "@deepseek-ai/dsh-timeout"
+tags: []
+category: "util"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-timeout
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 `dsh-timeout` 让调用方为工作设置有上限的截止时间、区分本地超时与上游取消，并监测流式读取是否空闲。`clampTimeout` 在提示缺失时填入后端默认值，把结果限制在允许的最大值以内，并在工作开始前拒绝无效值。`deadline` 将选定的超时与上游取消合并到一个信号中，而调用方仍负责真正停止自己的进程、套接字或任务。`idleWatchdog` 只计算等待提供方读取所花的时间；零仍保留给后端自有的不计时工作，而不是公开配置。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制说明本库刻意不做什么。它们是当前包约束，不是任务积压。
 
-当能力要在调用方可见的超时下运行一个工作单元时使用 `deadline`，读取流式传输时使用 `idleWatchdog`。先用 `clampTimeout` 验证调用方提示，确保到达 `deadline` 的 `timeoutMs` 总是正有限值。
+- **只发出通知**——deadline 无法停止忽略其信号的工作；每项能力仍需要自己的 socket、进程或任务终止路径。
+- **`timeoutMs <= 0` 是内部词汇**——只有在所属后端已解析策略后，它才会禁用本地 timer；绝不会作为面向模型或插件的公开开关。
+- **第一个中止原因决定分类**——当上游取消早于本地 timer 发生时，即使自己的超时之后也会到期，该层也无法再报告。
+- **空闲 watchdog 不是总 deadline**——它针对每个尚未完成的迭代器需求重新启动，并刻意排除消费方的处理时间。
 
-### 限制超时提示
+---
 
-```ts
-import { clampTimeout } from '@deepseek-ai/dsh-timeout'
+## 📊 指标
 
-declare const requested: number | undefined
-declare const DEFAULT_TIMEOUT_MS: number
-declare const MAX_TIMEOUT_MS: number
+通过渲染超时结果的超时消费方间接影响模型。
 
-const timeoutMs = clampTimeout(requested, DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, 'bash-local: request.timeoutMs')
-```
+#### KV Cache 影响
 
-提示缺失时 `clampTimeout` 填入后端默认值，把结果限制在后端最大值以内，并以调用方提供的名字拒绝非正数或非有限值的提示。此处绝不接受 0：它不是公开的禁用超时值。
+不会直接导致失效；请求前缀的任何变更由超时消费方负责。
 
-### 在 deadline 下运行工作
+---
 
-```text
-import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
-
-using d = deadline(upstream, timeoutMs, 'BASH_TIMEOUT')
-const outcome = await runWork({ signal: d.signal })   // work listens on d.signal and terminates itself
-const timedOut = timeoutOf(d.signal, 'BASH_TIMEOUT') !== undefined
-const aborted = d.signal.aborted && !timedOut
-```
-
-该信号只负责通知：调用方必须接入自己的终止机制——把 `d.signal` 传给 `fetch`，或监听 `abort` 并杀死子进程。让 promise 与 timer 竞速，会在子进程或套接字仍在泄漏时就让工具调用完成。
-
-### 分类结果
-
-只有当本 deadline 的 timer 先触发时，`timeoutOf(signal, code)` 才恢复超时原因。传入你自己的 `code`，让分类在嵌套场景中正确组合：当 `upstream` 本身是 deadline 信号时，外部超时会被当作普通的上游取消，而不是声称本地 timer 已到期。
-
-### 用空闲 watchdog 处理流式传输
-
-```ts
-import { idleWatchdog } from '@deepseek-ai/dsh-timeout'
-
-declare const upstream: AbortSignal | undefined
-declare const idleMs: number
-declare const providerIterator: AsyncIterator<unknown>
-
-using watchdog = idleWatchdog(upstream, idleMs, 'LLM_STREAM_IDLE_TIMEOUT')
-const next = await watchdog.next(providerIterator)    // timer runs only while this read is outstanding
-```
-
-timer 只在某个迭代器 `next()` 尚未完成时启动，并会因不产生值的传输活动通过 `pulse()` 重新启动，因此读取之间的消费方处理时间绝不计入空闲。间隔必须为正有限数，且不得大于 `MAX_TIMER_DELAY_MS`。
-
-### 哪些操作不设置超时
-
-本地文件 `read`/`write`/`edit` 不接受 `timeoutMs`：文件 IO 不设时限地运行，因为截止时间会中止操作系统仍会完成的工作。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -107,10 +66,17 @@ timer 只在某个迭代器 `next()` 尚未完成时启动，并会因不产生�
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | `clampTimeout`、`deadline`、`idleWatchdog`、`timeoutOf`、`TimeoutReason`、`MAX_TIMER_DELAY_MS` |
+
+---
+
+## 🔗 资源
 
 当你需要消费方或库背后的边界决策时，阅读以下页面。
 
@@ -119,35 +85,37 @@ timer 只在某个迭代器 `next()` 尚未完成时启动，并会因不产生�
 - [bash 提供方](../../shell/bash-local/README.zh.md)——杀死进程组的前台 deadline 消费方。
 - [文件系统子系统](../../../docs/subsystems/filesystem.zh.md)——本地文件 IO 为何不设时限。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-通过渲染超时结果的超时消费方间接影响模型。
+```ts
+import { clampTimeout } from '@deepseek-ai/dsh-timeout'
 
-#### KV Cache 影响
+declare const requested: number | undefined
+declare const DEFAULT_TIMEOUT_MS: number
+declare const MAX_TIMEOUT_MS: number
 
-不会直接导致失效；请求前缀的任何变更由超时消费方负责。
+const timeoutMs = clampTimeout(requested, DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS, 'bash-local: request.timeoutMs')
+```
 
-## 已知限制与延期工作
+```ts
+import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
 
-<a id="known-limitations-and-deferred-work"></a>
+using d = deadline(upstream, timeoutMs, 'BASH_TIMEOUT')
+const outcome = await runWork({ signal: d.signal })   // work listens on d.signal and terminates itself
+const timedOut = timeoutOf(d.signal, 'BASH_TIMEOUT') !== undefined
+const aborted = d.signal.aborted && !timedOut
+```
+
+限制超时提示
 
 
-这些限制说明本库刻意不做什么。它们是当前包约束，不是任务积压。
 
-- **只发出通知**——deadline 无法停止忽略其信号的工作；每项能力仍需要自己的 socket、进程或任务终止路径。
-- **`timeoutMs <= 0` 是内部词汇**——只有在所属后端已解析策略后，它才会禁用本地 timer；绝不会作为面向模型或插件的公开开关。
-- **第一个中止原因决定分类**——当上游取消早于本地 timer 发生时，即使自己的超时之后也会到期，该层也无法再报告。
-- **空闲 watchdog 不是总 deadline**——它针对每个尚未完成的迭代器需求重新启动，并刻意排除消费方的处理时间。
+提示缺失时 `clampTimeout` 填入后端默认值，把结果限制在后端最大值以内，并以调用方提供的名字拒绝非正数或非有限值的提示。此处绝不接受 0：它不是公开的禁用超时值。
 
-<a id="dev-note"></a>
-### 开发备注
+---
 
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
+## ⚙️ 技术栈
 
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-timeout

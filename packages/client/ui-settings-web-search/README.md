@@ -1,37 +1,36 @@
 ---
-description: "dsh Web 客户端插件页上的 DeepSeek 网页搜索提供方设置页：API Key、接口地址与单次请求的搜索次数上限。"
-kind: "package-reference"
+title: "client-ui-settings-web-search"
+tags: ["deepseek-harness", "client", "ui-settings-web-search"]
+category: "客户端"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-client-ui-settings-web-search
+# client-ui-settings-web-search
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 在侧栏打开**插件**，在官方分组里选择**网页搜索**，即可设置提供方的密钥、接口地址，以及一次请求最多可以搜索几次。页面暂存输入、只在保存时写入；密钥通过凭据域写入而不进设置文件，其明文从不出现在任何响应里。页面只在 Host 服务 `web-search-deepseek` 命名空间期间存在。
 
-## 目录
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
+⚡ 功能
 官方分组里的**网页搜索**卡片打开这一页。**API Key** 每次加载都是空的，只报告是否已配置密钥；未配置时提示仅使用 DeepSeek 账号模型的对话可以通过默认接口地址搜索，因为这类搜索使用账号登录鉴权；留空保存等于保留现有密钥，而当凭据不能从这里写入时（例如由进程环境变量提供的密钥）该控件会被禁用。**接口地址**和**单次请求最多搜索次数**显示生效值，一旦被覆盖就带**已覆盖**标签和**恢复默认**，清空后保存等于重置。点击**保存**之前不会写入任何内容；离开页面即丢弃草稿。
 
------
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+---
 
+📊 指标
+无，本包是浏览器侧的设置界面，不注册任何模型面。
+
+
+---
+
+🏛️ 设计
 <details>
 <summary>实现细节——点击展开</summary>
 
@@ -39,40 +38,42 @@ kind: "package-reference"
 
 </details>
 
------
-
-<a id="further-exploration"></a>
-## 进一步探索
-
-- [ui-plugin-manager](../ui-plugin-manager/README.zh.md)——插件页以及本页注册进去的 `plugins.item` slot。
-- [ui-settings](../ui-settings/README.zh.md)——本页依赖的设置 scope 与"命名空间被服务期间"的监视。
-- [ui-primitives](../ui-primitives/README.zh.md)——本页渲染的设置表单模型与字段。
-- [credentials](../../credentials/README.zh.md)——密钥写入所经的凭据引用 seam。
-- [web-search-deepseek](../../web/web-search-deepseek/README.zh.md)——注册该命名空间的提供方。
-
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-无，本包是浏览器侧的设置界面，不注册任何模型面。
-
-#### KV 缓存影响
-
+##### KV 缓存影响
 无；本包既不组装也不发送提供方请求。
 
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
+### 已知限制与延期工作
 - **只编辑命名空间的三个字段**——提供方的模型、API 版本和 token 预算保持组合值不变；本页只编辑密钥、接口地址和搜索次数。
 
-<a id="dev-note"></a>
-### 开发备注
-
+#### 开发备注
 <details>
 <summary>维护者工作上下文——点击展开</summary>
 
 无。
 
 </details>
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+- [ui-plugin-manager](../ui-plugin-manager/README.zh.md)——插件页以及本页注册进去的 `plugins.item` slot。
+- [ui-settings](../ui-settings/README.zh.md)——本页依赖的设置 scope 与"命名空间被服务期间"的监视。
+- [ui-primitives](../ui-primitives/README.zh.md)——本页渲染的设置表单模型与字段。
+- [credentials](../../credentials/README.zh.md)——密钥写入所经的凭据引用 seam。
+- [web-search-deepseek](../../web/web-search-deepseek/README.zh.md)——注册该命名空间的提供方。
+
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

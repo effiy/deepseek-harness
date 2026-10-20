@@ -1,29 +1,24 @@
 ---
-description: "通过统一协调队列热重载插件代码和 profile 配置。"
-kind: "package-reference"
+title: "hmr"
+tags: ["deepseek-harness", "boot", "hmr"]
+category: "基础设施"
+created: "2025-01-01"
+updated: "2026-10-20"
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-hmr
+# hmr
 
-[English](README.md) | 中文
-
-## 概述
-
+💡 概述
 在应用运行期间重载插件源码和配置。模块替换、Include 刷新与 profile 配置变更共用一个队列。包安装在该队列之外执行。`ctx.hmr` 保留现有 Cordis HMR 的配置和事件。
 
-## 目录
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+---
 
------
-
-<a id="use-this-package"></a>
-## 使用本包
-
+⚡ 功能
 启动器提供 `profileContext` 时，base 组合包以 `root: []` 启用 HMR；没有该 profile 上下文的宿主保留此条目为禁用状态。Headless、SDK 和 ACP 组合包在 YAML 中禁用此条目，后续 profile patch 可以重新启用。禁用或省略 HMR 时，更改在重启后生效。如需监听源码模块，在启动前通过 profile patch 配置 base 组合包提供的 `hmr` 条目：
 
 ```yaml
@@ -35,8 +30,7 @@ kind: "package-reference"
 
 已有配置将模块名 `@deepseek-ai/cordis-plugin-hmr` 替换为 `@deepseek-ai/dsh-hmr`。继续提供 `hmr` 服务键、`baseDir`、`config`、`getLinked()`、`getOuterStack()`、`hmr/change` 和 `hmr/reload`。工作区保留 vendored 包；DSH profile 使用本包。
 
-### 配置
-
+#### 配置
 | 字段 | 默认值 | 含义 |
 |---|---|---|
 | `base` | Context 的 base URL | 模块监听的基准目录。 |
@@ -46,11 +40,23 @@ kind: "package-reference"
 
 Chokidar 选项（包括轮询）保持原有含义。精确配置监听同时观察新增、删除及初始不存在的父目录。它们默认使用 `awaitWriteFinish: true`：编辑后等待 Chokidar 的 2 秒写入稳定窗口，避免其变化事件节流丢失通知。可通过 `awaitWriteFinish` 调整窗口；禁用它可能漏掉快速连续编辑。直接通过 Plugin Manager 发起的操作无需等待文件事件即可应用。
 
------
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+---
 
+📊 指标
+##### 模型看到什么
+`ctx.hmr` 不添加模型工具或消息。加载后的插件决定后续工具和提示词贡献。
+
+##### Token 影响
+没有直接的 token 贡献。
+
+##### KV Cache 影响
+重载提供上下文的插件可能改变后续请求前缀；HMR 不改写对话历史。
+
+
+---
+
+🏛️ 设计
 <details>
 <summary>实现细节——点击展开</summary>
 
@@ -72,27 +78,7 @@ Loader entry 保留原始导入结果。HMR 为每个 entry 名称与配置树 b
 
 </details>
 
-<a id="model-experience"></a>
-## 模型体验
-
-### 被重载的插件
-
-#### 模型看到什么
-
-`ctx.hmr` 不添加模型工具或消息。加载后的插件决定后续工具和提示词贡献。
-
-#### Token 影响
-
-没有直接的 token 贡献。
-
-#### KV Cache 影响
-
-重载提供上下文的插件可能改变后续请求前缀；HMR 不改写对话历史。
-
-## 已知限制与延期工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
+### 已知限制与延期工作
 - 模块替换需要 Node loader 内部接口。框架依赖变化调用宿主提供的 `loader.exit()` 钩子；HMR 本身不重启进程。
 - 通过插件管理器替换已安装包版本仍需要重启；`node_modules` 之下的 manifest 保留 Node 缓存的配置。浏览器 Client 模块图保留独立的浏览器侧加载机制。
 - TSX loader 和普通应用自行创建的 Worker 不在包缓存刷新支持范围内。
@@ -101,8 +87,26 @@ Loader entry 保留原始导入结果。HMR 为每个 entry 名称与配置树 b
 - 如果共享运行时的替换模块具有不同的插件回调，没有 Loader entry 的实例就无法确定应使用哪一个。HMR 会报告歧义错误并回滚此次重载。
 - `watchConfig()` 在 Chokidar 报告就绪时 resolve。darwin 上 libuv 随后才在自己的线程启动 FSEvents 流，因此注册后数毫秒内落地的写入要等到该目录的下一个事件才会被报告；启动之后的编辑不受影响。
 
-### 开发备注
-
-<a id="dev-note"></a>
-
+#### 开发备注
 无。
+
+
+---
+
+📁 目录
+「待补充」
+
+---
+
+🔗 资源
+「待补充」
+
+---
+
+🚀 快速开始
+「待补充」
+
+---
+
+⚙️ 技术栈
+「待补充」

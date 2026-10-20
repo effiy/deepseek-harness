@@ -1,61 +1,45 @@
 ---
-description: "面向客户端与维护者的全日志会话计数与墙钟时间说明，用于选择、组合或排查 sessionStats 投影单元。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-session-stats"
+tags: []
+category: "session"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-session-stats
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 本包通过公开的 `sessionStats` 值，为客户端提供全会话轮次与步骤计数，以及 LLM、工具、首 token 和解码墙钟时间。这些数字来自完整的持久日志，因此分页与压缩不会改变它们。当客户端必须在重新加载或缩减历史记录后显示一致的会话统计时，请使用本包。全会话统计不可用时，客户端可改用窗口口径计数。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制说明数字描述什么、单元何时缺失。它们是当前包约束。
 
-当客户端需要显示不受分页与压缩影响的全会话数字时，在会话存储与投影注册表旁挂载此插件。只有存在注册表时单元才会注册。
+- **步数统计的是已发生的工作，而非可见输出**——在产生任何可见内容前就失败的步仍以 `step/end` 关闭并计入；被崩溃打断的步在会话重新加载后计入，届时崩溃恢复补写合成的 `step/end`。
+- **被取消的步计数但不计时**——没有组装出 assistant 消息，其部分流式时间不进入任何墙钟数字；反之 max-tokens 的 usage 宿主消息贡献 surface 上看不到的模型时间。
+- **计数是日志口径，不是 surface 口径**——消息后来被压缩掉的步仍然计入；数字描述整个会话，而非当前模型可见 surface。
+- **仅在组合了投影注册表时挂载**——其他装配不提供 `sessionStats` 键，其消费者回退到窗口口径计数。
 
-### 组合
+---
 
-```yaml
-- name: '@deepseek-ai/dsh-session'
-- name: '@deepseek-ai/dsh-session-projection'
-- name: '@deepseek-ai/dsh-session-stats'
-```
+## 📊 指标
 
-### 各字段含义
+无，因为 sessionStats 单元把已写入日志的步边界折叠成面向客户端的读模型，不注册任何面向模型的内容。
 
-| 字段 | 含义 |
-|---|---|
-| `turns` | 含至少一个已关闭步的不同轮次；被拒绝或空轮不计 |
-| `steps` | 已关闭的步——完成、失败、取消与 max-tokens 的步全部计入 |
-| `llmMs` | 组装出消息的步的模型墙钟时间之和 |
-| `toolMs` | 匹配的 `tool/call` → `tool/result` 墙钟时间之和 |
-| `ttftMs` / `ttftSteps` | 首 token 延迟之和及其承载步数 |
-| `decodeMs` / `decodeTokens` | 上报用量的步的解码墙钟时间与提供方输出 token 之和 |
+#### KV Cache 影响
 
-每个字段在首个贡献事件之前均为 0；已装配的注册表恒提供该键，因此客户端读取值本身，而非键的存在性。客户端通过投影 seam 的快照与变更流渲染全日志数字；参考消费者是 Web 聊天统计条，其窗口折叠以相同字段名充当无单元时的回退。
+无；本包从不组装或发送提供方请求。
 
-### 失败与恢复
+---
 
-没有投影注册表时单元是惰性的：`inject` 使 fiber 保持挂起，不注册任何内容，因此其他装配缺少 `sessionStats` 键。卸载插件会移除该键，因为注册是挂载 fiber 上的 effect。被崩溃打断的步在会话重新加载后计入，届时崩溃恢复补写合成的 `step/end`。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -87,10 +71,19 @@ kind: "package-reference"
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 插件入口：`inject`、在挂载 fiber 上注册单元 |
+| [`src/projection.ts`](src/projection.ts) | 折叠：状态形状、逐事件转换、wire 视图 |
+| [`src/types.ts`](src/types.ts) | `sessionStats` 投影键声明与字段类型的唯一归属 |
+
+---
+
+## 🔗 资源
 
 当单元约定不够用时阅读以下页面。它们从驱动单元的注册表逐步进入相邻的会话包。
 
@@ -98,35 +91,31 @@ kind: "package-reference"
 - [会话投影注册表包](../session-projection/README.zh.md)——单元注册所依据的注册表约定。
 - [会话包映射](../README.zh.md)——相邻的持久化、投影、标题与遥测包。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-无，因为 sessionStats 单元把已写入日志的步边界折叠成面向客户端的读模型，不注册任何面向模型的内容。
+### 配置
 
-#### KV Cache 影响
+```yaml
+- name: '@deepseek-ai/dsh-session'
+- name: '@deepseek-ai/dsh-session-projection'
+- name: '@deepseek-ai/dsh-session-stats'
+```
 
-无；本包从不组装或发送提供方请求。
+### 参数
 
-## 已知限制与延期工作
+| 字段 | 含义 |
+|---|---|
+| `turns` | 含至少一个已关闭步的不同轮次；被拒绝或空轮不计 |
+| `steps` | 已关闭的步——完成、失败、取消与 max-tokens 的步全部计入 |
+| `llmMs` | 组装出消息的步的模型墙钟时间之和 |
+| `toolMs` | 匹配的 `tool/call` → `tool/result` 墙钟时间之和 |
+| `ttftMs` / `ttftSteps` | 首 token 延迟之和及其承载步数 |
+| `decodeMs` / `decodeTokens` | 上报用量的步的解码墙钟时间与提供方输出 token 之和 |
 
-<a id="known-limitations-and-deferred-work"></a>
+---
 
+## ⚙️ 技术栈
 
-这些限制说明数字描述什么、单元何时缺失。它们是当前包约束。
-
-- **步数统计的是已发生的工作，而非可见输出**——在产生任何可见内容前就失败的步仍以 `step/end` 关闭并计入；被崩溃打断的步在会话重新加载后计入，届时崩溃恢复补写合成的 `step/end`。
-- **被取消的步计数但不计时**——没有组装出 assistant 消息，其部分流式时间不进入任何墙钟数字；反之 max-tokens 的 usage 宿主消息贡献 surface 上看不到的模型时间。
-- **计数是日志口径，不是 surface 口径**——消息后来被压缩掉的步仍然计入；数字描述整个会话，而非当前模型可见 surface。
-- **仅在组合了投影注册表时挂载**——其他装配不提供 `sessionStats` 键，其消费者回退到窗口口径计数。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
-
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-session-stats

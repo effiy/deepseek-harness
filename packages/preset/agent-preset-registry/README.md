@@ -1,54 +1,50 @@
 ---
-description: "通过声明式 preset 选择 Agent 的工具、提示词和技能。同一进程可以运行多种组合。配置失败会显示在列表中；现有 Agent 保留已经使用的组合。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-agent-preset-registry"
+tags: []
+category: "preset"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-agent-preset-registry
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 通过声明式 preset 选择 Agent 的工具、提示词和技能。同一进程可以运行多种组合。配置失败会显示在列表中；现有 Agent 保留已经使用的组合。
 
-## 目录
+---
 
-- [使用此包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [延伸阅读](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与待办](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用此包
+- preset 不是安全沙箱：YAML 及插件可以执行 Host 代码。用户覆盖替换完整子插件列表，不自动合并内置列表的未来更新。进程退出后不保存旧代际的插件实现。
 
-### 最小配置
+---
 
-```yaml
-- id: agent-preset-registry
-  name: '@deepseek-ai/dsh-agent-preset-registry'
-  config:
-    default: standard
-- id: preset-standard
-  name: '@deepseek-ai/dsh-agent-preset'
-  config:
-    id: standard
-    plugins: []
-```
+## 📊 指标
 
-| 字段 | 默认值 | 含义 |
-|---|---|---|
-| `default` | 必填 | 未显式指定时使用的 preset ID |
+### Preset 选择
 
-Web 内置定义来自 `dsh-web-app` bundle。定义使用普通插件行；注册表不扫描目录，也不接受 preset 路径。`agent-preset-registry` 条目的 volatile 字段 `selectedDefault` 保留用户默认值，新会话优先使用它而不是部署 `default`。profile patch 仍可能带有已废弃的 `modeSelectionEnabled` 字段；注册表未声明该字段，既不读取也不重写它。
+#### 模型看到的内容
 
-注册表不写入任何声明。`read` Remote 把一条声明的子插件列表按 entry-list YAML 方言（含 `!!js` 条件）渲染回来，供客户端展示 preset 的组成；没有任何接口接受 YAML 写回。新建 preset 或覆盖内置 preset 都是 bundle 补丁：插入一行 `@deepseek-ai/dsh-agent-preset`，或按该行 id 写覆盖补丁，再用 `plugin_manager` 安装到 profile；创造模式在对话中编写这类 bundle。
+没有直接内容：所选 preset 的 `plugins` 拥有模型可见的工具和提示词片段。
 
-<a id="understand-the-implementation"></a>
-## 理解实现
+#### Token 影响
+
+本包自身没有；每个挂载的 `plugins` 行声明自己的工具和片段。
+
+#### KV Cache effect
+
+已有 Agent 保留插件和提示词。新 Agent 从当前定义构建前缀。
+
+## 已知限制与待办
+
+---
+
+## 🏛️ 设计
 
 <details>
 <summary>实现细节 — 点击展开</summary>
@@ -68,42 +64,48 @@ preset 的服务提供方及其消费方必须共享同一个 `cordis:group` 隔
 
 </details>
 
-<a id="further-exploration"></a>
+---
+
+## 📁 目录
+
+「待补充」
+
+---
+
+## 🔗 资源
+
 ## 延伸阅读
 
 - [Scope](../../core/scope/README.zh.md) — 注册隔离。
 - [Agent](../../core/agent/README.zh.md) — 会话运行时。
 - [Cordis](../../../docs/cordis-primer.zh.md) — 插件配置与生命周期。
 
-<a id="model-experience"></a>
-## 模型体验
+---
 
-### Preset 选择
+## 🚀 快速开始
 
-#### 模型看到的内容
+### 配置
 
-没有直接内容：所选 preset 的 `plugins` 拥有模型可见的工具和提示词片段。
+```yaml
+- id: agent-preset-registry
+  name: '@deepseek-ai/dsh-agent-preset-registry'
+  config:
+    default: standard
+- id: preset-standard
+  name: '@deepseek-ai/dsh-agent-preset'
+  config:
+    id: standard
+    plugins: []
+```
 
-#### Token 影响
+### 参数
 
-本包自身没有；每个挂载的 `plugins` 行声明自己的工具和片段。
+| 字段 | 默认值 | 含义 |
+|---|---|---|
+| `default` | 必填 | 未显式指定时使用的 preset ID |
 
-#### KV Cache effect
+---
 
-已有 Agent 保留插件和提示词。新 Agent 从当前定义构建前缀。
+## ⚙️ 技术栈
 
-## 已知限制与待办
-
-<a id="known-limitations-and-deferred-work"></a>
-
-- preset 不是安全沙箱：YAML 及插件可以执行 Host 代码。用户覆盖替换完整子插件列表，不自动合并内置列表的未来更新。进程退出后不保存旧代际的插件实现。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者工作上下文 — 点击展开</summary>
-
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-agent-preset-registry

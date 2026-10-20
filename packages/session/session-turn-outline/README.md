@@ -1,59 +1,45 @@
 ---
-description: "面向组合或调试 turnOutline 投影单元的客户端与维护者的全量轮次大纲说明，支撑整会话轮次导航。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-session-turn-outline"
+tags: []
+category: "session"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-session-turn-outline
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 本包为历史记录客户端提供涵盖完整会话的轮次大纲，其中包含每个已开始轮次的有界提示词预览与落定回复预览。客户端可以导航尚未加载的轮次，并从载入所选轮次所需的准确事件序号向后分页。它适用于提供会话投影的装配；在其他装配中，客户端继续使用仅覆盖已加载窗口的导航。预览排除注入的上下文与工具结果，并且回复仅在所属轮次落定后出现。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制说明大纲描述什么、单元何时缺失。它们是当前包约束。
 
-当客户端需要在不持有完整事件日志的情况下导航会话的每一轮时，在会话存储与投影注册表旁挂载此插件。只有存在注册表时单元才会注册。
+- **wire 值随会话增长**——每次推送携带完整大纲（整值规则），CJK 字符占满预算时每轮上限约 600 字节、通常远小于此；把预览拆成按需读取推迟到数千轮量级的会话真正需要时。
+- **回复只预览已落定的轮次**——它在 `turn/end` 提交，进行中的轮次（或从未记下结束边界的轮次）在边界落地前只有提示词预览。
+- **没有合格文本的轮次保持 `''`**——纯图片、纯命令的轮次可导航但按轮次号标注，步骤全程不产文本的轮次没有回复预览。
+- **仅在组合了投影注册表时挂载**——其他装配不提供 `turnOutline` 键，其消费方回退到仅按已加载窗口导航。
 
-### 组合
+---
 
-```yaml
-- name: '@deepseek-ai/dsh-session'
-- name: '@deepseek-ai/dsh-session-projection'
-- name: '@deepseek-ai/dsh-session-turn-outline'
-```
+## 📊 指标
 
-### 各字段含义
+无，因为 turnOutline 单元把已写入日志的轮次边界折叠成面向客户端的读模型，不注册任何面向模型的内容。
 
-| 字段 | 含义 |
-|---|---|
-| `turn` | `turn/start` 载荷里的宿主分配轮次号 |
-| `seq` | 该轮 `turn/start` 事件的 seq——窗口向后分页越过此 seq 即载入整轮 |
-| `prompt` | 该轮首条人类提示词的预览（文本块以空格连接、空白折叠、50 字符封顶且截断时补省略号——即导航卡片一行）；合格提示词落日志前为 `''` |
-| `response` | 该轮最后一条带文本的助手消息的预览（同样的归一化、120 字符封顶——即卡片至多三行）；轮次带着助手文本结束前为 `''` |
+#### KV Cache 影响
 
-wire 值是按 `turn` 严格递增的完整条目数组（整值规则）：消费方整体替换，从不合并。提示词只从带人类 `user` 来源的 `user/message` 事件填充，注入的上下文与工具结果绝不进入导航；纯图片提示词的轮次保持 `''`，消费方按轮次号标注。回复在轮次流式期间缓冲为草稿、在 `turn/end` 落定；变更流的原始视图身份门让纯草稿变化保持安静，因此大纲每轮至多推送三次——开轮、提示词、落定回复。预览预算与聊天导航栏已加载轮次的预览一致，同一轮在事件载入前后显示相同的文字。
+无；本包从不组装或发送提供方请求。
 
-### 失败与恢复
+---
 
-没有投影注册表时单元是惰性的：`inject` 使 fiber 保持挂起，不注册任何内容，因此其他装配缺少 `turnOutline` 键。卸载插件会移除该键，因为注册是挂载 fiber 上的 effect。持久缓存行在恢复时经受 schema 校验——包括轮次严格递增的顺序——损坏的行被丢弃而不会喂坏折叠。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现细节——点击展开</summary>
@@ -80,10 +66,19 @@ wire 值是按 `turn` 严格递增的完整条目数组（整值规则）：消�
 
 </details>
 
------
+---
 
-<a id="further-exploration"></a>
-## 进一步探索
+## 📁 目录
+
+| 文件 | 职责 |
+|---|---|
+| [`src/index.ts`](src/index.ts) | 插件入口：`inject`、在挂载 fiber 上注册单元 |
+| [`src/projection.ts`](src/projection.ts) | 折叠：条目追加、预览填充、wire 视图 |
+| [`src/types.ts`](src/types.ts) | `turnOutline` 投影键声明与条目类型的唯一归属 |
+
+---
+
+## 🔗 资源
 
 当单元约定不够用时阅读以下页面。它们从驱动单元的注册表逐步进入相邻的会话包。
 
@@ -91,35 +86,29 @@ wire 值是按 `turn` 严格递增的完整条目数组（整值规则）：消�
 - [会话投影注册表包](../session-projection/README.zh.md)——单元注册所依据的注册表约定。
 - [会话包映射](../README.zh.md)——相邻的持久化、投影、标题与遥测包。
 
------
+---
 
-<a id="model-experience"></a>
-## 模型体验
+## 🚀 快速开始
 
-无，因为 turnOutline 单元把已写入日志的轮次边界折叠成面向客户端的读模型，不注册任何面向模型的内容。
+### 配置
 
-#### KV Cache 影响
+```yaml
+- name: '@deepseek-ai/dsh-session'
+- name: '@deepseek-ai/dsh-session-projection'
+- name: '@deepseek-ai/dsh-session-turn-outline'
+```
 
-无；本包从不组装或发送提供方请求。
+### 参数
 
-## 已知限制与延期工作
+| 字段 | 含义 |
+|---|---|
+| `turn` | `turn/start` 载荷里的宿主分配轮次号 |
+| `seq` | 该轮 `turn/start` 事件的 seq——窗口向后分页越过此 seq 即载入整轮 |
+| `prompt` | 该轮首条人类提示词的预览（文本块以空格连接、空白折叠、50 字符封顶且截断时补省略号——即导航卡片一行）；合格提示词落日志前为 `''` |
+| `response` | 该轮最后一条带文本的助手消息的预览（同样的归一化、120 字符封顶——即卡片至多三行）；轮次带着助手文本结束前为 `''` |
 
-<a id="known-limitations-and-deferred-work"></a>
+---
 
+## ⚙️ 技术栈
 
-这些限制说明大纲描述什么、单元何时缺失。它们是当前包约束。
-
-- **wire 值随会话增长**——每次推送携带完整大纲（整值规则），CJK 字符占满预算时每轮上限约 600 字节、通常远小于此；把预览拆成按需读取推迟到数千轮量级的会话真正需要时。
-- **回复只预览已落定的轮次**——它在 `turn/end` 提交，进行中的轮次（或从未记下结束边界的轮次）在边界落地前只有提示词预览。
-- **没有合格文本的轮次保持 `''`**——纯图片、纯命令的轮次可导航但按轮次号标注，步骤全程不产文本的轮次没有回复预览。
-- **仅在组合了投影注册表时挂载**——其他装配不提供 `turnOutline` 键，其消费方回退到仅按已加载窗口导航。
-
-<a id="dev-note"></a>
-### 开发备注
-
-<details>
-<summary>维护者的工作上下文——点击展开</summary>
-
-无。
-
-</details>
+**npm**: @deepseek-ai/dsh-session-turn-outline

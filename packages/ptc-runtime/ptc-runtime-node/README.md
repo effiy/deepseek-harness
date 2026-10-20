@@ -1,81 +1,50 @@
 ---
-description: "在全新 Node 进程中运行 TypeScript 程序，使用会话文件系统沙箱、受管清理以及可配置的执行与输出限制。"
-kind: "package-reference"
+title: "@deepseek-ai/dsh-ptc-runtime-node"
+tags: []
+category: "ptc-runtime"
+created: 2025-01-01
+updated: 2026-10-20
+source: external
+type: index
+status: stable
+lifecycle: active
 ---
 
-# @deepseek-ai/dsh-ptc-runtime-node
-
-[English](README.md) | 中文
-
-## 概述
+## 💡 概述
 
 在与 Bash 相同的平台沙箱策略下执行模型编写的 TypeScript，并通过异步绑定调用 Host 提供的函数。每次调用启动一个全新的 Node 进程，返回捕获日志、精确 JSON 值或结构化失败。直接 Node API 在所选限制内仍可使用。经过时间截止、输出上限和 V8 堆限制约束执行；取消和完成都会终止受管进程范围。请求受限模式但沙箱后端不可用时，执行失败。
 
-## 目录
+---
 
-- [使用本包](#use-this-package)
-- [理解实现](#understand-the-implementation)
-- [进一步探索](#further-exploration)
-- [模型体验](#model-experience)
-- [已知限制与延后工作](#known-limitations-and-deferred-work)
-- [开发备注](#dev-note)
+## ⚡ 功能
 
------
+### 限制
 
-<a id="use-this-package"></a>
-## 使用本包
+这些限制界定执行保证与保留的输出。
 
-在提供 `fs`、`subprocess`、`sandbox` 与 `sandboxPolicy` 的组合中挂载本提供方。`dsh-tools` 的 PTC 模式传入调用 Session 的目录和常设策略；直接运行时消费方在执行前解析这些选项。
+- **约束继承所选后端的限制**——完整与部分强制能力分开报告；沙箱策略与受管进程约束是不同保证。
+- **堆上限不是进程树内存限制**——原生分配与后代进程内存不属于 V8 老生代上限。不提供进程树 CPU 计量器。
+- **清理继承子进程的可观测范围**——使用 fallback 的平台上，逃逸的后代可能仍在受管范围之外；参见子进程提供方声明的限制。
+- **执行是一次性的**——没有 yield/wait API、实时结果流或跨调用保留的程序状态。
+- **输出上限拒绝超量内容，而不保留每个字节**——溢出只能保存本提供方交付的有界结果。
+- **绑定在传输接纳时受限**——控制限制不约束 Host 绑定生成结果期间分配的内存。
+- **console shim 有五个方法**——`log`、`info`、`warn`、`error` 与 `debug`。
 
-### 配置
+---
 
-在所需服务可用后，配置提供方条目：
+## 📊 指标
 
-```yaml
-- name: '@deepseek-ai/dsh-ptc-runtime-node'
-  config:
-    timeoutMs: 120000
-    maxTimeoutMs: 600000
-    maxOutputBytes: 67108864
-    maxOldGenerationSizeMb: 512
-    maxMessageBytes: 134217728
-    maxPendingCalls: 128
-    graceMs: 3000
-```
+通过 `dsh-tools` 的 PTC 模式与 `dsh-workflow-ptc` 间接提供；它们通过各自的工具结果呈现程序结果。中间绑定通信不进入模型历史；外层结果遵循普通工具溢出策略。
 
-| 字段 | 默认值 | 含义 |
-|---|---|---|
-| `timeoutMs` | `120,000` | 默认经过时间截止，包括嵌套工具与审批等待 |
-| `maxTimeoutMs` | `600,000` | 解析器应用的经过时间截止上限 |
-| `maxOutputBytes` | `67,108,864` | 序列化日志与完成值或诊断的合计预算 |
-| `maxOldGenerationSizeMb` | `512` | V8 老生代堆上限，单位 MiB |
-| `maxMessageBytes` | `134,217,728` | 控制帧、未完成参数字节和排队控制写入的上限 |
-| `maxPendingCalls` | `128` | 同时进行的 Host 绑定调用数量上限 |
-| `graceMs` | `3,000` | 受管终止与输出排空宽限时间 |
-| `launch` | 本地载体 | 子进程环境中显式的 `{ kind: "node-script", executable, bootstrapPath? }` 或 `{ kind: "embedded", executable }` |
+#### KV Cache effect
 
-[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-ptc-runtime-node)定义可接受的配置字段。`resolve(request)` 补全 cwd、数值或 null 截止选择与执行策略；`run(spec)` 接受这些已解析输入，不补缺省值。
+不直接失效；具名消费方负责请求前缀的任何变更。
 
-### 执行与结果
+## 已知限制与延后工作
 
-程序是异步函数体：支持顶层 `await` 与 `return`，且只接受可擦除 TypeScript。成功调用以 `result.value` 返回无损 JSON 值，以 `result.logs` 返回捕获文本。`result.sandbox` 独立于程序结果报告所选模式、观察到的拒绝，以及后端完整或部分的强制能力。
+---
 
-直接文件系统、网络与子进程操作仍是 Node 操作，受所选 OS 沙箱约束。嵌套 Host 绑定通过控制通道调用；PTC 工具调用保留注册表的可见性、排序、日志和审批规则。运行程序不会改变 Session 的常设策略，也不会在拒绝后自动重放程序。
-
-### 截止时间与取消
-
-PTC 消费方按 [dsh-tools](../../core/tools/README.zh.md#ptc-mode) 的说明公开逐次超时与经审批的沙箱选择。运行时只读 `timeout` 描述符向该消费方报告有效默认值与上限。 其 `executionInstructions` 在面向模型的 schema 中说明全新 Node 状态、直接 Node API、空程序环境和文件策略。
-
-省略 `timeoutMs` 使用配置的经过时间默认值；数值请求经过验证并封顶。服务调用方可以显式传入 `timeoutMs: null` 来省略经过时间定时器，工作流适配器即如此；`run_code` 仍只接受正数覆盖值。启用的截止覆盖运行时准备和执行，包括等待嵌套工具或审批的时间。它不是 CPU 计量器。超时或取消通过 Host 的受管进程所有者停止同步循环；成功完成也会清理该受管范围。选择结果后、清理前停止计时器，因此调用可能要在执行截止之后等待清理结算才返回。
-
-### 失败
-
-程序解析错误与抛出异常为 `exception`；截止到期为 `timeout`；取消为 `abort`；畸形或超量控制通信为 `protocol`；约束不可用为 `sandbox-unavailable`；进程提前退出或受管清理失败为 `worker-exit`。进程提供方保留与执行基底无关的失败名 `worker-exit`。有损完成值为 `invalid-output`，外层结果超限为 `output-limit`，并保留能容纳的日志前缀。无效或不支持的选项，以及资源释放后的调用，以调用方误用拒绝。
-
------
-
-<a id="understand-the-implementation"></a>
-## 理解实现
+## 🏛️ 设计
 
 <details>
 <summary>实现内部——点击展开</summary>
@@ -107,41 +76,6 @@ Host 擦除可擦除类型，在配置的执行世界中解析可执行文件与
 
 -----
 
-<a id="further-exploration"></a>
-## 进一步探索
-
-直接使用提供方前先读服务约定；决策记录解释策略与消费方职责。
-
-- [PTC 运行时服务](../ptc-runtime/README.zh.md)——请求、已解析 spec 与结果。
-- [沙箱 Node 决策](../../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.zh.md)——安全、生命周期与 timeout 取舍。
-- [PTC 基础](../../../.agents/notes/implemented/feature/2026-06-15-ptc.zh.md)——注册表呈现与嵌套工具分派。
-- [子进程提供方](../../subprocess/subprocess-local/README.zh.md)——受管进程范围与平台限制。
-
------
-
-<a id="model-experience"></a>
-## 模型体验
-
-通过 `dsh-tools` 的 PTC 模式与 `dsh-workflow-ptc` 间接提供；它们通过各自的工具结果呈现程序结果。中间绑定通信不进入模型历史；外层结果遵循普通工具溢出策略。
-
-#### KV Cache effect
-
-不直接失效；具名消费方负责请求前缀的任何变更。
-
-## 已知限制与延后工作
-
-<a id="known-limitations-and-deferred-work"></a>
-
-这些限制界定执行保证与保留的输出。
-
-- **约束继承所选后端的限制**——完整与部分强制能力分开报告；沙箱策略与受管进程约束是不同保证。
-- **堆上限不是进程树内存限制**——原生分配与后代进程内存不属于 V8 老生代上限。不提供进程树 CPU 计量器。
-- **清理继承子进程的可观测范围**——使用 fallback 的平台上，逃逸的后代可能仍在受管范围之外；参见子进程提供方声明的限制。
-- **执行是一次性的**——没有 yield/wait API、实时结果流或跨调用保留的程序状态。
-- **输出上限拒绝超量内容，而不保留每个字节**——溢出只能保存本提供方交付的有界结果。
-- **绑定在传输接纳时受限**——控制限制不约束 Host 绑定生成结果期间分配的内存。
-- **console shim 有五个方法**——`log`、`info`、`warn`、`error` 与 `debug`。
-
 <a id="dev-note"></a>
 ### 开发备注
 
@@ -151,3 +85,57 @@ Host 擦除可擦除类型，在配置的执行世界中解析可执行文件与
 [timeout 讨论](../../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.zh.md#deferred-timeout-design)记录 yield、总生命周期、审批等待计时和进程树 CPU/RSS 上限的开放选择。这些选择不改变数值截止的默认值或显式的不设截止服务选项。
 
 </details>
+
+---
+
+## 📁 目录
+
+「待补充」
+
+---
+
+## 🔗 资源
+
+直接使用提供方前先读服务约定；决策记录解释策略与消费方职责。
+
+- [PTC 运行时服务](../ptc-runtime/README.zh.md)——请求、已解析 spec 与结果。
+- [沙箱 Node 决策](../../../.agents/notes/implemented/architecture/2026-09-11-sandboxed-node-ptc-runtime.zh.md)——安全、生命周期与 timeout 取舍。
+- [PTC 基础](../../../.agents/notes/implemented/feature/2026-06-15-ptc.zh.md)——注册表呈现与嵌套工具分派。
+- [子进程提供方](../../subprocess/subprocess-local/README.zh.md)——受管进程范围与平台限制。
+
+---
+
+## 🚀 快速开始
+
+### 配置
+
+```yaml
+- name: '@deepseek-ai/dsh-ptc-runtime-node'
+  config:
+    timeoutMs: 120000
+    maxTimeoutMs: 600000
+    maxOutputBytes: 67108864
+    maxOldGenerationSizeMb: 512
+    maxMessageBytes: 134217728
+    maxPendingCalls: 128
+    graceMs: 3000
+```
+
+### 参数
+
+| 字段 | 默认值 | 含义 |
+|---|---|---|
+| `timeoutMs` | `120,000` | 默认经过时间截止，包括嵌套工具与审批等待 |
+| `maxTimeoutMs` | `600,000` | 解析器应用的经过时间截止上限 |
+| `maxOutputBytes` | `67,108,864` | 序列化日志与完成值或诊断的合计预算 |
+| `maxOldGenerationSizeMb` | `512` | V8 老生代堆上限，单位 MiB |
+| `maxMessageBytes` | `134,217,728` | 控制帧、未完成参数字节和排队控制写入的上限 |
+| `maxPendingCalls` | `128` | 同时进行的 Host 绑定调用数量上限 |
+| `graceMs` | `3,000` | 受管终止与输出排空宽限时间 |
+| `launch` | 本地载体 | 子进程环境中显式的 `{ kind: "node-script", executable, bootstrapPath? }` 或 `{ kind: "embedded", executable }` |
+
+---
+
+## ⚙️ 技术栈
+
+**npm**: @deepseek-ai/dsh-ptc-runtime-node

@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { inspectSiteFragments, missingSiteFiles } from './verify-doc-site-fragments.ts'
+import { inspectSiteFragments, missingSiteFiles } from './docs-page.ts'
 
 const roots: string[] = []
 
