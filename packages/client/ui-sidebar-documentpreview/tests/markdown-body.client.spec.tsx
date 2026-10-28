@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { MarkdownBody, type MarkdownBodyProps } from '../src/client/markdown/MarkdownBody.tsx'
+import { resolveRelativePath } from '../src/client/markdown/MarkdownBody.tsx'
 import { en, zh } from '../src/client/markdown/locales.ts'
 import type { DocumentContent } from '../src/client/document/contract.ts'
 
@@ -24,6 +25,7 @@ function content(pageTexts: readonly string[], eof: boolean): DocumentContent {
 function props(value: DocumentContent, t: MarkdownBodyProps['t'] = makeTranslate(en), absolutePath?: string): MarkdownBodyProps {
   return {
     resourceAddress: 'dsh-resource://file/session/markdown/notes.md', content: value, wrap: false, t,
+    openFile: () => {},
     useResource: () => ({
       status: absolutePath === undefined ? 'loading' : 'live',
       value: absolutePath === undefined ? undefined : { absolutePath, version: 'v1' },
@@ -188,5 +190,57 @@ describe('MarkdownBody', () => {
     expect(view.container.querySelector('[data-document-markdown]')?.textContent).toBe('')
     view.rerender(<MarkdownBody {...props({ kind: 'bytes', data: new TextEncoder().encode('text') })} />)
     expect(view.container.childElementCount).toBe(0)
+  })
+})
+
+describe('resolveRelativePath', () => {
+  it('resolves a sibling file relative to the base directory', () => {
+    expect(resolveRelativePath('/home/user/project/guide/notes.md', 'reference.md'))
+      .toBe('/home/user/project/guide/reference.md')
+  })
+
+  it('resolves a parent-directory reference with ..', () => {
+    expect(resolveRelativePath('/home/user/project/guide/notes.md', '../index.md'))
+      .toBe('/home/user/project/index.md')
+  })
+
+  it('resolves multiple parent-directory segments', () => {
+    expect(resolveRelativePath('/home/user/project/guide/notes.md', '../../other/file.md'))
+      .toBe('/home/user/other/file.md')
+  })
+
+  it('clamps .. at the filesystem root', () => {
+    expect(resolveRelativePath('/home/user/notes.md', '../../../../outside.md'))
+      .toBe('/outside.md')
+  })
+
+  it('skips dot segments', () => {
+    expect(resolveRelativePath('/a/b/c.md', './d.md'))
+      .toBe('/a/b/d.md')
+  })
+
+  it('skips empty segments from double slashes', () => {
+    expect(resolveRelativePath('/a/b/c.md', 'd//e.md'))
+      .toBe('/a/b/d/e.md')
+  })
+
+  it('normalises Windows backslashes in the base path', () => {
+    expect(resolveRelativePath('\\home\\user\\project\\notes.md', 'guide/reference.md'))
+      .toBe('/home/user/project/guide/reference.md')
+  })
+
+  it('normalises Windows backslashes in the relative path', () => {
+    expect(resolveRelativePath('/home/user/project/notes.md', 'guide\\reference.md'))
+      .toBe('/home/user/project/guide/reference.md')
+  })
+
+  it('handles a root-level base file', () => {
+    expect(resolveRelativePath('/README.md', 'docs/guide.md'))
+      .toBe('/docs/guide.md')
+  })
+
+  it('handles a root-level base file with .. going to root', () => {
+    expect(resolveRelativePath('/file.md', '../other.md'))
+      .toBe('/other.md')
   })
 })

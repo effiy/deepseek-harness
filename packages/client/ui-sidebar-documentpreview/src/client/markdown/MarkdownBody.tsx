@@ -18,7 +18,7 @@ import css from './MarkdownBody.module.css'
  * @param relativePath - relative destination (e.g. `../../d/e.md`).
  * @returns the joined and normalised absolute path.
  */
-function resolveRelativePath(basePath: string, relativePath: string): string {
+export function resolveRelativePath(basePath: string, relativePath: string): string {
   // Strip the filename from the base path.
   const baseDir = basePath.replace(/\\/g, '/').replace(/\/[^/]*$/, '')
   const parts = baseDir.split('/')
