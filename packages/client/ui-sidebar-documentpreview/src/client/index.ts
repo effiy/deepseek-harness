@@ -20,6 +20,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/remote'
 import type { WorkspaceFileParams } from '@deepseek-ai/dsh-api-workspace-files/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { parseFileAddress, fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
 import { TextPreview } from './TextPreview.tsx'
 import type { TextPreviewInjected } from './TextPreview.tsx'
@@ -115,7 +116,7 @@ export function apply(ctx: ClientContext): void {
         makeFileOpener: (resourceAddress: string) => {
           const parsed = parseFileAddress(resourceAddress)
           if (parsed?.scope !== 'session') return () => {}
-          const cwd = ctx.sessions.list.getSnapshot().byId[parsed.sessionId]?.cwd
+          const cwd = ctx.sessions.list.getSnapshot().byId[parsed.sessionId as SessionId]?.cwd
           return (path: string, options?: { line?: number }) => {
             const url = fileAddressFor(parsed.sessionId, cwd, path)
             if (options?.line === undefined) ctx.sidebarRight.openResource(url)
