@@ -29,6 +29,7 @@ export function ConversationContent(props: ConversationContentProps) {
   const Views = useFactorySlot('views', ConversationSessionView)
   const WidthControls = useFactorySlot('widthControls', NoConversationWidthControls)
   const [body, setBody] = useState<HTMLDivElement | null>(null)
+  const bodyRef = useCallback((node: HTMLDivElement | null) => { setBody(node) }, [])
   const pendingInteraction = useSessionStatus(snapshot =>
     sessionId === undefined ? undefined : snapshot.get(sessionId)?.pendingInteraction)
   const inputState = useInput(s => s)
@@ -187,7 +188,7 @@ export function ConversationContent(props: ConversationContentProps) {
 
   return (
     <section
-      ref={setBody}
+      ref={bodyRef}
       className={clsx(css.body, props.variant === 'embedded' && css.embeddedBody)}
       data-conversation-content=""
       data-conversation-session={sessionId}
