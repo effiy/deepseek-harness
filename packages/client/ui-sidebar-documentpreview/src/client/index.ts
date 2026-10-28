@@ -20,6 +20,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/remote'
 import type { WorkspaceFileParams } from '@deepseek-ai/dsh-api-workspace-files/client'
+import { parseFileAddress, fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
 import { TextPreview } from './TextPreview.tsx'
 import type { TextPreviewInjected } from './TextPreview.tsx'
 import { TextTitle } from './TextTitle.tsx'
@@ -79,7 +80,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
  * Required browser services: the tab registry, the slot registry, copy, and the
  * workspace Remote for bytes and paged text reads.
  */
-export const inject = ['slots', 'locale', 'sidebarRightTabs', 'remote', 'remote.workspaceFiles', 'configForms', 'resources']
+export const inject = ['slots', 'locale', 'sidebarRightTabs', 'remote', 'remote.workspaceFiles', 'configForms', 'resources', 'sessions', 'sidebarRight']
 
 /**
  * Client plugin body: register the type, its dictionaries, its body, and its chip title.
@@ -111,6 +112,16 @@ export function apply(ctx: ClientContext): void {
       },
       inject: (sessionId, actions): TextPreviewInjected => ({
         ...face(sessionId, actions), hooks: { documentPreviews: source },
+        makeFileOpener: (resourceAddress: string) => {
+          const parsed = parseFileAddress(resourceAddress)
+          if (parsed?.scope !== 'session') return () => {}
+          const cwd = ctx.sessions.list.getSnapshot().byId[parsed.sessionId]?.cwd
+          return (path: string, options?: { line?: number }) => {
+            const url = fileAddressFor(parsed.sessionId, cwd, path)
+            if (options?.line === undefined) ctx.sidebarRight.openResource(url)
+            else ctx.sidebarRight.openResource(url, { params: { line: options.line } })
+          }
+        },
       }),
     },
     TextPreview,

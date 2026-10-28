@@ -74,6 +74,8 @@ async function boot() {
   ctx.provide('locale', locale as never)
   ctx.provide('remote', { workspaceFiles: { read, readBytes } } as never)
   ctx.provide('remote.workspaceFiles', { read, readBytes } as never)
+  ctx.provide('sessions', { list: { getSnapshot: () => ({ byId: {} }) } } as never)
+  ctx.provide('sidebarRight', { openResource: vi.fn() } as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   onTestFinished(async () => { await fiber.dispose() })
   await fiber.await()

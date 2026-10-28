@@ -38,6 +38,13 @@ export type { LoadedPage } from './text/lines.ts'
 /** Private registration inputs; the framework binds the registry source to useDocumentPreviews. */
 export interface TextPreviewInjected extends TextInjected {
   readonly hooks: { readonly documentPreviews: ObservableSnapshot<readonly DocumentPreviewDefinition[]> }
+  /**
+   * Create an `openFile` closure for a document body, bound to the file's session
+   * and the owning Sidebar. The caller holds the file's resource address.
+   * @param resourceAddress - `dsh-resource://file/session/<id>/<path>` address of the file being viewed.
+   * @returns an `openFile` callback whose path parameters are passed to the Sidebar's resource opener.
+   */
+  readonly makeFileOpener: (resourceAddress: string) => (path: string, options?: { line?: number }) => void
 }
 
 /** The body's composed props: the tab, its navigation, the shared store and face, and copy. */
@@ -56,13 +63,16 @@ export type TextPreviewProps =
 export function TextPreview({
   useTabInfo, useResource, useStore, actions, loadPage, reloadPages,
   loadAll, reloadAll, prepareRenderer, useDocumentPreviews, renderSlot, t,
-  addResource, setResources,
+  addResource, setResources, makeFileOpener,
 }: TextPreviewProps): ReactNode {
   const { tab } = useTabInfo()
   const { navigation, signal } = tab
   const meta = useResource<'file'>(tab.contentId)
   const canRead = meta.status !== 'none'
   const file = useMemo(() => hostFileOf(tab.contentId), [tab.contentId])
+  // The opener is recreated when the tab's resource address changes; the
+  // returned callback stays stable while the same file is viewed.
+  const openFile = useMemo(() => makeFileOpener(tab.contentId), [tab.contentId, makeFileOpener])
   const state = useStore(s => s.byTab[tab.id])
   const definitions = useDocumentPreviews(value => value)
   const unviewable = useMemo(() => unviewableBinaryPath(file.path), [file.path])
@@ -345,7 +355,7 @@ export function TextPreview({
         )}
         {content !== undefined && renderSlot('sidebar.right.tab.document', {
           resourceAddress: tab.contentId, content, wrap: state.wrap, scrollportRef: bindScrollport,
-          addResource: add, setResources: set,
+          addResource: add, setResources: set, openFile,
         }, {
           entryKey: selected.id, hookContext: useTabInfo,
           fallback: <p className={css.statusLine}>{t('rendererUnavailable', { name: selected.title() })}</p>,

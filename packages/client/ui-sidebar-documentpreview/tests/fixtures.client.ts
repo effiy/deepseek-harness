@@ -173,6 +173,7 @@ export function harness(script: Record<number, RemoteResult<WorkspaceFileText>> 
     addResource: face.addResource, setResources: face.setResources,
     useDocumentPreviews: () => definitions,
     renderSlot,
+    makeFileOpener: (_resourceAddress: string) => (_path: string, _options?: { line?: number }) => {},
     t,
   }) as unknown as TextPreviewProps
   return {

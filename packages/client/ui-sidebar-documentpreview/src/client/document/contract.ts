@@ -43,6 +43,13 @@ export interface DocumentBodyOwner {
   readonly wrap: boolean
   /** Report a renderer-owned scrollport; passing `null` restores the shared body as the owner. */
   readonly scrollportRef: RefCallback<HTMLElement>
+  /**
+   * Open a local file destination in the Sidebar preview. Relative paths are
+   * resolved against this file's directory; absolute paths are used as-is.
+   * @param path - absolute or file-relative path, already decoded.
+   * @param options - first line to reveal when the destination specifies a range.
+   */
+  readonly openFile: (path: string, options?: { line?: number }) => void
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
