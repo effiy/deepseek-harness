@@ -210,7 +210,17 @@ export function ChatView({
           <div ref={scroll.columnRef} className={css.column} data-chat-flow=""
             data-chat-motion={deferCompletedTurns && scroll.initialized
               && (running || motionTail || pendingInputs.length > 0) ? '' : undefined}>
-            {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
+            {openState === 'loading' && entries.length === 0 && (
+              <div className={css.skeletonFlow} role="status" aria-label={t('chat.loadingHistory')}>
+                <div className={css.skeletonBubble} />
+                <div className={css.skeletonBubble} />
+                <div className={css.skeletonBubble} />
+                <div className={css.skeletonBubble} />
+              </div>
+            )}
+            {openState === 'loading' && entries.length > 0 && (
+              <div className={css.hint}>{t('chat.loadingHistory')}</div>
+            )}
             {openState === 'error' && openError !== null && (
               <div className={css.openError}>
                 {t('chat.loadError', { message: openError.message, code: openError.code })}

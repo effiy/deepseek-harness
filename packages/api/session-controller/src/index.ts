@@ -62,6 +62,10 @@ import type {
   SessionProjectionValues,
   SessionUpdateQueueRequest,
   SessionUpdateQueueValue,
+  SessionMessageDeleteRequest,
+  SessionMessageDeleteValue,
+  SessionMessageUpdateRequest,
+  SessionMessageUpdateValue,
 } from './types.ts'
 
 export type * from './types.ts'
@@ -462,6 +466,26 @@ export class SessionController extends TypertRemoteService {
   @Remote('updateQueue')
   updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue> {
     return this.commands.updateQueue(request)
+  }
+
+  /**
+   * Shadow one committed message or complete exchange from the model-visible surface.
+   * @param request - Session identity, exact message sequence, and optional cascade flag.
+   * @returns acknowledgement that the replacement was committed.
+   */
+  @Remote('message-delete')
+  messageDelete(request: SessionMessageDeleteRequest): Promise<SessionMessageDeleteValue> {
+    return this.commands.messageDelete(request)
+  }
+
+  /**
+   * Replace one committed message's content on the model-visible surface.
+   * @param request - Session identity, exact message sequence, and replacement text content.
+   * @returns acknowledgement that the replacement was committed.
+   */
+  @Remote('message-update')
+  messageUpdate(request: SessionMessageUpdateRequest): Promise<SessionMessageUpdateValue> {
+    return this.commands.messageUpdate(request)
   }
 
   /**

@@ -33,6 +33,16 @@
   border-radius: var(--dsw-radius-sm);
 }
 
+@media (pointer: coarse) {
+  .md {
+    min-height: 44px;
+  }
+  .sm {
+    min-height: 44px;
+    padding: 0 16px;
+  }
+}
+
 .primary {
   background: var(--dsw-alias-button-primary-fill);
   color: var(--dsw-alias-label-primary-foreground);

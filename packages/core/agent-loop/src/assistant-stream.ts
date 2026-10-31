@@ -118,6 +118,11 @@ export class AssistantStreamAttempt {
     return this.assembler.blocks()
   }
 
+  /** Indices of blocks known to be complete while the stream is still live. */
+  committedBlockIndices(): number[] {
+    return this.assembler.committedBlockIndices()
+  }
+
   /** Safe visible prefix when cancellation interrupts the attempt. */
   interruptedBlocks(): ContentBlock[] {
     return this.assembler.interruptedBlocks()

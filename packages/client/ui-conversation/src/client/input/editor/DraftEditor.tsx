@@ -21,6 +21,11 @@ export interface DraftEditorProps {
   readonly onWorkspaceKeyDown: KeyboardEventHandler<HTMLDivElement>
   readonly hint: string | null
   readonly showPlaceholder: boolean
+  /** When set to 'none', suppresses the soft keyboard on mobile. */
+  readonly inputMode?: 'none' | 'text'
+  /** When true, adds `readOnly` to the contentEditable to prevent the
+   *  system soft-keyboard on mobile while keeping the editor focusable. */
+  readonly readOnly?: boolean
 }
 
 /**
@@ -30,7 +35,7 @@ export interface DraftEditorProps {
  */
 export function DraftEditor({
   classNames: css, editor, scrollRef, editable, editorDisabled, phase, placeholderText, ariaLabel,
-  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder,
+  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder, inputMode, readOnly,
 }: DraftEditorProps): ReactNode {
   return (
     <div ref={scrollRef} className={css.scroll} data-input-scroll>
@@ -38,6 +43,7 @@ export function DraftEditor({
         <ComposerContentEditable
           editor={workspaceTrigger ? null : editor}
           editable={editable}
+          readOnly={readOnly}
           className={clsx(css.input, editorDisabled && css.inputDisabled)}
           data-phase={phase}
           aria-disabled={editorDisabled || undefined}
@@ -50,6 +56,7 @@ export function DraftEditor({
           tabIndex={workspaceTrigger ? 0 : undefined}
           onKeyDown={workspaceTrigger ? onWorkspaceKeyDown : undefined}
           style={hint === null ? undefined : { '--dsh-composer-hint': JSON.stringify(hint) } as CSSProperties}
+          inputMode={inputMode}
         />
         {showPlaceholder && (
           <div aria-hidden className={css.placeholder} data-composer-placeholder>

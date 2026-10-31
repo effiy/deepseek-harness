@@ -1,6 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { extname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from 'node:zlib'
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -165,6 +166,70 @@ function npmPackageOf(id: string): string | undefined {
   return first
 }
 
+// ── Build-time pre-compression ────────────────────────────────────────────
+// Generate `.br` (brotli) and `.gz` (gzip) copies of every text-based output
+// asset after the bundle is written. The frontend-static server reads these
+// pre-built copies when the Client's Accept-Encoding signals support,
+// avoiding per-request compression overhead. Mobile connections benefit most:
+// brotli delivers ~20 % smaller responses than gzip at similar decode cost.
+
+/** Extensions worth pre-compressing — text-based formats. */
+const COMPRESSIBLE_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.js', '.mjs', '.cjs',
+  '.css',
+  '.html',
+  '.svg',
+  '.json',
+  '.map',
+  '.webmanifest',
+  '.txt',
+  '.xml',
+])
+
+/** Extensions already compressed by their native format — skip them. */
+const SKIP_COMPRESS_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.gz', '.br',
+  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif',
+  '.woff', '.woff2',
+  '.mp4', '.webm',
+])
+
+/** Minimum uncompressed size in bytes to bother pre-compressing. */
+const MIN_COMPRESS_BYTES = 256
+
+/** Generate `.br` and `.gz` copies of compressible output assets after the bundle is written. */
+function precompressAssets(): Plugin {
+  return {
+    name: 'dsh-precompress-assets',
+    async writeBundle(options, bundle) {
+      if (options.dir === undefined) return
+      let count = 0
+      for (const [fileName, output] of Object.entries(bundle)) {
+        if (output.type !== 'chunk' && output.type !== 'asset') continue
+        const source = output.type === 'chunk' ? output.code : output.source
+        if (typeof source !== 'string' && !(source instanceof Uint8Array)) continue
+        const ext = extname(fileName).toLowerCase()
+        if (!COMPRESSIBLE_EXTENSIONS.has(ext)) continue
+        if (SKIP_COMPRESS_EXTENSIONS.has(ext)) continue
+        const buffer = typeof source === 'string' ? Buffer.from(source, 'utf8') : Buffer.from(source)
+        if (buffer.length < MIN_COMPRESS_BYTES) continue
+        const outPath = resolve(options.dir, fileName)
+        try {
+          await writeFile(`${outPath}.br`, brotliCompressSync(buffer, {
+            params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 5 }, // balanced size/speed
+          }))
+          await writeFile(`${outPath}.gz`, Buffer.from(gzipSync(buffer, { level: 9 })))
+          count++
+        } catch {
+          // A per-file failure must not fail the whole build.
+          console.warn(`precompress: failed to compress ${fileName}`)
+        }
+      }
+      if (count > 0) console.info(`precompress: generated .br + .gz copies for ${String(count)} assets`)
+    },
+  }
+}
+
 export default defineConfig({
   // Relative asset URLs: preview.html mounts the same output under any base
   // directory, and the served index resolves identically from the site root.
@@ -172,6 +237,7 @@ export default defineConfig({
   plugins: [
     rejectStandaloneServe(), clientDocumentTitle(), brandFontLicense(), react(), emitPreviewPage(),
     productWebBundleIsolation(src('../..'), src('.')),
+    precompressAssets(),
   ],
   build: {
     // The worker bootstrap holds its page at top-level await; Vite's default

@@ -227,6 +227,8 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/title-invalid': { readonly sessionId: SessionId }
     'session/fork-unavailable': { readonly sessionId: SessionId }
     'session/migration-required': { readonly sessionId: SessionId }
+    'session/message-not-found': { readonly sessionId: SessionId; readonly messageSeq: number }
+    'session/message-not-editable': { readonly sessionId: SessionId; readonly messageSeq: number }
     'subagent/not-found': {
       readonly parentSessionId: SessionId
       readonly childSessionId: SessionId
@@ -371,6 +373,39 @@ export interface SessionUpdateQueueRequest {
 
 /** Receipt after one pending queue mutation commits. */
 export interface SessionUpdateQueueValue {
+  readonly accepted: true
+}
+
+/** Committed-message delete request. */
+export interface SessionMessageDeleteRequest {
+  readonly sessionId: SessionId
+  /** Exact event sequence number of the committed message to delete. */
+  readonly messageSeq: number
+  /**
+   * When true, delete the full exchange: the targeted message and everything
+   * between it and the next user message, effectively removing a complete
+   * question-answer turn. When false or omitted, only the single named message
+   * is shadowed from the model-visible surface.
+   */
+  readonly cascade?: boolean
+}
+
+/** Receipt after a committed message was shadowed from the surface. */
+export interface SessionMessageDeleteValue {
+  readonly accepted: true
+}
+
+/** Committed-message content-update request. */
+export interface SessionMessageUpdateRequest {
+  readonly sessionId: SessionId
+  /** Exact event sequence number of the committed message to update. */
+  readonly messageSeq: number
+  /** Non-empty text-only replacement content. */
+  readonly content: readonly TextBlock[]
+}
+
+/** Receipt after a committed message was updated on the surface. */
+export interface SessionMessageUpdateValue {
   readonly accepted: true
 }
 

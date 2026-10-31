@@ -435,6 +435,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       if (sessionId === undefined) {
         return {
           keyboard: undefined,
+          toggleSidebar: () => { ctx.layout.toggleSidebar() },
           addFiles: undefined,
           removeAttachment: undefined,
           resolveDraftAttachments: undefined,
@@ -457,6 +458,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       const bridge = hostPathBridge()
       return {
         keyboard: shell,
+        toggleSidebar: () => { ctx.layout.toggleSidebar() },
         addFiles: (files, directories = new Set()) => {
           if (sessions.binding(sessionId) === undefined) return t('file.sessionUnavailable')
           if (shell.snapshot.phase === 'adjudicating' || shell.snapshot.phase === 'submitting') {

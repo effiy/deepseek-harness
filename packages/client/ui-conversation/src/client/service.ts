@@ -113,7 +113,7 @@ function nextPaint(): Promise<void> {
         clearTimeout(fallback)
         setTimeout(resolve, 0)
       }
-      const fallback = setTimeout(finish, 100)
+      const fallback = setTimeout(finish, 50)
       requestAnimationFrame(finish)
     } else {
       setTimeout(resolve, 0)

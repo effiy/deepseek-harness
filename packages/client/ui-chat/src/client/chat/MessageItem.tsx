@@ -3,11 +3,12 @@ import type { ReactNode } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock, projectUserText, StateDot, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
+import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, MessageActionOwnerProps } from '../contract/slots.ts'
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
+import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
@@ -317,10 +318,14 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
 }
 
 /** User and admitted-steering keyed Chat renderer. */
+type UserMessageNodeViewProps = ChatNodeViewProps<'user' | 'steering'> & PropsRenderSlots<'conversation.chat.user-actions'>
+
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, openFile, openSkill, t,
-}: ChatNodeViewProps<'user' | 'steering'>) {
+  node, renderMessageImages, openFile, openSkill, renderSlot, t,
+}: UserMessageNodeViewProps) {
   const data = node.data
+  const userActionsOwner: MessageActionOwnerProps = { seq: data.seq, text: contentParts(data.content).text }
+  const userActions = renderSlot('conversation.chat.user-actions', userActionsOwner)
   return (
     <UserStyleBubble
       content={data.content}
@@ -335,6 +340,7 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           time={data.time}
           clock="start"
           className={css.actions}
+          extraActions={userActions}
           t={t}
         />
       )}

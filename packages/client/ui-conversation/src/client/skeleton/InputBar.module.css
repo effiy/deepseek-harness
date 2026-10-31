@@ -198,6 +198,17 @@
   color: var(--dsw-alias-label-caption);
 }
 
+/* Prevent iOS Safari auto-zoom on focus when inputMode="none" suppresses the
+   soft keyboard: Safari still zooms when the focused input's font-size is
+   less than 16px, changing the visual-viewport width and causing a horizontal
+   scrollbar.  16px is also the designer-recommended floor for mobile body text
+   (design audit T1). */
+@media (max-width: 640px) {
+  .input {
+    font-size: 16px;
+  }
+}
+
 .input[data-composer-composing] p:last-child::after {
   content: none;
 }
@@ -416,3 +427,84 @@
 .activity { display: flex; align-items: center; flex: none; }
 .activity:empty { display: none; }
 .activityExpanded { flex: 1; min-width: 0; }
+
+/* Touch devices: enlarge the send button to a 44 px minimum touch
+   target (WeChat-style affordance for thumb-driven typing).  The
+   border-radius stays 999 px so it remains circular. */
+@media (pointer: coarse) {
+  .primary {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* Mobile: tighten the composer card for WeChat-style compactness.
+   Radius from desktop 28px panel to 8px (rectangular with subtle
+   rounding); top pad and internal gap shrink to reduce vertical
+   footprint and bring the toolbar closer to the text area.
+   Side clearance comes from --dsh-composer-side-clearance (12px at
+   ≤640px) — no override needed here. */
+@media (max-width: 480px) {
+  .root {
+    /* Wider side clearance for mobile — prevents card from appearing
+     * too wide and provides WeChat-like breathing room. */
+    --dsh-composer-side-clearance: 16px;
+    /* Tighten root bottom pad so VK sits closer to the composer
+       (10px visual gap vs desktop's 12px). */
+    padding-bottom: 2px;
+  }
+  .root .card {
+    border-radius: var(--dsw-radius-sm);
+    padding-top: 6px;
+    gap: 8px;
+    /* iOS Safari zooms when focused input font-size < 16px.
+     * The textarea inherits from the card, so setting 16px here
+     * prevents unwanted viewport zoom on tap.
+     * Use descendant selector for higher specificity than the base
+     * .card rule which comes later in the cascade. */
+    font-size: 16px;
+  }
+}
+
+/* ── Sidebar toggle button (mobile composer toolbar) ────────────────────────
+   Hidden on desktop; shown on narrow viewports where the sidebar is
+   collapsed and the composer toolbar is the primary thumb-accessible
+   surface.  The button sits in the trailing row alongside the model
+   selector and send controls. */
+
+.sidebarToggle {
+  display: none;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.sidebarToggle:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.sidebarToggle:active {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+@media (max-width: 1023px) {
+  .sidebarToggle {
+    display: flex;
+  }
+}
+
+@media (pointer: coarse) {
+  .sidebarToggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

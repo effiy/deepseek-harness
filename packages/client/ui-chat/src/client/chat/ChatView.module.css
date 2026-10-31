@@ -128,6 +128,69 @@
 /* Selection still sets data-selected for details linkage; no outline —
    tool rows match Think chrome (no selected ring). */
 
+/* ── Skeleton loading ──────────────────────────────────────────────────────
+   Placeholder message bubbles shown while the chat history loads.  Alternating
+   left/right alignment and varying widths mimic a real conversation, and the
+   shimmer animation signals activity without a blank screen. */
+
+.skeletonFlow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeletonBubble {
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-interactive-bg-hover);
+  height: 36px;
+  animation: chat-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* User message — right aligned, short */
+.skeletonBubble:nth-child(1) {
+  align-self: flex-end;
+  width: 42%;
+}
+
+/* Bot message — left aligned, longer */
+.skeletonBubble:nth-child(2) {
+  width: 72%;
+}
+
+/* User message — right aligned, very short */
+.skeletonBubble:nth-child(3) {
+  align-self: flex-end;
+  width: 28%;
+  height: 28px;
+}
+
+/* Bot message — left aligned, medium-length */
+.skeletonBubble:nth-child(4) {
+  width: 58%;
+  height: 52px;
+}
+
+@keyframes chat-skeleton-shimmer {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBubble {
+    animation: none;
+    opacity: 0.45;
+  }
+}
+
+/* Mobile: tighten skeleton spacing to match the WeChat-style flow gap. */
+@media (max-width: 480px) {
+  .skeletonFlow {
+    gap: 8px;
+  }
+}
+
+/* ── Hint (loading text) ────────────────────────────────────────────────── */
+
 .hint {
   color: var(--dsw-alias-label-tertiary);
   font-size: var(--dsh-content-font-size-secondary, 13px);
@@ -158,7 +221,7 @@
   display: none;
   width: 100%;
   height: 0.5px;
-  margin: 8px 0 10px;
+  margin: 8px 0 8px;
   background: color-mix(in srgb, var(--dsw-alias-border-l1) 75%, var(--dsw-alias-border-l2));
   pointer-events: none;
 }
@@ -293,7 +356,39 @@
   background: var(--dsw-alias-button-floating-hover);
 }
 
+@media (pointer: coarse) {
+  .toBottom {
+    min-width: 44px;
+    min-height: 44px;
+    margin-top: -44px;
+  }
+}
+
 /* Host open-path refusal: same dialog family as the workspace folder error. */
 .modalAction {
   min-width: 72px;
+}
+
+/* ── Mobile (≤480px): WeChat-style compact chat area ──────────────────── */
+
+@media (max-width: 480px) {
+  .scroll {
+    /* Tighten transcript side padding: 8px vertical, 10px horizontal gives
+       more reading width on narrow screens while keeping a breath edge.
+       The desktop 16px + clearance sides waste ~32px per edge on a 375px
+       viewport. */
+    padding: 8px 10px;
+  }
+
+  .column {
+    /* 15px floor prevents iOS Safari auto-zoom on the chat body while
+       staying one step below the 16px input floor. */
+    font-size: max(var(--dsh-content-font-size, 14px), 15px);
+  }
+
+  .flowItem[data-chat-group-part="response"] {
+    /* Tighter 10px gap between response turns — WeChat's compact reading
+       rhythm vs the desktop 12px. */
+    --dsh-chat-flow-gap: 8px;
+  }
 }

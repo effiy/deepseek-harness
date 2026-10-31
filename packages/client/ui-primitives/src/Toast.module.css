@@ -5,7 +5,9 @@
 
 .toast {
   position: fixed;
-  top: 40px;
+  /* 40px below the viewport edge, plus the device's notch/status-bar inset
+     so the toast never overlaps the clock or camera area on notched phones. */
+  top: calc(40px + env(safe-area-inset-top, 0px));
   left: 50%;
   /* Above the 1000 the image lightbox backdrop uses: a failure reported while
      a preview is open must stay readable. */

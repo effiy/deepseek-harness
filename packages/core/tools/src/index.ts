@@ -833,8 +833,13 @@ export class ToolRuntime extends Service {
   private contentProjectors = new WeakMap<ToolRunContext, ToolDefinition['projectContent']>()
   private readonly layers = new ScopedLayers(
     scope => new ToolLayer(scope),
-    () => { this.ctx.emit('tools/change') },
+    () => {
+      this.rev++
+      this.ctx.systemPrompt.invalidate()
+      this.ctx.emit('tools/change')
+    },
   )
+  private rev = 0
   /** Presentation for scopes that declare none; {@link presentAs} shadows it per scope. */
   private readonly defaultMode: ToolPresentationMode
   private readonly maxParallelSubCalls: number
@@ -857,6 +862,14 @@ export class ToolRuntime extends Service {
       ctx.systemPrompt.section(this.collapseSection())
       ctx.systemPrompt.section(this.sdkSection())
     }
+  }
+
+  /**
+   * Monotonic revision counter incremented on every {@link tools/change}
+   * so consumers can detect tool-set changes without event propagation coupling.
+   */
+  get revision(): number {
+    return this.rev
   }
 
   /**

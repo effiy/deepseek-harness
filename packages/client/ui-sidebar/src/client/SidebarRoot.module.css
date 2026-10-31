@@ -13,6 +13,7 @@
   height: 100%;
   padding: 6px var(--dsh-sidebar-inline-padding);
   box-sizing: border-box;
+  overflow-x: hidden;
   background: var(--dsw-specific-sidebar-fill);
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
@@ -33,6 +34,7 @@
    the whale's box (24px to the 24-wide whale glyph itself). */
 .root.collapsed {
   padding: 18px 10px 6px;
+  overflow-x: hidden;
 }
 
 /* The brand stays in the sidebar; fixed caption controls survive zero-width collapse. */
@@ -341,6 +343,13 @@
   outline-offset: -2px;
 }
 
+@media (pointer: coarse) {
+  .iconButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 .collapsed .iconButton {
   width: 36px;
   height: 36px;
@@ -519,6 +528,13 @@
 .panelRow:focus-visible {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -2px;
+}
+
+@media (pointer: coarse) {
+  .panelRow {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
 }
 
 .panelGlyph {

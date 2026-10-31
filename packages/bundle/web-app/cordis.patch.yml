@@ -184,7 +184,7 @@
         port: !!js ctx.webStartup.port ?? 3080
         tls: !!js ctx.webStartup.tls
         compression: gzip
-        compressionLevel: 1
+        compressionLevel: 6
         compressionThresholdBytes: 1024
 
     # Web glue owned by this bundle: resolves the built frontend dist (an
@@ -326,6 +326,9 @@
 
     - id: ui-chat
       name: '@deepseek-ai/dsh-client-ui-chat'
+
+    - id: ui-message-actions
+      name: '@deepseek-ai/dsh-client-ui-message-actions'
 
     # Official occupants for the generic sidebar and conversation brand slots.
     - id: ui-brand-official

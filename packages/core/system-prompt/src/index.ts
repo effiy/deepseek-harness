@@ -146,6 +146,7 @@ const SECTION_ORDERS = {
   TOOL_PTY: 1700,
   TOOL_WEB_SEARCH: 2000,
   TOOL_WEB_FETCH: 2100,
+  TOOL_RAG_QUERY: 2500,
   TOOL_LSP: 2200,
   TOOL_SESSION_QUERY: 2300,
   TOOL_GOAL: 2400,
@@ -434,9 +435,18 @@ export class SystemPrompt extends Service {
 
   private readonly layers = new ScopedLayers(
     scope => new PromptLayer(scope),
-    () => { this.ctx.emit('system-prompt/change') },
+    () => {
+      this.rev++
+      this.ctx.emit('system-prompt/change')
+    },
   )
   private readonly toolOrder: string[] | undefined
+  private rev = 0
+  /** Per-scope tool-schema cache: avoids re-collecting and cloning tool schemas when registrations haven't changed. */
+  private readonly assembleCache = new Map<ScopeKey | undefined, {
+    tools: ToolSchema[]
+    rev: number
+  }>()
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'systemPrompt')
@@ -461,6 +471,24 @@ export class SystemPrompt extends Service {
       text: config.personaSuffix ?? '',
     })
     if (!(config.includeRuntimeContext ?? true)) this.suppressRuntimeContext()
+  }
+
+  /**
+   * Monotonic revision counter incremented on every {@link system-prompt/change}
+   * so consumers can detect registration changes without event propagation coupling.
+   */
+  get revision(): number {
+    return this.rev
+  }
+
+  /**
+   * Invalidate the assembly cache so the next {@link assemble} call
+   * re-collects sections and tools. Called by external services that
+   * change state the registered providers depend on without changing
+   * prompt registrations themselves.
+   */
+  invalidate(): void {
+    this.rev++
   }
 
   /**
@@ -566,6 +594,28 @@ export class SystemPrompt extends Service {
   }
 
   /**
+   * Resolve registered prompt variables for one assembly without the
+   * full section/tool collection or waterfall. Providers are re-evaluated
+   * on every call; return values may be `undefined`.
+   * @param context - the optional scope and plugin-defined assembly fields.
+   * @returns the resolved variable name-to-value map.
+   */
+  resolveVariables(context: AssembleContext = {}): Record<string, string | undefined> {
+    const scope = context.scope
+    const scopeLayers = this.layers.chainLayers(scope)
+    const variables: Record<string, string | undefined> = {}
+    for (const [name, provider] of this.layers.global.variables.entries()) {
+      variables[name] = provider(context)
+    }
+    for (const layer of scopeLayers) {
+      for (const [name, provider] of layer.variables.entries()) {
+        variables[name] = provider(context)
+      }
+    }
+    return variables
+  }
+
+  /**
    * Refresh accepted registered runtime facts for request admission. Contexts
    * added only by the assembly waterfall retain their accepted values. Current
    * suppression removes optional contexts, and missing required registrations
@@ -612,46 +662,65 @@ export class SystemPrompt extends Service {
     const scopeLayers = this.layers.chainLayers(scope)
     const runtimeContextSuppressed = !this.layers.global.runtimeContextSuppressors.isEmpty()
       || scopeLayers.some(layer => !layer.runtimeContextSuppressors.isEmpty())
-    // Scoped variables shadow globals.
-    const variables: Record<string, string | undefined> = {}
-    for (const [name, provider] of this.layers.global.variables.entries()) {
-      variables[name] = provider(context)
-    }
-    // Scope-chain variables, farthest first, so the nearest scope wins a name.
-    for (const layer of scopeLayers) {
-      for (const [name, provider] of layer.variables.entries()) {
-        variables[name] = provider(context)
+    // Scoped variables shadow globals; resolve once so the assembly
+    // and waterfall share the same snapshot.
+    const variables = this.resolveVariables(context)
+    const contextByName = this.layers.merge(scope, layer => layer.contexts)
+
+    let sections: AssembledSection[]
+    let tools: ToolSchema[]
+    let completeSection: AssembledSection | undefined
+
+    const cached = this.assembleCache.get(scope)
+    if (cached !== undefined && cached.rev === this.rev) {
+      // Cache hit: reuse tool schemas (the expensive part).
+      // Clone parameters so mutations through the returned assembly
+      // do not corrupt the cache for subsequent calls.
+      tools = cached.tools.map(tool => ({
+        ...tool,
+        parameters: structuredClone(tool.parameters),
+      }))
+    } else {
+      // Cache miss: collect tool schemas from all registered providers.
+      const providers = [
+        ...this.layers.global.toolProviders.values(),
+        ...scopeLayers.flatMap(layer => [...layer.toolProviders.values()]),
+      ]
+      const collected: ToolSchema[] = []
+      const knownNames = new Set<string>()
+      const revBefore = this.rev
+      for (const provider of providers) {
+        const result = provider(context)
+        const schemas = result.schemas.map(({ name, description, parameters, deferLoading }): ToolSchema => ({
+          name,
+          description,
+          parameters: structuredClone(parameters),
+          ...deferLoading === true ? { deferLoading } : {},
+        }))
+        const acceptedKnownNames = result.knownNames ?? schemas.map(tool => tool.name)
+        collected.push(...schemas)
+        for (const name of acceptedKnownNames) knownNames.add(name)
+      }
+      tools = orderTools(collected, this.toolOrder, knownNames)
+      // Cache tool schemas until the next invalidation. Skip caching
+      // when a provider registered new providers during evaluation
+      // (rev changed mid-collection: the result is incomplete).
+      // Clone on store so mutations to the returned assembly do not
+      // corrupt the cached reference.
+      if (this.rev === revBefore) {
+        this.assembleCache.set(scope, { tools: structuredClone(tools), rev: this.rev })
       }
     }
-    // Scoped sections shadow globals before the deterministic order sort.
+
+    // Sections are always rebuilt: merging, sorting, and resolving text
+    // providers are cheap, and their output may depend on the assemble context.
     const sectionByName = this.layers.merge(scope, layer => layer.sections)
-    const contextByName = this.layers.merge(scope, layer => layer.contexts)
-    // Validate order against pre-restriction names while collecting visible schemas.
-    const providers = [
-      ...this.layers.global.toolProviders.values(),
-      ...scopeLayers.flatMap(layer => [...layer.toolProviders.values()]),
-    ]
-    const collected: ToolSchema[] = []
-    const knownNames = new Set<string>()
-    for (const provider of providers) {
-      const result = provider(context)
-      const schemas = result.schemas.map(({ name, description, parameters, deferLoading }): ToolSchema => ({
-        name,
-        description,
-        parameters: structuredClone(parameters),
-        ...deferLoading === true ? { deferLoading } : {},
-      }))
-      const acceptedKnownNames = result.knownNames ?? schemas.map(tool => tool.name)
-      collected.push(...schemas)
-      for (const name of acceptedKnownNames) knownNames.add(name)
-    }
     const sectionDefinitions = [...sectionByName.values()].sort(comparePromptSections)
     const completeSections = sectionDefinitions.filter(section => section.complete === true)
     if (completeSections.length > 1) {
       throw new Error(`multiple complete prompt sections are active: ${completeSections.map(section => JSON.stringify(section.name)).join(', ')}`)
     }
-    let completeSection: AssembledSection | undefined
-    const sections = sectionDefinitions
+    sections = sectionDefinitions
       .map((section) => {
         const assembled = {
           name: section.name,
@@ -661,15 +730,21 @@ export class SystemPrompt extends Service {
         if (section.complete === true) completeSection = { ...assembled }
         return assembled
       })
+
+    // Context providers are always re-evaluated per step.
+    const contexts = [...contextByName.values()]
+      .filter(entry => !runtimeContextSuppressed || entry.required === true)
+      .sort((a, b) => a.order - b.order)
+      .map(entry => resolveContext(entry, context))
+
     const assembly: PromptAssembly = {
       sections,
-      contexts: [...contextByName.values()]
-        .filter(entry => !runtimeContextSuppressed || entry.required === true)
-        .sort((a, b) => a.order - b.order)
-        .map(entry => resolveContext(entry, context)),
-      tools: orderTools(collected, this.toolOrder, knownNames),
+      contexts,
+      tools,
       variables,
     }
+    // The waterfall always runs: listeners may capture mutable
+    // state that changes without a `system-prompt/change` emission.
     const transformed = await this.ctx.waterfall(
       scopeTarget(this, scope), 'system-prompt/assemble', assembly, context,
       () => Promise.resolve(assembly),

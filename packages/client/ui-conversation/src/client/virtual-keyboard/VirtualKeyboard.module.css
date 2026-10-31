@@ -1,0 +1,181 @@
+/* ------------------------------------------------------------------
+ * Virtual keyboard
+ *
+ * Rendered inside the composer seat, extending it downward through
+ * normal flex flow.  The keyboard pushes the transcript area up so
+ * the composer stays above the keys without fixed positioning.
+ *
+ * Visual design:
+ *   • Glassmorphism — backdrop-filter blur over a semi-transparent
+ *     background, matching the iOS / WeChat keyboard aesthetic.
+ *   • Keys are 44 px tall with 6 px gaps; special keys use a
+ *     muted fill to distinguish them from character keys.
+ *   • Hardware-accelerated transforms for key-press feedback.
+ *   • Safe-area aware — bottom padding includes the home indicator.
+ *
+ * Phase 2 additions: staggered QWERTY row indentation (classic
+ * keyboard layout) and shift-key visual states (active/inactive).
+ * ------------------------------------------------------------------ */
+
+/* ── Root container ──────────────────────────────────────────────────────── */
+
+.root {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: color-mix(in srgb, var(--dsw-specific-keyboard-fill) 88%, transparent);
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+  /* Frosted glass */
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  box-shadow: 0 -1px 0 rgb(0 0 0 / 0.05), 0 -4px 12px rgb(0 0 0 / 0.08);
+  user-select: none;
+  -webkit-user-select: none;
+  /* Animation */
+  animation: slideUp 200ms var(--ds-ease-in-out);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Top bar (Done button) ───────────────────────────────────────────────── */
+
+.topBar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 2px 6px 0;
+}
+
+.doneButton {
+  flex: none;
+  padding: 6px 16px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-state-business-primary);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  cursor: pointer;
+  transition: opacity 100ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.doneButton:active {
+  opacity: 0.75;
+}
+
+@media (pointer: coarse) {
+  .doneButton {
+    min-height: 44px;
+  }
+}
+
+/* ── Row ─────────────────────────────────────────────────────────────────── */
+
+.row {
+  display: flex;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+/* Staggered QWERTY layout — classic keyboard row indentation.  Only applied
+   to QWERTY layouts (not numbers/symbols) via the data-layout attribute on
+   the root.  Row indices count from 1 (after the topBar). */
+[data-layout^="qwerty"] > .row:nth-child(3) {
+  /* Second character row (a–l): ~half-key indent from the left edge. */
+  padding-left: 16px;
+}
+
+[data-layout^="qwerty"] > .row:nth-child(4) {
+  /* Third character row (shift + z–m + backspace): deeper indent. */
+  padding-left: 24px;
+}
+
+/* ── Key ─────────────────────────────────────────────────────────────────── */
+
+.key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 12%, var(--dsw-alias-bg-base));
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+  /* Composition-layer promotion for snappy press feedback. */
+  transform: translateZ(0);
+  transition:
+    background-color 80ms ease,
+    transform 60ms ease;
+  -webkit-tap-highlight-color: transparent;
+  /* Minimum 44 px touch target regardless of visual size. */
+  min-height: 44px;
+}
+
+.key:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 24%, var(--dsw-alias-bg-base));
+  transform: scale(0.94);
+}
+
+.keySpecial {
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary) 8%, var(--dsw-alias-bg-base));
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.keySpecial:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary) 18%, var(--dsw-alias-bg-base));
+}
+
+/* Shift key visual states — lighter hollow background in lowercase mode
+   signals the key is inactive (matching the iOS keyboard convention).
+   Uppercase keeps the default .keySpecial filled background. */
+.key[data-shift-state="inactive"] {
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary) 4%, var(--dsw-alias-bg-base));
+}
+
+.keyDone {
+  display: none; /* Done is rendered in the top bar, not as a regular key */
+}
+
+.keyLabel {
+  /* Prevent long-press text selection on key labels. */
+  pointer-events: none;
+}
+
+/* ── Dark-theme adjustments ─────────────────────────────────────────────── */
+
+:global([data-ds-dark-theme]) .root {
+  background: color-mix(in srgb, var(--dsw-specific-keyboard-fill) 92%, transparent);
+  box-shadow: 0 -1px 0 rgb(255 255 255 / 0.04), 0 -4px 12px rgb(0 0 0 / 0.16);
+}
+
+:global([data-ds-dark-theme]) .key {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base));
+}
+
+:global([data-ds-dark-theme]) .key:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-primary) 20%, var(--dsw-alias-bg-base));
+}
+
+:global([data-ds-dark-theme]) .keySpecial {
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary) 6%, var(--dsw-alias-bg-base));
+}
+
+:global([data-ds-dark-theme]) .keySpecial:active {
+  background: color-mix(in srgb, var(--dsw-alias-label-secondary) 14%, var(--dsw-alias-bg-base));
+}

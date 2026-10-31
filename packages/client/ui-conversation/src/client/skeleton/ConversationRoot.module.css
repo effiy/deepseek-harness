@@ -2,6 +2,7 @@
   position: relative; /* positioning context for slot-owned absolute chrome */
   display: flex;
   flex-direction: column;
+  width: 100%;
   height: 100%;
   min-width: 0;
   background: var(--dsw-alias-bg-base);
@@ -18,13 +19,13 @@
   flex: none;
   box-sizing: border-box;
   min-height: 76px;
-  padding: 10px 28px 0 20px;
+  padding: 12px 28px 0 20px;
   border-bottom: 0.5px solid var(--dsw-alias-border-l3);
 }
 
 .header:where(:not(:has(.tabs))) {
   min-height: 0;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
 }
 
 /* Blank Sessions retain navigation controls without conversation title or tabs. */
@@ -205,7 +206,7 @@ button.crumb:hover {
    sitting over the rule. */
 .tab {
   position: relative;
-  padding: 0 0 9px;
+  padding: 0 0 8px;
   border: none;
   background: transparent;
   font-size: 13px;
@@ -383,7 +384,7 @@ button.crumb:hover {
      preference; embedded occurrences override this adaptive axis below. */
   --dsh-chat-content-width: var(
     --dsh-chat-user-width,
-    clamp(680px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 920px)
+    min(clamp(480px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 920px), calc(100% - 24px))
   );
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
@@ -398,6 +399,43 @@ button.crumb:hover {
   --dsh-composer-dock-inset: 8px;
 }
 
+/* Narrow viewports (mobile and small tablets): override the 480 px
+   clamp floor so the content column never exceeds the screen width. */
+@media (max-width: 640px) {
+  /* Shrink the header to 56 px on narrow viewports (76 px → 24% on a
+     320 px screen) and reduce horizontal padding so the title row has
+     more room. */
+  .header {
+    min-height: 56px;
+    padding: 8px 16px 0 12px;
+  }
+
+  .body {
+    --dsh-chat-content-width: var(
+      --dsh-chat-user-width,
+      min(calc(100% - 24px), 920px)
+    );
+    --dsh-composer-side-clearance: 12px;
+  }
+
+  /* Mobile platforms use overlay scrollbars; reserving 2 px on the
+     right gains nothing and eats into the already narrow content area. */
+  .scrollBody {
+    scrollbar-gutter: auto;
+  }
+
+  /* Align to the 8px grid on mobile: tighten the composer stack gap
+     from 6px to 8px (2 × 4px unit) and the header title cluster from
+     10px to 8px for a consistent WeChat-style rhythm. */
+  .composerStack {
+    --dsh-composer-stack-gap: 8px;
+  }
+
+  .titleCluster {
+    gap: 8px;
+  }
+}
+
 .scrollBody {
   display: flex;
   flex: 1;
@@ -407,6 +445,7 @@ button.crumb:hover {
      `.list`, ui-sidebar-files FilesBody `.body`): the bar sits 2px clear of
      the column's edge instead of flush against it. */
   margin-right: 2px;
+  overflow-x: hidden;
   overflow-y: auto;
   /* Reserved unconditionally: the composer seat rides this box's content box in
      Chat and its padding box under a view's composer overlay, so an `auto`
@@ -429,8 +468,15 @@ button.crumb:hover {
 
 .root[data-phase='active'] .composerSeat,
 .embeddedBody[data-content-phase='active'] .composerSeat {
-  position: sticky;
-  bottom: 0;
+  /* Structural migration (2026-10): the composer seat moved out of .scrollBody
+     into .body as a direct flex child.  The keyboard offset rides the margin
+     so the seat lifts with the soft keyboard without sticky coordinate-system
+     complications inside a scroll container.  keyboard-inset.ts publishes the
+     live height as --dsh-keyboard-height.  On devices with a home indicator
+     (iPhone X+), env(safe-area-inset-bottom) adds the system bar clearance so
+     the composer never sits behind it. */
+  margin-bottom: calc(var(--dsh-keyboard-height) + env(safe-area-inset-bottom, 0px));
+  transition: margin-bottom 250ms ease-out;
   /* Above markdown CodeBlock sticky banners (z-index 6) so the footer never
      paints under a sticking code header while scrolling. The pinned compaction
      header (MessageItem.module.css, ui-chat) and the turn-navigation rail slot
@@ -452,6 +498,13 @@ button.crumb:hover {
   );
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .root[data-phase='active'] .composerSeat,
+  .embeddedBody[data-content-phase='active'] .composerSeat {
+    transition: none;
+  }
+}
+
 /* An open @/slash menu (data-trigger-menu, ui-input-trigger) renders inside
    the input card, so the seat's stacking context caps its z-index; lift the
    seat above the back-to-bottom control (z-index 8, ui-chat ChatView) while
@@ -462,8 +515,10 @@ button.crumb:hover {
 }
 
 /* Views may opt into a composer overlay while ConversationRoot retains
-   ownership of the seat geometry and its active-phase precedence. */
-.scrollBody:has([data-conversation-composer-overlay]) {
+   ownership of the seat geometry and its active-phase precedence.
+   Selector runs on .body (the parent of both .scrollBody and .composerSeat)
+   now that the composer seat lives outside the scroll container. */
+.body:has([data-conversation-composer-overlay]) {
   position: relative;
   /* A clipping box nothing scrolls out of, stated as a scroll container on both
      axes rather than `overflow: hidden`: a single-axis scroller computes the
@@ -479,13 +534,13 @@ button.crumb:hover {
   scrollbar-gutter: auto;
 }
 
-.scrollBody:has([data-conversation-composer-overlay]) > :global([data-slot='conversation.session']) > .viewArea {
+.body:has([data-conversation-composer-overlay]) > :global([data-slot='conversation.session']) > .viewArea {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
 }
 
-.scrollBody:has([data-conversation-composer-overlay]) > .composerSeat {
+.body:has([data-conversation-composer-overlay]) > .composerSeat {
   position: absolute;
   /* Chat's seat rides this box's content box, which its own scrolling shortens
      by the bar's width; the overlay seat is against the padding box, so it
@@ -529,12 +584,20 @@ button.crumb:hover {
   padding: 0 16px 0 20px;
 }
 
-/* Hero: the composer sits inside the session scroll body; center there so
-   the tree seat matches active (sticky footer) without a Root remount. */
-.root[data-phase='hero'] .scrollBody,
-.embeddedBody[data-content-phase='hero'] .scrollBody {
+/* Hero: the composer stack is centered in the body column (composerSeat
+   is now a direct child of .body, not inside .scrollBody). */
+.root[data-phase='hero'] .body,
+.embeddedBody[data-content-phase='hero'] .body {
   justify-content: center;
   overflow-y: auto;
+}
+
+/* Safari compatibility: prevent the empty scroll container from claiming
+   a minimum height and pushing the hero composer off-center. */
+.root[data-phase='hero'] .scrollBody,
+.embeddedBody[data-content-phase='hero'] .scrollBody {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 /* Settling (session replaying, hero/docked unknown): keep the composer seat

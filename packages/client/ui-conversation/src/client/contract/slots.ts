@@ -377,6 +377,11 @@ export interface ComposerBarOwnerProps {
 export interface ComposerBarInjected {
   keyboard: ComposerKeyboard | undefined
   /**
+   * Fold / unfold the sidebar on narrow viewports where the composer
+   * toolbar is the primary thumb-accessible surface.
+   */
+  toggleSidebar: () => void
+  /**
    * Register one picked batch; resolves to the rejection copy or null. Where
    * the browser shell reports host paths (the Desktop application), files
    * and folders with a real path become `@path` references in the draft

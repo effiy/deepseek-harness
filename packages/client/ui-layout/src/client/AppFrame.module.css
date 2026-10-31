@@ -288,3 +288,83 @@
 .overlayLayer > * {
   pointer-events: auto;
 }
+
+/* Narrow viewports (≤640 px · mobile portrait & landscape phones):
+ * the sidebar becomes a fixed overlay that slides in from the left without
+ * pushing content — the grid column stays at 0 so the conversation fills
+ * the viewport.
+ *
+ * Mobile design decisions:
+ * - 100dvh adapts to mobile browser chrome (address bar show/hide); 100 % is
+ *   the fallback for older browsers.
+ * - min(280px, 80vw) caps the drawer at 80 % of the viewport so it never
+ *   dominates a small screen (e.g. 375px-wide phone → 300px drawer).
+ * - translate3d is preferred over translateX: older mobile browsers only
+ *   promote 3D transforms to a GPU layer; modern browsers treat them the same.
+ * - No will-change: mobile browsers already promote 3D-transformed elements
+ *   to the compositor, and will-change pins a GPU layer that wastes memory on
+ *   devices that rarely toggle the sidebar.
+ * - The backdrop stays pointer-events:none in both states: the sidebar JS
+ *   listens on document.body for mousedown outside .bt-side, so the backdrop
+ *   only provides the visual dimming. */
+@media (max-width: 640px) {
+  .frame {
+    grid-template-columns: 0px minmax(0px, 1fr) 0px !important;
+  }
+
+  .sidebarCol {
+    /* Fixed overlay hidden off-screen by default */
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    width: min(280px, 80vw);
+    height: 100%; /* fallback for browsers without dvh */
+    height: 100dvh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; /* iOS momentum scroll */
+    overscroll-behavior: contain;      /* don't chain scroll to body */
+
+    /* Slide off left edge */
+    transform: translate3d(-100%, 0, 0);
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+
+    /* Prevent subpixel flicker during animation on iOS */
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+
+    /* Safe-area insets: push content below the notch and above the
+     * home indicator so nothing is clipped by the device chrome. */
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .frame:not([data-sidebar-collapsed]) .sidebarCol {
+    transform: translate3d(0, 0, 0);
+  }
+
+  /* Collapsed: completely invisible — no border, no background, no
+     interaction. translate3d alone cannot guarantee full invisibility
+     on every mobile engine (iOS Safari can bleed compositor layers
+     from a fixed-position transform). */
+  .frame[data-sidebar-collapsed] .sidebarCol {
+    visibility: hidden;
+    border-right: none;
+    background: transparent;
+  }
+
+  /* Visual backdrop: only rendered when the sidebar is expanded.
+   * When collapsed there is no ::after element at all — this avoids a
+   * position:fixed pseudo-element covering the viewport on mobile Safari,
+   * which can interfere with compositing and block content rendering.
+   * Click-to-close is handled by the sidebar's mousedown listener on
+   * document.body. */
+  .frame:not([data-sidebar-collapsed])::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: rgba(0, 0, 0, 0.46);
+  }
+}

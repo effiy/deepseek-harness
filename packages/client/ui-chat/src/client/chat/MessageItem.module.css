@@ -362,3 +362,26 @@
   font-size: 12px;
   line-height: 15px;
 }
+
+/* ── Mobile (≤480px): WeChat-style message bubbles ──────────────────── */
+
+@media (max-width: 480px) {
+  .bubble {
+    /* Tighter 8px radius matches WeChat's rectangular bubble style
+       vs the desktop 20px pill. */
+    border-radius: var(--dsw-radius-sm);
+    /* 20px line-height packs text tighter for mobile reading. */
+    line-height: 20px;
+  }
+
+  .userStack {
+    /* 92% width gives user bubbles more horizontal room on narrow
+       screens (up from the desktop 82% cap). */
+    max-width: 92%;
+  }
+
+  .fileCard {
+    /* File attachment cards match the bubble's tighter radius. */
+    border-radius: var(--dsw-radius-sm);
+  }
+}

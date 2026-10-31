@@ -18,6 +18,7 @@ import type { MessageSource } from '@deepseek-ai/dsh-llm'
 import { buildForkSeed } from '@deepseek-ai/dsh-session/fork'
 import { SessionLogOffset, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
+import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
@@ -43,6 +44,10 @@ import type {
   SessionCreateValue,
   SessionForkRequest,
   SessionForkValue,
+  SessionMessageDeleteRequest,
+  SessionMessageDeleteValue,
+  SessionMessageUpdateRequest,
+  SessionMessageUpdateValue,
   SessionPromptRequest,
   SessionPromptValue,
   SessionRenameRequest,
@@ -501,6 +506,172 @@ export class SessionCommandController {
         assertNever(request.action, 'queue action')
     }
     return { accepted: true }
+  }
+
+  /**
+   * Shadow one committed message or complete exchange from the model-visible surface.
+   * @param request - Session identity and exact sequence number of the message to shadow.
+   * @returns acknowledgement that the replacement was committed.
+   */
+  async messageDelete(request: SessionMessageDeleteRequest): Promise<SessionMessageDeleteValue> {
+    const agent = await this.resolveAgent(request.sessionId)
+    const session = agent.session
+    const targetSeq = SessionSeq(request.messageSeq)
+
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+    const events = session.snapshotEvents()
+    const targetEvent: SessionEvent | undefined = events[targetSeq]
+    if (targetEvent === undefined || targetEvent.seq !== targetSeq) {
+      throw new RemoteError('session/message-not-found',
+        `no message at seq ${request.messageSeq}`,
+        { sessionId: request.sessionId, messageSeq: request.messageSeq })
+    }
+    if (!isAppendSurfaceEvent(targetEvent)
+      || (targetEvent.type !== 'user/message' && targetEvent.type !== 'assistant/message')) {
+      throw new RemoteError('session/message-not-editable',
+        'only user or assistant messages can be deleted',
+        { sessionId: request.sessionId, messageSeq: request.messageSeq })
+    }
+
+    let startSeq: SessionSeq
+    let endSeq: SessionSeq
+    let sourceEventSeqs: SessionSeq[]
+
+    if (request.cascade) {
+      ({ startSeq, endSeq, sourceEventSeqs } = this.#cascadeSurfaceRange(events, targetSeq, request.sessionId))
+    } else {
+      startSeq = targetSeq
+      endSeq = targetSeq
+      sourceEventSeqs = [targetSeq]
+    }
+
+    // Use a user/message replacement because assistant/message cannot carry
+    // sourceEventSeqs, which are required to validate the shadowed range.
+    session.append('user/message', createUserMessage({
+      content: [],
+      source: {
+        kind: 'user',
+        rpcId: brandString<SessionRequestId>(`delete-${randomUUID()}`),
+      },
+    }), {
+      surfaceOp: { op: 'replace', startSeq, endSeq },
+      sourceEventSeqs,
+    })
+
+    return { accepted: true }
+  }
+
+  /**
+   * Replace one committed message's content on the model-visible surface.
+   * @param request - Session identity, exact message sequence, and replacement text content.
+   * @returns acknowledgement that the replacement was committed.
+   */
+  async messageUpdate(request: SessionMessageUpdateRequest): Promise<SessionMessageUpdateValue> {
+    if (request.content.length === 0
+      || !request.content.some(block => block.type === 'text' && block.text.trim().length > 0)) {
+      throw new RemoteError('gateway/bad-request',
+        'edit content must include non-whitespace text', {})
+    }
+
+    const agent = await this.resolveAgent(request.sessionId)
+    const session = agent.session
+    const targetSeq = SessionSeq(request.messageSeq)
+
+    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
+    const events = session.snapshotEvents()
+    const targetEvent: SessionEvent | undefined = events[targetSeq]
+    if (targetEvent === undefined || targetEvent.seq !== targetSeq) {
+      throw new RemoteError('session/message-not-found',
+        `no message at seq ${request.messageSeq}`,
+        { sessionId: request.sessionId, messageSeq: request.messageSeq })
+    }
+    if (!isAppendSurfaceEvent(targetEvent)
+      || (targetEvent.type !== 'user/message' && targetEvent.type !== 'assistant/message')) {
+      throw new RemoteError('session/message-not-editable',
+        'only user or assistant messages can be edited',
+        { sessionId: request.sessionId, messageSeq: request.messageSeq })
+    }
+
+    // Always use a user/message replacement so sourceEventSeqs carries the
+    // shadowed reference required by surface validation.
+    session.append('user/message', createUserMessage({
+      content: [...request.content],
+      source: {
+        kind: 'user',
+        rpcId: brandString<SessionRequestId>(`edit-${randomUUID()}`),
+      },
+    }), {
+      surfaceOp: { op: 'replace', startSeq: targetSeq, endSeq: targetSeq },
+      sourceEventSeqs: [targetSeq],
+    })
+
+    return { accepted: true }
+  }
+
+  /**
+   * Compute the surface node range shadowed by a cascade delete.
+   * For a user message: from the target through all later surface nodes up to
+   * (but not including) the next user/message append event.
+   * For an assistant message: from the preceding user/message through the
+   * next user/message boundary.
+   */
+  #cascadeSurfaceRange(
+    events: readonly SessionEvent[],
+    targetSeq: SessionSeq,
+    sessionId: SessionId,
+  ): { startSeq: SessionSeq; endSeq: SessionSeq; sourceEventSeqs: SessionSeq[] } {
+    // Validated by caller: targetSeq is an append-surface user/assistant message.
+    const targetEvent = events[targetSeq]!
+    let rangeStart: number
+    let rangeEnd: number
+
+    if (targetEvent.type === 'user/message') {
+      rangeStart = targetSeq
+      rangeEnd = events.length - 1
+      for (let i = targetSeq + 1; i < events.length; i++) {
+        const event = events[i] as SessionEvent
+        if (event.type === 'user/message' && isAppendSurfaceEvent(event)) {
+          rangeEnd = i - 1
+          break
+        }
+      }
+    } else {
+      // assistant/message — find surrounding user/message boundaries.
+      rangeStart = 0
+      for (let i = targetSeq - 1; i >= 0; i--) {
+        const event = events[i] as SessionEvent
+        if (event.type === 'user/message' && isAppendSurfaceEvent(event)) {
+          rangeStart = i
+          break
+        }
+      }
+      rangeEnd = events.length - 1
+      for (let i = targetSeq + 1; i < events.length; i++) {
+        const event = events[i] as SessionEvent
+        if (event.type === 'user/message' && isAppendSurfaceEvent(event)) {
+          rangeEnd = i - 1
+          break
+        }
+      }
+    }
+
+    // Collect all append-surface event seqs in the inclusive range.
+    const shadowedSeqs: SessionSeq[] = []
+    for (let i = rangeStart; i <= rangeEnd; i++) {
+      const event = events[i] as SessionEvent
+      if (isAppendSurfaceEvent(event)) shadowedSeqs.push(SessionSeq(event.seq))
+    }
+
+    if (shadowedSeqs.length === 0) {
+      throw new RemoteError('session/message-not-found',
+        'no surface messages in the cascade range', { sessionId, messageSeq: Number(targetSeq) })
+    }
+
+    return {
+      startSeq: shadowedSeqs[0]!,
+      endSeq: shadowedSeqs[shadowedSeqs.length - 1]!,
+      sourceEventSeqs: shadowedSeqs,
+    }
   }
 
   /**

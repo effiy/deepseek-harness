@@ -1,0 +1,173 @@
+/* ------------------------------------------------------------------
+ * Mobile bottom tab bar — rendered in the AppFrame's shell.bottom
+ * slot on narrow viewports (≤1023 px).
+ *
+ * Visual design:
+ *   • Glassmorphism — backdrop-filter blur over a semi-transparent
+ *     background so the chat content shows through subtly, matching
+ *     the iOS tab bar aesthetic.
+ *   • Pill indicator — the active tab gets a filled capsule that
+ *     scales in with a spring curve; inactive tabs stay muted.
+ *   • Hardware-accelerated — transforms and opacity changes run on
+ *     the compositor for 60 fps tab switches.
+ *   • Safe-area aware — bottom padding includes the home indicator
+ *     inset so the bar never gets clipped.
+ * ------------------------------------------------------------------ */
+
+.root {
+  display: none; /* hidden above the breakpoint, shown by media query */
+  align-items: center;
+  justify-content: space-around;
+  box-sizing: border-box;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding: 4px 12px env(safe-area-inset-bottom, 0px);
+  background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 82%, transparent);
+  border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l3) 60%, transparent);
+  color: var(--dsw-alias-label-secondary);
+  /* Blur the content behind the bar for a frosted-glass effect.
+     The fallback (no blur) is the solid sidebar fill at 82% opacity. */
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  /* Elevation: a soft top shadow so the bar separates from the
+     scrollable content behind it. */
+  box-shadow: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -4px 16px rgb(0 0 0 / 0.06);
+}
+
+@media (max-width: 1023px) {
+  .root {
+    display: flex;
+  }
+}
+
+/* ------------------------------------------------------------------
+ * Tab button
+ * ------------------------------------------------------------------ */
+
+.button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  max-width: 88px;
+  height: 100%;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  /* Composition-layer promotion: the active state scales a
+     background pill under the icon without repainting the text. */
+  transform: translateZ(0);
+  will-change: transform;
+  transition: color 200ms var(--ds-ease-in-out);
+  -webkit-tap-highlight-color: transparent;
+  /* Minimum 44 px touch target regardless of visual size. */
+  min-height: 44px;
+}
+
+/* ------------------------------------------------------------------
+ * Active pill indicator
+ *
+ * Each button carries a ::before pseudo-element that serves as the
+ * filled capsule behind the icon.  It is transparent and scaled down
+ * when inactive; the `.active` class scales it to full size with a
+ * spring-like cubic-bezier curve.  The pill is coloured with the
+ * primary semantic token so it adapts to both themes.
+ * ------------------------------------------------------------------ */
+
+.button::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  /* 36 px wide: the pill frames the 20 px icon with 8 px padding
+     on each side.  28 px tall: centres on the icon row. */
+  width: 36px;
+  height: 28px;
+  /* Capsule shape: radius > half the 28 px height clips to a pill.
+     Uses the largest design-system token (28 px) to stay within the
+     verified radius set. */
+  border-radius: var(--dsw-radius-panel);
+  background: var(--dsw-alias-state-business-primary);
+  /* Inactive: transparent and quarter-size. */
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 200ms var(--ds-ease-in-out),
+    transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.active::before {
+  opacity: 0.12;
+  transform: scale(1);
+}
+
+/* The active tab lifts its label to the primary colour and bumps
+   the font weight slightly for visual emphasis. */
+.active {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* ------------------------------------------------------------------
+ * Hover / press states
+ * ------------------------------------------------------------------ */
+
+.button:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.active:hover {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.button:active {
+  transform: scale(0.96);
+  transition: transform 100ms var(--ds-ease-in-out);
+}
+
+.active:active {
+  transform: scale(0.96);
+}
+
+/* ------------------------------------------------------------------
+ * SVG icon styling
+ * ------------------------------------------------------------------ */
+
+.button svg {
+  flex: none;
+  /* Let the parent colour cascade to the stroke via currentColor. */
+  opacity: 0.64;
+  transition: opacity 200ms var(--ds-ease-in-out);
+}
+
+.active svg {
+  opacity: 1;
+  /* Filled appearance: swap stroke to fill so the icon reads as
+     solid on the active state. */
+  fill: currentColor;
+  stroke: none;
+}
+
+/* ------------------------------------------------------------------
+ * Dark-theme adjustments
+ * ------------------------------------------------------------------ */
+
+:global([data-ds-dark-theme]) .root {
+  background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 88%, transparent);
+  box-shadow: 0 -1px 0 rgb(255 255 255 / 0.04), 0 -4px 16px rgb(0 0 0 / 0.12);
+}
+
+:global([data-ds-dark-theme]) .active::before {
+  opacity: 0.18;
+}

@@ -105,6 +105,40 @@ export class BlockAssembler {
     return partial
   }
 
+  /**
+   * Indices of blocks known to be complete — either closed by an explicit
+   * `block-end` or superseded by a later block index in a delta-only stream.
+   * The live stream's current (highest) index is excluded until it receives
+   * its own `block-end`; blocks with higher indices still receiving deltas
+   * are also excluded.
+   *
+   * This is the canonical signal for "this block will receive no more deltas,"
+   * enabling progressive dispatch of tool calls during streaming.
+   */
+  committedBlockIndices(): number[] {
+    const committed: number[] = []
+    if (this.order.length === 0) return committed
+    const highest = Math.max(...this.order)
+    for (const index of this.order) {
+      const partial = this.partials.get(index)
+      if (partial === undefined) continue
+      // block-end always closes; superseded index is done in delta-only mode
+      if (partial.block !== undefined || index < highest) {
+        committed.push(index)
+      }
+    }
+    return committed
+  }
+
+  /**
+   * Completed blocks per {@link committedBlockIndices}, assembled in stream
+   * order. Safe to consume while the stream is still delivering chunks for
+   * later blocks.
+   */
+  committedBlocks(): ContentBlock[] {
+    return this.committedBlockIndices().map(index => this.assemble(this.mustGet(index), index))
+  }
+
   private assemble(partial: PartialBlock, index: number): ContentBlock {
     if (partial.block) return partial.block
     switch (partial.blockType) {

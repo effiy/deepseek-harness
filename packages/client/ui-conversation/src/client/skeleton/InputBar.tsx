@@ -31,10 +31,11 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { DraftEditor } from '../input/editor/DraftEditor.tsx'
 import {
-  focusDraftEditor, installDraftFilePicker, installDraftKeymap, installDraftWheel,
+  installDraftFilePicker, installDraftKeymap, installDraftWheel,
   keepDraftFocus, revealDraftSelection,
 } from '../input/editor/view-binding.ts'
 import { resolveSubmitMode } from '../input/submission-policy.ts'
+import { VirtualKeyboard } from '../virtual-keyboard/VirtualKeyboard.tsx'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
@@ -47,6 +48,7 @@ export const InputBar = memo(function InputBar({
   useSession, useInput, inputActions, keyboard, addFiles, removeAttachment, resolveDraftAttachments,
   retryFileUpload,
   toggleCommandMenu, stop, t,
+  toggleSidebar,
   renderSlot, useBusyEnter, useFileUploads, useNotices, useLexicon, useMenuLauncher, useStopShortcut,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
@@ -59,6 +61,10 @@ export const InputBar = memo(function InputBar({
   void useLexicon // hook seat stays bound by the inject compartment; text-ref decoration rides the shell's editor transforms
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
   const [activity, setActivity] = useState(false)
+  const [showVK, setShowVK] = useState(false)
+  // Only mobile devices expose the Visual Viewport API; suppress the
+  // system keyboard on mobile so the virtual keyboard can take over.
+  const suppressSysKb = typeof window !== 'undefined' && window.visualViewport !== null
   useEffect(() => { setActivity(false) }, [sessionId])
   const promptError = useSession(s => s.promptError) ?? null
   const running = useSession(s => s.running) ?? false
@@ -172,15 +178,10 @@ export const InputBar = memo(function InputBar({
     revealDraftSelection(scrollRef)
   }
 
-  // Unlock (mount / session switch) returns focus to the box, and owns the
-  // reveal that comes with it. Lexical's focus() suppresses the browser's
-  // scroll walk (preventScroll inside), so the reveal in our own scrollport
-  // is ours to perform — switching to a longer draft otherwise leaves the
-  // caret (restored at the draft's end) off screen.
-  useEffect(() => {
-    if (locked || editor === null) return
-    focusDraftEditor(editor, revealSelection)
-  }, [locked, sessionId, editor])
+  // WeChat-style: do NOT auto-focus the editor on session changes.
+  // Clicking a bot / switching conversations should reveal the chat
+  // history but keep the keyboard dismissed — the user taps the input
+  // field when they are ready to type.
 
   // A persisted draft arrives AFTER the unlock effect: DefaultConversationViews
   // adopts it in its own mount effect, and a parent's mount effect runs after
@@ -202,6 +203,27 @@ export const InputBar = memo(function InputBar({
   useEffect(() => {
     return installDraftWheel(scrollRef)
   }, [])
+
+  // WeChat-style: dismiss the soft keyboard after a successful send so the
+  // conversation transcript becomes immediately visible.  The effect only
+  // fires on touch devices (visualViewport is the reliable mobile signal).
+  const sentRef = useRef(false)
+  useEffect(() => {
+    if (input?.phase === 'submitting') { sentRef.current = true; return }
+    if (!sentRef.current) return
+    // Don't consume the flag until the host confirms the send by clearing
+    // the draft.  Phase may pass through adjudicating before plain.
+    if (draft !== '') return
+    sentRef.current = false
+    if (!window.visualViewport) return
+    // WeChat-style haptic tap on successful send (10 ms pulse).
+    navigator.vibrate?.(10)
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        (document.activeElement as HTMLElement)?.blur()
+      }, 0)
+    })
+  }, [input?.phase, draft])
 
   // Intake pre-check: an addition that would break a projected image limit is
   // refused as a whole batch, announced immediately, and never enters the
@@ -282,22 +304,23 @@ export const InputBar = memo(function InputBar({
     const target = e.target
     if (!(target instanceof Element) || !e.currentTarget.contains(target)) return
     if (target.closest('[data-composer-overlay]') !== null) return
+    // Mobile: intercept every card-area tap.  readOnly on the contentEditable
+    // prevents the system soft-keyboard; preventDefault stops the browser from
+    // focusing the editable element during the tap sequence so the viewport
+    // never adjusts.  Show the virtual keyboard instead.
+    if (suppressSysKb && editor !== null) {
+      e.preventDefault()
+      setShowVK(true)
+      return
+    }
     if (scrollRef.current?.contains(target)) return
     const control = target.closest('button, a, input, select, textarea, [role="button"], [contenteditable], [tabindex]')
     if (control !== null && e.currentTarget.contains(control)) return
     e.preventDefault()
-    // Lexical's stored selection can lag behind native caret moves, so calling
-    // editor.focus() on a focused editor can restore an older caret.
-    if (document.activeElement !== editor.getRootElement()) focusDraftEditor(editor, revealSelection)
   }
 
   const onToggleCommandMenu = (): void => {
     if (keyboard === undefined) return
-    // The menu is a combobox over the editor, so the keyboard has to be there
-    // before the launcher opens it: activating the button from the keyboard
-    // leaves focus on the button, and restoring it afterwards would re-track an
-    // empty draft and close the menu again.
-    if (editor !== null) focusDraftEditor(editor, revealSelection)
     toggleCommandMenu?.(keyboard.caretSpan())
   }
 
@@ -427,6 +450,7 @@ export const InputBar = memo(function InputBar({
           scrollRef={scrollRef}
           editable={editable}
           editorDisabled={editorDisabled}
+          readOnly={suppressSysKb}
           phase={input?.phase ?? 'inert'}
           placeholderText={placeholderText}
           ariaLabel={workspaceTrigger ? t('hero.chooseWorkspace') : placeholderText}
@@ -435,6 +459,7 @@ export const InputBar = memo(function InputBar({
           onWorkspaceKeyDown={onWorkspaceKeyDown}
           hint={hint}
           showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
+          inputMode={suppressSysKb ? 'none' : undefined}
         />
         <div ref={rowRef} className={css.row}>
           <div className={css.tools} hidden={activity}>
@@ -469,6 +494,22 @@ export const InputBar = memo(function InputBar({
               : renderSlot('conversation.input.left', {})}
           </div>
           <div className={clsx(css.trailing, activity && css.trailingActive)}>
+            {toggleSidebar && (
+              <Tooltip label={t('input.sidebarToggle')} delayMs={500}>
+                <button
+                  type="button"
+                  className={css.sidebarToggle}
+                  aria-label={t('input.sidebarToggle')}
+                  onMouseDown={keepFocus}
+                  onClick={() => { toggleSidebar() }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <rect x="2.5" y="2.5" width="4" height="11" rx="0.75" stroke="currentColor" strokeWidth="1.25" />
+                    <rect x="8.5" y="2.5" width="5" height="11" rx="0.75" stroke="currentColor" strokeWidth="1.25" />
+                  </svg>
+                </button>
+              </Tooltip>
+            )}
             <div className={css.standardControls} hidden={activity}>
               {input === undefined || sessionId === undefined
                 ? null
@@ -523,6 +564,15 @@ export const InputBar = memo(function InputBar({
           : null}
         {activity ? null : <ContextMeter useProjection={useProjection} t={t} />}
       </div>
+      {showVK && editor !== null && (
+        <VirtualKeyboard
+          editor={editor}
+          visible={showVK}
+          doneLabel={t('virtualKeyboard.done')}
+          spaceLabel={t('virtualKeyboard.space')}
+          onHide={() => { setShowVK(false) }}
+        />
+      )}
     </section>
   )
 })

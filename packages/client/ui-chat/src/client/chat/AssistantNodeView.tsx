@@ -1,10 +1,11 @@
 import { memo, useCallback, useMemo } from 'react'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ChatNodeViewProps, PresentationInjected, TurnTailOwnerProps } from '../contract/slots.ts'
+import type { ChatNodeViewProps, MessageActionOwnerProps, PresentationInjected, TurnTailOwnerProps } from '../contract/slots.ts'
 import { AssistantMarkdown } from './AssistantMarkdown.tsx'
+import { assistantText } from './turn-assistant.ts'
 
 type AssistantNodeViewProps = ChatNodeViewProps<'assistant-step'> & InjectFace<PresentationInjected>
-  & PropsRenderSlots<'conversation.chat.reasoning.body'>
+  & PropsRenderSlots<'conversation.chat.reasoning.body' | 'conversation.chat.user-actions'>
 
 /** Streaming, settled, and interrupted Assistant states share one keyed renderer instance. */
 export const AssistantNodeView = memo(function AssistantNodeView({
@@ -31,8 +32,14 @@ export const AssistantNodeView = memo(function AssistantNodeView({
     && turnProcess.spec.inlineReasoning
     && !turnProcess.open
   const revealProcess = useCallback(() => { turnProcess?.setOpen(true) }, [turnProcess])
+  const userActionsOwner = useMemo<MessageActionOwnerProps | undefined>(() => {
+    if (data.finalNode == null) return undefined
+    return { seq: data.finalNode.seq, text: assistantText(data.blocks) }
+  }, [data.finalNode, data.blocks])
+  const userActions = userActionsOwner == null ? null : renderSlot('conversation.chat.user-actions', userActionsOwner)
   return (
-    <AssistantMarkdown
+    <>
+      <AssistantMarkdown
       blocks={data.blocks}
       groupPart={groupPart}
       useDisclosure={useDisclosure}
@@ -47,5 +54,6 @@ export const AssistantNodeView = memo(function AssistantNodeView({
       mentions={mentions}
       t={t}
     />
-  )
-})
+    {userActions}
+  </>
+))
