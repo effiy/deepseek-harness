@@ -28,12 +28,12 @@ export interface KeyDef {
 
 const SHIFT: KeyDef    = { label: '\u21E7', action: 'shift', flex: 1.2 }
 const BACKSPACE: KeyDef = { label: '\u232B', action: 'backspace', flex: 1.2 }
-const NUMBERS: KeyDef   = { label: '123',  action: 'layout', layout: 'numbers', flex: 1.2 }
+const NUMBERS_TOGGLE: KeyDef   = { label: '123',  action: 'layout', layout: 'numbers', flex: 1.2 }
 const LETTERS: KeyDef   = { label: 'ABC',  action: 'layout', layout: 'qwerty-lower', flex: 1.2 }
 const SYMBOLS_TOGGLE: KeyDef = { label: '#+=', action: 'layout', layout: 'symbols', flex: 1.2 }
 const SPACE: KeyDef     = { label: 'space', value: ' ', action: 'char', flex: 4.5 }
 const ENTER: KeyDef     = { label: '\u21B5', action: 'enter', flex: 1.5 }
-const DONE: KeyDef      = { label: '', action: 'hide', flex: 1.5 } // label filled at render time
+const _DONE: KeyDef      = { label: '', action: 'hide', flex: 1.5 } // label filled at render time; reserved for future use
 const ROW: KeyDef       = { label: '', action: 'row' }
 
 function comma(): KeyDef  { return { label: ',', value: ',', action: 'char' } }
@@ -50,14 +50,14 @@ export const QWERTY_LOWER: readonly KeyDef[] = [
   ch('q'), ch('w'), ch('e'), ch('r'), ch('t'), ch('y'), ch('u'), ch('i'), ch('o'), ch('p'), ROW,
   ch('a'), ch('s'), ch('d'), ch('f'), ch('g'), ch('h'), ch('j'), ch('k'), ch('l'), ROW,
   SHIFT, ch('z'), ch('x'), ch('c'), ch('v'), ch('b'), ch('n'), ch('m'), BACKSPACE, ROW,
-  NUMBERS, comma(), SPACE, dot(), ENTER,
+  NUMBERS_TOGGLE, comma(), SPACE, dot(), ENTER,
 ]
 
 export const QWERTY_UPPER: readonly KeyDef[] = [
   ch('Q'), ch('W'), ch('E'), ch('R'), ch('T'), ch('Y'), ch('U'), ch('I'), ch('O'), ch('P'), ROW,
   ch('A'), ch('S'), ch('D'), ch('F'), ch('G'), ch('H'), ch('J'), ch('K'), ch('L'), ROW,
   SHIFT, ch('Z'), ch('X'), ch('C'), ch('V'), ch('B'), ch('N'), ch('M'), BACKSPACE, ROW,
-  NUMBERS, comma(), SPACE, dot(), ENTER,
+  NUMBERS_TOGGLE, comma(), SPACE, dot(), ENTER,
 ]
 
 export const NUMBERS: readonly KeyDef[] = [
@@ -70,6 +70,6 @@ export const NUMBERS: readonly KeyDef[] = [
 export const SYMBOLS: readonly KeyDef[] = [
   ch('['), ch(']'), ch('{'), ch('}'), ch('#'), ch('%'), ch('^'), ch('*'), ch('+'), ch('='), ROW,
   ch('_'), ch('\\'), ch('|'), ch('~'), ch('<'), ch('>'), ch('\u20AC'), ch('\u00A3'), ch('\xA5'), ch('\u2022'), ROW,
-  NUMBERS, dot(), comma(), ch('?'), ch('!'), ch('\''), BACKSPACE, ROW,
+  NUMBERS_TOGGLE, dot(), comma(), ch('?'), ch('!'), ch('\''), BACKSPACE, ROW,
   LETTERS, SPACE, ENTER,
 ]

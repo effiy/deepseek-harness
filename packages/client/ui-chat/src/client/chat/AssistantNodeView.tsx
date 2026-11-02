@@ -40,20 +40,21 @@ export const AssistantNodeView = memo(function AssistantNodeView({
   return (
     <>
       <AssistantMarkdown
-      blocks={data.blocks}
-      groupPart={groupPart}
-      useDisclosure={useDisclosure}
-      streaming={data.status === 'running'}
-      interrupted={data.status === 'interrupted'}
-      renderMessageImages={renderMessageImages}
-      reasoningHidden={reasoningHidden}
-      useGroupAction={useGroupAction}
-      usePresentation={usePresentation}
-      renderSlot={renderSlot}
-      revealProcess={revealProcess}
-      mentions={mentions}
-      t={t}
-    />
-    {userActions}
-  </>
-))
+        blocks={data.blocks}
+        groupPart={groupPart}
+        useDisclosure={useDisclosure}
+        streaming={data.status === 'running'}
+        interrupted={data.status === 'interrupted'}
+        renderMessageImages={renderMessageImages}
+        reasoningHidden={reasoningHidden}
+        useGroupAction={useGroupAction}
+        usePresentation={usePresentation}
+        renderSlot={renderSlot}
+        revealProcess={revealProcess}
+        mentions={mentions}
+        t={t}
+      />
+      {userActions}
+    </>
+  )
+})
