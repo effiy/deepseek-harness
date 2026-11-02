@@ -1,6 +1,6 @@
 /** Time formatting and assistant timing display for the trajectory inspector. */
 import { useState } from 'react'
-import type { AssistantMetricDetail } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { AssistantMetricDetail } from './trajectory-record.ts'
 import type { TrajectoryTranslate } from './locales.ts'
 import css from './TrajectoryTable.module.css'
 

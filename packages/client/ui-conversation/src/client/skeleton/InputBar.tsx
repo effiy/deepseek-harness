@@ -459,7 +459,7 @@ export const InputBar = memo(function InputBar({
           onWorkspaceKeyDown={onWorkspaceKeyDown}
           hint={hint}
           showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
-          inputMode={suppressSysKb ? 'none' : undefined}
+          {...suppressSysKb ? { inputMode: 'none' as const } : {}}
         />
         <div ref={rowRef} className={css.row}>
           <div className={css.tools} hidden={activity}>

@@ -51,7 +51,7 @@ export function ComposerContentEditable({ editor, editable, readOnly, ...rest }:
       readOnly={readOnly || undefined}
       role="textbox"
       aria-multiline="true"
-      data-composer-input
+      data-composer-input=""
       {...rest}
     />
   )

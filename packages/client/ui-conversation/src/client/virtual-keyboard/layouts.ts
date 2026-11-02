@@ -33,6 +33,7 @@ const LETTERS: KeyDef   = { label: 'ABC',  action: 'layout', layout: 'qwerty-low
 const SYMBOLS_TOGGLE: KeyDef = { label: '#+=', action: 'layout', layout: 'symbols', flex: 1.2 }
 const SPACE: KeyDef     = { label: 'space', value: ' ', action: 'char', flex: 4.5 }
 const ENTER: KeyDef     = { label: '\u21B5', action: 'enter', flex: 1.5 }
+// @ts-expect-error reserved for future use
 const _DONE: KeyDef      = { label: '', action: 'hide', flex: 1.5 } // label filled at render time; reserved for future use
 const ROW: KeyDef       = { label: '', action: 'row' }
 

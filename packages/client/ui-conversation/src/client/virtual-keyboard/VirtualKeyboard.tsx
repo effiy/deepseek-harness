@@ -11,7 +11,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { LexicalEditor } from 'lexical'
 import { $getSelection, $isRangeSelection, DELETE_CHARACTER_COMMAND, INSERT_LINE_BREAK_COMMAND } from 'lexical'
-import type { KeyAction } from './layouts.ts'
 import { QWERTY_LOWER, QWERTY_UPPER, NUMBERS, SYMBOLS, type KeyDef, type LayoutId } from './layouts.ts'
 import css from './VirtualKeyboard.module.css'
 
@@ -77,7 +76,7 @@ export function VirtualKeyboard({ editor, visible, doneLabel, spaceLabel, onHide
   const handleEnter = useCallback(() => {
     if (editor === null) return
     editor.focus()
-    editor.dispatchCommand(INSERT_LINE_BREAK_COMMAND, undefined)
+    editor.dispatchCommand(INSERT_LINE_BREAK_COMMAND, null)
     navigator.vibrate?.(5)
   }, [editor])
 
