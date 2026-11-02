@@ -2,19 +2,14 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
+import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
-import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   ApiSessionAgentController,
 } from '../src/agent.ts'
 import { SessionCommandController } from '../src/commands.ts'
-import type {
-  SessionMessageDeleteRequest,
-  SessionMessageUpdateRequest,
-} from '../src/types.ts'
 import { installSessionReadTestServices } from './test-remote.ts'
 
 async function baseContext(): Promise<Context> {
@@ -46,7 +41,7 @@ function completedSession(ctx: Context, id: string): Session {
     content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' },
   }), { surfaceOp: 'append' })
   session.append('assistant/message', {
-    message: { role: 'assistant', content: 'hi there' },
+    message: { role: 'assistant', content: [{ type: 'text', text: 'hi there' }], source: { kind: 'model', provider: 'test', model: 'test-model' }, id: MessageId('msg-1') },
     stream: [],
     turn: 1, step: 1,
   }, { surfaceOp: 'append' })
@@ -87,7 +82,7 @@ describe('messageDelete', () => {
 
     // Verify the replacement was appended
     const events = session.snapshotEvents()
-    const replacement = events[events.length - 1]
+    const replacement = events[events.length - 1]!
     expect(replacement.type).toBe('user/message')
     expect(replacement.surfaceOp).toMatchObject({ op: 'replace', startSeq: 1, endSeq: 1 })
 
@@ -114,7 +109,7 @@ describe('messageDelete', () => {
     expect(result).toEqual({ accepted: true })
 
     const events = session.snapshotEvents()
-    const replacement = events[events.length - 1]
+    const replacement = events[events.length - 1]!
     expect(replacement.surfaceOp).toMatchObject({
       op: 'replace',
       startSeq: 1,
@@ -189,7 +184,7 @@ describe('messageUpdate', () => {
     expect(result).toEqual({ accepted: true })
 
     const events = session.snapshotEvents()
-    const replacement = events[events.length - 1]
+    const replacement = events[events.length - 1]!
     expect(replacement.type).toBe('user/message')
     expect(replacement.surfaceOp).toMatchObject({ op: 'replace', startSeq: 1, endSeq: 1 })
     expect(replacement.seq).toBeGreaterThan(3) // after turn/start, user, assistant, turn/end
