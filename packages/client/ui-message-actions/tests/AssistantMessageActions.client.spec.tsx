@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { AssistantMessageActions } from '../src/client/AssistantMessageActions.tsx'
-import { zh } from '../src/client/locales.ts'
+import { zh } from '../src/client/locale.ts'
 
 const t = makeTranslate(zh, commonZh)
 
@@ -82,7 +82,7 @@ describe('AssistantMessageActions', () => {
   })
 
   it('returns null when text is empty', () => {
-    const { result } = render(
+    const result = render(
       <AssistantMessageActions {...{
         seq: 5, text: '',
         useStore: (s: (state: StoreState) => unknown) => s({ editingMessageSeq: null, pendingDeleteSeq: null }),
