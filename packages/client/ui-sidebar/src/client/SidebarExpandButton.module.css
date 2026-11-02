@@ -1,0 +1,12 @@
+/* Align with the shared compact Button — same geometry as the right sidebar's expand button. */
+.button {
+  flex: none;
+  width: 28px;
+  padding: 0;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.button svg {
+  width: 15px;
+  height: 15px;
+}

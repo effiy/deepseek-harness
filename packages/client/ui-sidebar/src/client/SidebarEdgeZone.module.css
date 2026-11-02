@@ -1,0 +1,30 @@
+/* Invisible left-edge touch zone for sidebar expansion.
+ * Only rendered on touch-capable mobile devices (≤640px) via the nested
+ * media queries. Desktop (pointer: fine) never shows it.
+ *
+ * z-index: 48 sits between the sidebar overlay (50) and its backdrop (49,
+ * the ::after pseudo-element on the frame). On a touch device, the 16px
+ * strip is wide enough to feel but invisible — WeChat's drawer edge
+ * affordance.
+ */
+
+.zone {
+  display: none;
+}
+
+@media (pointer: coarse) and (max-width: 640px) {
+  .zone {
+    display: block;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 16px;
+    z-index: 48;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+    -webkit-app-region: no-drag;
+  }
+}
