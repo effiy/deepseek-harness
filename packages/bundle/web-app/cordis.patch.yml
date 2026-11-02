@@ -327,6 +327,9 @@
     - id: ui-chat
       name: '@deepseek-ai/dsh-client-ui-chat'
 
+    - id: ui-message-actions
+      name: '@deepseek-ai/dsh-client-ui-message-actions'
+
     # Official occupants for the generic sidebar and conversation brand slots.
     - id: ui-brand-official
       name: '@deepseek-ai/dsh-client-ui-brand-official'

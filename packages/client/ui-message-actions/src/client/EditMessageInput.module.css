@@ -1,0 +1,97 @@
+.inlineWrapper {
+  width: 100%;
+  animation: fadeIn 0.2s ease;
+}
+
+.inlineActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.confirmBubble {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  animation: fadeIn 0.2s ease;
+}
+
+.confirmText {
+  flex: 1 1 100%;
+  font-size: 0.875rem;
+  color: var(--dsw-text-secondary);
+}
+
+.editArea {
+  width: 100%;
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid var(--dsw-border-default);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-surface-default);
+  color: var(--dsw-text-primary);
+  font: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.editArea:focus {
+  outline: none;
+  border-color: var(--dsw-border-accent);
+}
+
+.btn {
+  padding: 6px 16px;
+  border-radius: var(--dsw-radius-sm);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: 1px solid var(--dsw-border-default);
+  background: var(--dsw-surface-default);
+  color: var(--dsw-text-primary);
+}
+
+.btn:hover {
+  background: var(--dsw-surface-hover);
+}
+
+.btnPrimary {
+  background: var(--dsw-surface-accent, #155eef);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btnPrimary:hover {
+  opacity: 0.9;
+}
+
+.btnDanger {
+  background: var(--dsw-surface-danger, #e5484d);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btnDanger:hover {
+  opacity: 0.9;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

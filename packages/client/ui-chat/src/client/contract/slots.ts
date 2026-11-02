@@ -61,6 +61,14 @@ export interface AssistantActionOwnerProps {
   messageId: MessageId
 }
 
+/** Owner currency of per-message edit/delete actions. */
+export interface MessageActionOwnerProps {
+  /** Session event sequence number (API's messageSeq). */
+  seq: number
+  /** Joined plain-text content for edit preview. */
+  text: string
+}
+
 /** Stable quota failure codes retained in the Session log; both raise the frame-wide notice. */
 export type QuotaNoticeCode = 'QUOTA' | 'ACCOUNT_QUOTA'
 
@@ -412,6 +420,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * that entry. With no entries, the standard action row remains unchanged.
      */
     'conversation.chat.assistant-actions': { kind: 'list'; scope: 'session'; owner: AssistantActionOwnerProps }
+    /**
+     * Ordered per-message actions (edit, delete) for user and assistant messages.
+     * Each entry receives the message sequence and joined text; a fresh `id` adds
+     * an action icon. With no entries, the standard action row remains unchanged.
+     */
+    'conversation.chat.user-actions': { kind: 'list'; scope: 'session'; owner: MessageActionOwnerProps }
     /**
      * Frame-wide quota notice chain. The Chat-owned host in `shell.overlay`
      * offers the one live notice; the first entry whose selector claims its
