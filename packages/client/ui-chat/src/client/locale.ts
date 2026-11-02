@@ -195,6 +195,9 @@ export const zh = {
   'json.truncated': '… 已截断，共 {total} 字符',
   'clock.md': '{m}月{d}日',
   'clock.ymd': '{y}年{m}月{d}日',
+  'copy': '复制',
+  'delete': '删除',
+  'copied': '已复制',
 } satisfies Record<string, string>
 
 /** Chat dictionary key union. */
@@ -392,4 +395,7 @@ export const en = {
   'json.truncated': '… truncated, {total} characters total',
   'clock.md': '{m}/{d}',
   'clock.ymd': '{y}-{m}-{d}',
+  'copy': 'Copy',
+  'delete': 'Delete',
+  'copied': 'Copied',
 } satisfies Record<ChatKey, string>

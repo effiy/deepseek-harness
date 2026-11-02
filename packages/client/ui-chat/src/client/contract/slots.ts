@@ -59,6 +59,10 @@ export interface TurnTailOwnerProps {
 /** Owner currency of finalized-assistant actions. */
 export interface AssistantActionOwnerProps {
   messageId: MessageId
+  /** Session event sequence number (API's messageSeq). */
+  seq: number
+  /** Joined plain-text content for edit preview. */
+  text: string
 }
 
 /** Owner currency of per-message edit/delete actions. */
@@ -233,6 +237,8 @@ export interface ChatNodeOwnerProps {
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
   /** Turn-process state when this Node belongs to a projected Turn. */
   turnProcess?: TurnProcessOwnerProps | undefined
+  /** Delete a message by seq. Optional — provided when message-actions is active. */
+  deleteMessage?: ((seq: number) => Promise<void>) | undefined
 }
 
 /** Shared presentation state for one Turn-process answer generation. */

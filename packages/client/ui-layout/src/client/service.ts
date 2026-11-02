@@ -51,6 +51,8 @@ export interface ILayout {
   openRightbar(track: boolean, fullscreen: boolean): void
   /** Report the right panel as hidden: no track, no handle. */
   closeRightbar(): void
+  /** Root store's shared sidebar-collapse source. */
+  readonly sidebarCollapsed: HostObservable<boolean>
 }
 
 /** Cross-plugin panel-action face (ctx.layout). */
@@ -61,11 +63,13 @@ export class LayoutController implements ILayout {
    * @param panels - actions of the instance shared with the root entry.
    * @param hasMainPanel - checks the live main-slot registry for a panel id.
    * @param panelInfo - root store's shared central-panel selection source.
+   * @param sidebarCollapsed - root store's shared sidebar-collapse source.
    */
   constructor(
     private readonly panels: PanelActions,
     private readonly hasMainPanel: (id: MainPanelId) => boolean,
     readonly panelInfo: HostObservable<PanelInfo>,
+    readonly sidebarCollapsed: HostObservable<boolean>,
   ) {}
 
   /** Select a global panel or return to the Conversation. */

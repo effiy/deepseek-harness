@@ -1,0 +1,22 @@
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--dsw-icon-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.action:hover {
+  color: var(--dsw-icon-primary);
+  background: var(--dsw-surface-secondary);
+}
+
+.danger:hover {
+  color: var(--dsw-icon-danger);
+}

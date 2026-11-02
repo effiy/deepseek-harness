@@ -270,6 +270,7 @@ type ToolOwner = Pick<ChatNodeOwnerProps, 'openFile' | 'inspectCall'> & {
 const renderCommandSlot: React.ComponentProps<typeof CommandNodeView>['renderSlot'] =
   (_key, _owner, opts) => opts?.fallback ?? null
 const renderTurnTailSlot: React.ComponentProps<typeof TurnTailNodeView>['renderSlot'] = () => null
+const renderUserActionsSlot: React.ComponentProps<typeof UserMessageNodeView>['renderSlot'] = () => null
 const assistantSlots: Pick<React.ComponentProps<typeof AssistantNodeView>, 'renderSlot'> = {
   renderSlot: renderReasoningSlot,
 }
@@ -305,9 +306,9 @@ function HarnessChatNode({ standard, owner, hookContext, usePerformanceUsage, to
   const nodeProps = { ...shared, ...owner, ...hooks }
   switch (owner.node.kind) {
     case 'user':
-      return <UserMessageNodeView {...nodeProps} node={owner.node} />
+      return <UserMessageNodeView {...nodeProps} node={owner.node} renderSlot={renderUserActionsSlot} />
     case 'steering':
-      return <UserMessageNodeView {...nodeProps} node={owner.node} />
+      return <UserMessageNodeView {...nodeProps} node={owner.node} renderSlot={renderUserActionsSlot} />
     case 'context':
       return <ContextMessageNodeView {...nodeProps} node={owner.node} />
     case 'assistant-step':

@@ -74,7 +74,8 @@ function MessageItem({ node, t: translate, referenceLabels, skillNames }: Messag
   switch (node.kind) {
     case 'user':
     case 'steering':
-      return <UserMessageNodeView {...props as ChatNodeViewProps<'user' | 'steering'>} />
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return <UserMessageNodeView {...props as any} renderSlot={(() => null) as any} />
     case 'context':
       return <ContextMessageNodeView {...props as ChatNodeViewProps<'context'>} />
     case 'compaction':

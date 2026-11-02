@@ -1,12 +1,14 @@
-import { Fragment, memo, useEffect, useMemo, useState } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock, projectUserText, StateDot, TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives'
+import { fileExtension, FileTypeIcon, fileSizeText, JsonBlock, projectUserText, StateDot, TextShimmer, Toast, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, MessageActionOwnerProps } from '../contract/slots.ts'
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
+import { ContextMenu } from './ContextMenu.tsx'
+import type { ContextMenuItem } from './ContextMenu.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import css from './MessageItem.module.css'
@@ -159,10 +161,15 @@ function TurnMaxTokensItem({ t }: {
   )
 }
 
+/** Milliseconds before a touch is treated as long-press. */
+const LONG_PRESS_MS = 500
+/** Pixel dead zone within which a touch-move won't cancel the long-press. */
+const MOVE_DEAD_ZONE = 10
+
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
   content, renderMessageImages, actions, pending = false, echo = false, referenceLabels = [], skillNames = [],
-  previewAttachments, references, t,
+  previewAttachments, references, t, onCopyText, onDeleteMessage,
 }: {
   content: readonly unknown[]
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
@@ -180,12 +187,111 @@ function UserStyleBubble({
   previewAttachments?: readonly PresentedAttachment[]
   references?: Pick<ChatNodeOwnerProps, 'openFile' | 'openSkill'>
   t: ChatViewSlotProps['t']
+  /** Copy the message text to the clipboard. */
+  onCopyText?: (text: string) => void
+  /** Delete the message. Undefined when delete is not available. */
+  onDeleteMessage?: (() => void) | undefined
 }): ReactNode {
   const { text, attachments: contentAttachments, rest } = contentParts(content)
   const attachments = previewAttachments ?? contentAttachments
   const compactImages = attachments.length > 1
   const truncated = (total: number): string => t('json.truncated', { total })
   const showBubble = text !== '' || rest.length > 0
+
+  // ── Context-menu state: long-press / right-click ──
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  const [menu, setMenu] = useState<{
+    items: ContextMenuItem[]
+    top: number
+    left: number
+    originX: number
+    originY: string
+  } | null>(null)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStart = useRef({ x: 0, y: 0 })
+
+  const clearLongPress = useCallback(() => {
+    if (longPressTimer.current !== null) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }, [])
+
+  const dismissMenu = useCallback(() => {
+    setMenu(null)
+    const el = bubbleRef.current
+    if (el !== null) el.removeAttribute('data-long-pressed')
+  }, [])
+
+  useEffect(() => () => { clearLongPress() }, [clearLongPress])
+
+  const showMenu = useCallback((x: number, y: number) => {
+    const bubble = bubbleRef.current
+    if (bubble === null) return
+    const bubbleRect = bubble.getBoundingClientRect()
+    const vw = window.innerWidth
+    const gap = 8
+    const edgePad = 16
+    const menuW = 160
+    const menuH = 96.5
+    const above = y - menuH - gap > 0
+    const top = above ? y - menuH - gap : bubbleRect.bottom + gap
+    const originY = above ? '100%' : '0%'
+    const left = Math.max(edgePad, Math.min(x - menuW / 2, vw - menuW - edgePad))
+    const originX = (x - left) / menuW * 100
+    const items: ContextMenuItem[] = []
+    if (onCopyText !== undefined && text !== '') items.push({
+      label: t('copy'),
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <rect x="6" y="3" width="10" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.25" />
+          <path d="M4 6v10.5A1.5 1.5 0 0 0 5.5 18H12" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+        </svg>
+      ),
+      action: () => { onCopyText(text) },
+    })
+    if (onDeleteMessage !== undefined) items.push({
+      label: t('delete'),
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M5 6.5h10l-.8 9.5a1.5 1.5 0 0 1-1.5 1.5H7.3a1.5 1.5 0 0 1-1.49-1.37L5 6.5zM3.5 4.5h13M8 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+      danger: true,
+      action: () => { onDeleteMessage() },
+    })
+    if (items.length === 0) return
+    const el = bubbleRef.current
+    if (el !== null) el.setAttribute('data-long-pressed', '')
+    navigator.vibrate?.(10)
+    setMenu({ items, top, left, originX, originY: originY })
+  }, [onCopyText, onDeleteMessage, text, t])
+
+  // Mobile: long-press timer.
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    if (pending || echo) return
+    const touch = e.touches[0]
+    if (!touch) return
+    touchStart.current = { x: touch.clientX, y: touch.clientY }
+    clearLongPress()
+    longPressTimer.current = setTimeout(() => {
+      longPressTimer.current = null
+      showMenu(touchStart.current.x, touchStart.current.y)
+    }, LONG_PRESS_MS)
+  }, [pending, echo, clearLongPress, showMenu])
+
+  // Mobile: cancel on finger movement past the dead zone.
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (longPressTimer.current === null) return
+    const touch = e.touches[0]
+    if (!touch) return
+    const dx = Math.abs(touch.clientX - touchStart.current.x)
+    const dy = Math.abs(touch.clientY - touchStart.current.y)
+    if (dx > MOVE_DEAD_ZONE || dy > MOVE_DEAD_ZONE) clearLongPress()
+  }, [clearLongPress])
+
+  const onTouchEnd = useCallback(() => { clearLongPress() }, [clearLongPress])
+
   return (
     <div
       className={css.userRow}
@@ -219,7 +325,13 @@ function UserStyleBubble({
               ))}
           </div>
         )}
-        {showBubble && <div className={css.bubble}>
+        {showBubble && <div
+          ref={bubbleRef}
+          className={css.bubble}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           {projectUserText(text, referenceLabels, skillNames, 'skill', references)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
@@ -230,6 +342,9 @@ function UserStyleBubble({
         )}
       </div>
       {actions?.(text)}
+      {menu !== null && (
+        <ContextMenu items={menu.items} position={menu} onDismiss={dismissMenu} />
+      )}
     </div>
   )
 }
@@ -321,30 +436,43 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
 type UserMessageNodeViewProps = ChatNodeViewProps<'user' | 'steering'> & PropsRenderSlots<'conversation.chat.user-actions'>
 
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, openFile, openSkill, renderSlot, t,
+  node, renderMessageImages, openFile, openSkill, renderSlot, t, deleteMessage,
 }: UserMessageNodeViewProps) {
   const data = node.data
-  const userActionsOwner: MessageActionOwnerProps = { seq: data.seq, text: contentParts(data.content).text }
+  const { text } = contentParts(data.content)
+  const userActionsOwner: MessageActionOwnerProps = { seq: data.seq, text }
   const userActions = renderSlot('conversation.chat.user-actions', userActionsOwner)
+  const [copied, setCopied] = useState(false)
+  const onCopyText = useCallback((textToCopy: string) => {
+    writeClipboard(textToCopy).then((ok) => { if (ok) setCopied(true) })
+  }, [])
+  const onDeleteMessage = deleteMessage !== undefined ? useCallback(() => {
+    deleteMessage(data.seq)
+  }, [deleteMessage, data.seq]) : undefined
   return (
-    <UserStyleBubble
-      content={data.content}
-      references={{ openFile, openSkill }}
-      renderMessageImages={renderMessageImages}
-      {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
-      {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
-      t={t}
-      actions={text => (
-        <MessageIconActions
-          text={text}
-          time={data.time}
-          clock="start"
-          className={css.actions}
-          extraActions={userActions}
-          t={t}
-        />
-      )}
-    />
+    <>
+      {copied && <Toast text={t('copied')} onDone={() => { setCopied(false) }} />}
+      <UserStyleBubble
+        content={data.content}
+        references={{ openFile, openSkill }}
+        renderMessageImages={renderMessageImages}
+        {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
+        {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
+        t={t}
+        onCopyText={onCopyText}
+        onDeleteMessage={onDeleteMessage}
+        actions={textValue => (
+          <MessageIconActions
+            text={textValue}
+            time={data.time}
+            clock="start"
+            className={css.actions}
+            extraActions={userActions}
+            t={t}
+          />
+        )}
+      />
+    </>
   )
 })
 

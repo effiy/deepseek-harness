@@ -6,7 +6,7 @@ import type {
 } from '@deepseek-ai/dsh-attachment'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { LlmAttemptId, MessageId } from '@deepseek-ai/dsh-llm/brand'
-import type { TextBlock } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -167,8 +167,8 @@ export interface ModelCatalog {
 export type QueueAction =
   | {
     readonly kind: 'edit'
-    /** Non-empty text-only replacement content. */
-    readonly content: readonly TextBlock[]
+    /** Non-empty replacement content; each text block must have non-whitespace text. */
+    readonly content: readonly ContentBlock[]
   }
   | { readonly kind: 'remove' }
   | { readonly kind: 'steer' }
@@ -400,8 +400,8 @@ export interface SessionMessageUpdateRequest {
   readonly sessionId: SessionId
   /** Exact event sequence number of the committed message to update. */
   readonly messageSeq: number
-  /** Non-empty text-only replacement content. */
-  readonly content: readonly TextBlock[]
+  /** Non-empty replacement content; each text block must have non-whitespace text. */
+  readonly content: readonly ContentBlock[]
 }
 
 /** Receipt after a committed message was updated on the surface. */

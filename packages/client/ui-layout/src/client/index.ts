@@ -17,6 +17,7 @@ import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
+import { SIDEBAR_AUTO_COLLAPSE } from './columns.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { en, zh } from './shortcut-locales.ts'
 import { ThemePresenter } from './theme-presenter.ts'
@@ -171,8 +172,17 @@ export function apply(ctx: ClientContext): void {
       getSnapshot: () => instance.getSnapshot().panelInfo,
       subscribe: listener => instance.subscribe(listener),
     }
+    const sidebarCollapsed: HostObservable<boolean> = {
+      getSnapshot: () => {
+        const { layoutInfo } = instance.getSnapshot()
+        return layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE
+          ? !layoutInfo.narrowExpanded
+          : layoutInfo.sidebar === 0
+      },
+      subscribe: listener => instance.subscribe(listener),
+    }
     const layout = new LayoutController(instance.actions, id =>
-      ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo)
+      ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo, sidebarCollapsed)
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: layout.panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRegistration = ctx.slots.register({

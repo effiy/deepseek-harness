@@ -11,6 +11,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createMessageEditStore } from './store.ts'
 import { NS, zh, en } from './locale.ts'
 import { UserMessageActions } from './UserMessageActions.tsx'
+import { AssistantMessageActions } from './AssistantMessageActions.tsx'
 
 export const name = 'ui-message-actions'
 
@@ -33,21 +34,35 @@ export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-message-actions: dictionaries')
   const store = createMessageEditStore()
 
+  /** Shared inject factory: edit and delete RPC callbacks used by both user and assistant actions. */
+  const makeInject = (sessionId: SessionId) => ({
+    editMessage: async (seq: number, text: string) => {
+      const content: readonly TextBlock[] = [{ type: 'text', text }]
+      await ctx.remote.session['message-update']({ sessionId, messageSeq: seq, content })
+    },
+    deleteMessage: async (seq: number) => {
+      await ctx.remote.session['message-delete']({ sessionId, messageSeq: seq })
+    },
+  })
+
   ctx.slots.inject('conversation.chat.user-actions', () =>
     ctx.slots.register({
       name: 'conversation.chat.user-actions',
       id: 'message-actions',
       store,
       locale: NS,
-      inject: (sessionId: SessionId) => ({
-        editMessage: async (seq: number, text: string) => {
-          const content: readonly TextBlock[] = [{ type: 'text', text }]
-          await ctx.remote.session['message-update']({ sessionId, messageSeq: seq, content })
-        },
-        deleteMessage: async (seq: number) => {
-          await ctx.remote.session['message-delete']({ sessionId, messageSeq: seq })
-        },
-      }),
+      inject: makeInject,
     }, UserMessageActions),
+  )
+
+  ctx.slots.inject('conversation.chat.assistant-actions', () =>
+    ctx.slots.register({
+      name: 'conversation.chat.assistant-actions',
+      id: 'message-edit',
+      order: 20,
+      store,
+      locale: NS,
+      inject: makeInject,
+    }, AssistantMessageActions),
   )
 }

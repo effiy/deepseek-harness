@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from './contract/slots.ts'
 import { HeaderLeadingControls } from './HeaderLeadingControls.tsx'
+import { SidebarEdgeZone } from './SidebarEdgeZone.tsx'
 import { SidebarRoot } from './SidebarRoot.tsx'
 import { en, zh, type SidebarKey } from './locales.ts'
 
@@ -96,5 +97,17 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: injectProps,
   }, HeaderLeadingControls))
+  // Touch edge zone for expanding sidebar on narrow viewports (WeChat-style
+  // drawer gesture). The zone renders fixed at the left viewport edge on
+  // touch-capable mobile devices while the sidebar is collapsed.
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'sidebar.edge-zone',
+    locale: NS,
+    inject: () => ({
+      toggleSidebar: () => { ctx.layout.toggleSidebar() },
+      hooks: { sidebarCollapsed: ctx.layout.sidebarCollapsed },
+    }),
+  }, SidebarEdgeZone))
   syncPanels()
 }
