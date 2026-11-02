@@ -76,7 +76,7 @@ export function VirtualKeyboard({ editor, visible, doneLabel, spaceLabel, onHide
   const handleEnter = useCallback(() => {
     if (editor === null) return
     editor.focus()
-    editor.dispatchCommand(INSERT_LINE_BREAK_COMMAND, null)
+    editor.dispatchCommand(INSERT_LINE_BREAK_COMMAND, true)
     navigator.vibrate?.(5)
   }, [editor])
 
@@ -99,7 +99,7 @@ export function VirtualKeyboard({ editor, visible, doneLabel, spaceLabel, onHide
         navigator.vibrate?.(5)
         break
       case 'layout':
-        setLayoutId(key.layout!)
+        if (key.layout !== undefined) setLayoutId(key.layout)
         navigator.vibrate?.(5)
         break
       case 'hide':

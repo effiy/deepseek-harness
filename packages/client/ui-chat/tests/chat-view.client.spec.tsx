@@ -301,7 +301,7 @@ function HarnessChatNode({ standard, owner, hookContext, usePerformanceUsage, to
     useDisclosure: CHAT_NODE_INJECT.hooks.disclosure(standard, hookContext),
     useGroupAction: CHAT_NODE_INJECT.hooks.groupAction(standard, hookContext),
   }), [standard, hookContext])
-  const { renderSlot: _rootRenderSlot, __renders: _rootRenders, ...shared } = standard
+  const { __renders: _rootRenders, ...shared } = standard
   const nodeProps = { ...shared, ...owner, ...hooks }
   switch (owner.node.kind) {
     case 'user':
