@@ -696,9 +696,17 @@ export class SessionCommandController {
         'no surface messages in the cascade range', { sessionId, messageSeq: Number(targetSeq) })
     }
 
+    const firstSeq = shadowedSeqs[0]
+    const lastSeq = shadowedSeqs[shadowedSeqs.length - 1]
+    /* v8 ignore next 3 -- guarded by length check above */
+    if (firstSeq === undefined || lastSeq === undefined) {
+      throw new RemoteError('session/message-not-found',
+        'no surface messages in the cascade range', { sessionId, messageSeq: Number(targetSeq) })
+    }
+
     return {
-      startSeq: shadowedSeqs[0],
-      endSeq: shadowedSeqs[shadowedSeqs.length - 1],
+      startSeq: firstSeq,
+      endSeq: lastSeq,
       sourceEventSeqs: shadowedSeqs,
     }
   }
