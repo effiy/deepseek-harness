@@ -436,7 +436,6 @@ export class SessionCommandController {
    */
   async updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue> {
     if (request.action.kind === 'edit') {
-      // oxlint-disable-next-line typescript/no-unnecessary-condition -- Remote callers can submit untyped JSON.
       if (request.action.content.some(block => block.type !== 'text')) {
         throw new RemoteError(
           'session/attachment-invalid',
@@ -518,7 +517,6 @@ export class SessionCommandController {
     const session = agent.session
     const targetSeq = SessionSeq(request.messageSeq)
 
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const events = session.snapshotEvents()
     const targetEvent: SessionEvent | undefined = events[targetSeq]
     if (targetEvent === undefined || targetEvent.seq !== targetSeq) {
@@ -563,12 +561,40 @@ export class SessionCommandController {
 
   /**
    * Replace one committed message's content on the model-visible surface.
-   * @param request - Session identity, exact message sequence, and replacement text content.
+   * @param request - Session identity, exact message sequence, and replacement content.
    * @returns acknowledgement that the replacement was committed.
    */
   async messageUpdate(request: SessionMessageUpdateRequest): Promise<SessionMessageUpdateValue> {
-    if (request.content.length === 0
-      || !request.content.some(block => block.type === 'text' && block.text.trim().length > 0)) {
+    if (request.content.length === 0) {
+      throw new RemoteError('gateway/bad-request',
+        'edit content must not be empty', {})
+    }
+
+    let hasNonEmptyText = false
+    for (const block of request.content) {
+      switch (block.type) {
+        case 'text':
+          if (block.text.trim().length > 0) hasNonEmptyText = true
+          break
+        case 'image':
+        case 'file':
+          // Image and file attachment references are validated by the Typert
+          // JSON schema at the gateway boundary. Full attachment-existence
+          // resolution is deferred to the prompt path.
+          break
+        case 'reasoning':
+        case 'tool-call':
+        case 'tool-addition':
+        case 'tool-removal':
+          throw new RemoteError('gateway/bad-request',
+            `content block type "${block.type}" is not valid in message edits`, {})
+        default:
+          // Merge-extensible ContentBlockMap: reject unknown types.
+          throw new RemoteError('gateway/bad-request',
+            `content block type "${String((block as Record<string, unknown>)['type'])}" is not supported in message edits`, {})
+      }
+    }
+    if (!hasNonEmptyText) {
       throw new RemoteError('gateway/bad-request',
         'edit content must include non-whitespace text', {})
     }
@@ -577,7 +603,6 @@ export class SessionCommandController {
     const session = agent.session
     const targetSeq = SessionSeq(request.messageSeq)
 
-    // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
     const events = session.snapshotEvents()
     const targetEvent: SessionEvent | undefined = events[targetSeq]
     if (targetEvent === undefined || targetEvent.seq !== targetSeq) {
@@ -621,7 +646,11 @@ export class SessionCommandController {
     sessionId: SessionId,
   ): { startSeq: SessionSeq; endSeq: SessionSeq; sourceEventSeqs: SessionSeq[] } {
     // Validated by caller: targetSeq is an append-surface user/assistant message.
-    const targetEvent = events[targetSeq]!
+    const targetEvent = events[targetSeq]
+    if (targetEvent === undefined) {
+      throw new RemoteError('session/message-not-found',
+        `no event at seq ${Number(targetSeq)}`, { sessionId, messageSeq: Number(targetSeq) })
+    }
     let rangeStart: number
     let rangeEnd: number
 
@@ -668,8 +697,8 @@ export class SessionCommandController {
     }
 
     return {
-      startSeq: shadowedSeqs[0]!,
-      endSeq: shadowedSeqs[shadowedSeqs.length - 1]!,
+      startSeq: shadowedSeqs[0],
+      endSeq: shadowedSeqs[shadowedSeqs.length - 1],
       sourceEventSeqs: shadowedSeqs,
     }
   }
@@ -729,7 +758,6 @@ export class SessionCommandController {
   private async readSessionState(sessionId: SessionId): Promise<SessionReadState> {
     const attached = this.ctx.sessions.get(sessionId)
     if (attached !== undefined) {
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
       return { id: attached.id, header: attached.header, events: attached.snapshotEvents() }
     }
     const inspected = await inspectApiSession(this.ctx, sessionId)
@@ -776,7 +804,6 @@ function hasPromptRequest(agent: Agent, requestId: SessionRequestId): boolean {
     return source.kind === 'user' && 'rpcId' in source && source.rpcId === requestId
   }
   if (agent.inbox.nextTurn.some(matches) || agent.inbox.nextStep.some(matches)) return true
-  // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
   return agent.session.snapshotEvents().some((event) => {
     if (event.type !== 'user/message') return false
     const source = event.data.source

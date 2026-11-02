@@ -3,6 +3,7 @@ import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
+import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
@@ -59,6 +60,24 @@ function sessionAgent(ctx: Context, session: Session): AgentHandle {
     } as unknown as Agent,
     dispose: () => Promise.resolve(),
   }
+}
+
+function mockImageRef(): ImageAttachmentRef {
+  return {
+    attachmentId: 'img-test-1',
+    mediaType: 'image/png',
+    bytes: 1000,
+    width: 100,
+    height: 100,
+  } as ImageAttachmentRef
+}
+
+function mockFileRef(): FileAttachmentRef {
+  return {
+    attachmentId: 'file-test-1',
+    name: 'test.txt',
+    bytes: 500,
+  } as FileAttachmentRef
 }
 
 describe('messageDelete', () => {
@@ -263,6 +282,172 @@ describe('messageUpdate', () => {
       content: [{ type: 'text', text: 'try edit turn/end' }],
     })).rejects.toMatchObject({
       code: 'session/message-not-editable',
+    })
+
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects image-only content with no text', async () => {
+    const ctx = await baseContext()
+    const session = completedSession(ctx, 'update-image-only')
+    const controller = new SessionCommandController(
+      ctx,
+      controllerAgents({
+        resolveAgent: () => Promise.resolve(sessionAgent(ctx, session)),
+      }),
+      '/default',
+    )
+
+    await expect(controller.messageUpdate({
+      sessionId: session.id,
+      messageSeq: 1,
+      content: [{ type: 'image', attachment: mockImageRef() } as never],
+    })).rejects.toMatchObject({
+      code: 'gateway/bad-request',
+    })
+
+    await ctx.fiber.dispose()
+  })
+
+  it('accepts text and image content', async () => {
+    const ctx = await baseContext()
+    const session = completedSession(ctx, 'update-text-image')
+    const controller = new SessionCommandController(
+      ctx,
+      controllerAgents({
+        resolveAgent: () => Promise.resolve(sessionAgent(ctx, session)),
+      }),
+      '/default',
+    )
+
+    const result = await controller.messageUpdate({
+      sessionId: session.id,
+      messageSeq: 1,
+      content: [
+        { type: 'text', text: 'updated with image' },
+        { type: 'image', attachment: mockImageRef() },
+      ] as never,
+    })
+    expect(result).toEqual({ accepted: true })
+
+    const events = session.snapshotEvents()
+    const replacement = events[events.length - 1]!
+    expect(replacement.type).toBe('user/message')
+    expect(replacement.surfaceOp).toMatchObject({ op: 'replace', startSeq: 1, endSeq: 1 })
+
+    await ctx.fiber.dispose()
+  })
+
+  it('accepts text and file content', async () => {
+    const ctx = await baseContext()
+    const session = completedSession(ctx, 'update-text-file')
+    const controller = new SessionCommandController(
+      ctx,
+      controllerAgents({
+        resolveAgent: () => Promise.resolve(sessionAgent(ctx, session)),
+      }),
+      '/default',
+    )
+
+    const result = await controller.messageUpdate({
+      sessionId: session.id,
+      messageSeq: 1,
+      content: [
+        { type: 'text', text: 'updated with file' },
+        { type: 'file', attachment: mockFileRef() },
+      ] as never,
+    })
+    expect(result).toEqual({ accepted: true })
+
+    await ctx.fiber.dispose()
+  })
+
+  it('accepts text with image and file', async () => {
+    const ctx = await baseContext()
+    const session = completedSession(ctx, 'update-text-image-file')
+    const controller = new SessionCommandController(
+      ctx,
+      controllerAgents({
+        resolveAgent: () => Promise.resolve(sessionAgent(ctx, session)),
+      }),
+      '/default',
+    )
+
+    const result = await controller.messageUpdate({
+      sessionId: session.id,
+      messageSeq: 1,
+      content: [
+        { type: 'text', text: 'updated with both' },
+        { type: 'image', attachment: mockImageRef() },
+        { type: 'file', attachment: mockFileRef() },
+      ] as never,
+    })
+    expect(result).toEqual({ accepted: true })
+
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects reasoning block in content', async () => {
+    const ctx = await baseContext()
+    const session = completedSession(ctx, 'update-reasoning')
+    const controller = new SessionCommandController(
+      ctx,
+      controllerAgents({
+        resolveAgent: () => Promise.resolve(sessionAgent(ctx, session)),
+      }),
+      '/default',
+    )
+
+    await expect(controller.messageUpdate({
+      sessionId: session.id,
+      messageSeq: 1,
+      content: [{ type: 'reasoning', text: 'let me think' } as never],
+    })).rejects.toMatchObject({
+      code: 'gateway/bad-request',
+    })
+
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects tool-call block in content', async () => {
+    const ctx = await baseContext()
+    const session = completedSession(ctx, 'update-tool-call')
+    const controller = new SessionCommandController(
+      ctx,
+      controllerAgents({
+        resolveAgent: () => Promise.resolve(sessionAgent(ctx, session)),
+      }),
+      '/default',
+    )
+
+    await expect(controller.messageUpdate({
+      sessionId: session.id,
+      messageSeq: 1,
+      content: [{ type: 'tool-call', id: 'call-1', name: 'bash', arguments: '{}' } as never],
+    })).rejects.toMatchObject({
+      code: 'gateway/bad-request',
+    })
+
+    await ctx.fiber.dispose()
+  })
+
+  it('rejects unknown block type', async () => {
+    const ctx = await baseContext()
+    const session = completedSession(ctx, 'update-unknown')
+    const controller = new SessionCommandController(
+      ctx,
+      controllerAgents({
+        resolveAgent: () => Promise.resolve(sessionAgent(ctx, session)),
+      }),
+      '/default',
+    )
+
+    await expect(controller.messageUpdate({
+      sessionId: session.id,
+      messageSeq: 1,
+      content: [{ type: 'unknown-type', data: 'whatever' } as never],
+    })).rejects.toMatchObject({
+      code: 'gateway/bad-request',
     })
 
     await ctx.fiber.dispose()
