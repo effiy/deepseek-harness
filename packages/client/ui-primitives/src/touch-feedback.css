@@ -1,0 +1,88 @@
+/* ── Touch feedback primitives ───────────────────────────────────────────────
+ * Reusable mobile touch-interaction classes for buttons, list items, and
+ * interactive surfaces. All transforms and opacity changes run on the
+ * compositor (no layout/paint) for 60 fps on mobile.
+ *
+ * Design principles:
+ *   • scale-down on press (0.97×) — the canonical mobile tap feedback
+ *   • highlight flash (background pulse) — for non-transformable elements
+ *   • combined press (scale + opacity) — premium-feel compound feedback
+ *   • minimum 44 px touch targets (coarse-pointer) — iOS HIG / WCAG 2.5.5
+ *   • respects prefers-reduced-motion — disabled when accessibility setting on
+ *
+ * Usage: add the class to any interactive element; it applies automatically
+ * on :active (on touch devices the :active pseudo stays for the touch duration).
+ * ------------------------------------------------------------------ */
+
+/* ── Scale-down on press ────────────────────────────────────────────────── */
+
+.touchScale:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 120ms var(--ds-ease-in-out);
+}
+
+/* ── Background highlight on press ──────────────────────────────────────────
+ * For elements that cannot use a scale transform (e.g. full-width list cells
+ * where scale would show gaps). */
+
+.touchHighlight:active:not(:disabled) {
+  transition: background-color 80ms ease;
+}
+
+/* ── Compound press feedback (scale + opacity) ───────────────────────────── */
+
+.touchPress:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.82;
+  transition:
+    transform 120ms var(--ds-ease-in-out),
+    opacity 100ms ease;
+}
+
+/* ── Touch target minimum ──────────────────────────────────────────────────
+ * Apply to any interactive element to guarantee a 44 px × 44 px hit area
+ * on touch devices, regardless of visual size. */
+
+@media (pointer: coarse) {
+  .touchTarget {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* ── Accessible reduced-motion override ──────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .touchScale:active:not(:disabled),
+  .touchPress:active:not(:disabled) {
+    transform: none;
+    transition: none;
+  }
+  .touchHighlight:active:not(:disabled) {
+    transition: none;
+  }
+}
+
+/* ── Swipe-to-action hint ──────────────────────────────────────────────────
+ * A subtle horizontal wobble to suggest a list row is swipeable. Apply
+ * sparingly to the first item or after a tutorial state. */
+
+.touchSwipeHint {
+  animation: touch-swipe-hint 1.8s var(--ds-ease-in-out) 1.2s both;
+}
+
+@keyframes touch-swipe-hint {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-6px); }
+  30% { transform: translateX(6px); }
+  45% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+  85% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .touchSwipeHint {
+    animation: none;
+  }
+}
