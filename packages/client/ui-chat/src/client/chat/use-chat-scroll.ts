@@ -7,6 +7,7 @@ import { useChatNavigation, type ChatNavigation, type ChatNavigationInput } from
 import { useChatReading, type ChatReadingState } from './use-chat-reading.ts'
 import { useChatViewport } from './use-chat-viewport.ts'
 import type { FlowMotionRows } from './flow-motion.ts'
+import { ChatRecycler } from './ChatRecycler.ts'
 
 /** Committed content and Session operations used to reconcile scroll ownership. */
 export interface ChatScrollInput extends ChatNavigationInput {
@@ -48,6 +49,7 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     loadedTurns, chatScroll, hasMore, loadingOlder, loadOlder, loadThrough, transcriptView,
   } = input
   const { viewport, listRef, columnRef } = useChatViewport()
+  const recyclerRef = useRef<ChatRecycler | null>(null)
   const { reading, state } = useChatReading(viewport, chatScroll, loadedTurns.at(-1)?.turn ?? null)
   const navigationInput = useMemo(() => ({
     firstSeq, loadingOlder, hasMore, loadOlder, loadThrough,
@@ -125,6 +127,11 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
         if (!content.current.opened) return
         if (!event.movedByReader && viewport.motion.foldActive()) return
         reading.onScroll(event)
+        // Auto-load older history when the user scrolls near the top.
+        const input = content.current.input
+        if (event.movedByReader && event.metrics.top < 200 && input.hasMore && !input.loadingOlder) {
+          input.loadOlder()
+        }
       },
       scrollEnd: (outer) => {
         reading.onScrollEnd(outer)
@@ -195,6 +202,22 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     navigation.cancel()
     reading.followTail()
   }, [navigation, reading, cancelPendingFollow])
+
+  // ChatRecycler: create and observe when DOM elements are available.
+  useLayoutEffect(() => {
+    const list = listRef.current
+    const column = columnRef.current
+    if (list === null || column === null) return
+    const scroller = list.closest<HTMLElement>('[data-conversation-scroll]') ?? list
+    if (recyclerRef.current === null) recyclerRef.current = new ChatRecycler({ tailKeep: 5 })
+    recyclerRef.current.observe(scroller, column)
+    return () => { recyclerRef.current?.disconnect() }
+  }, [listRef, columnRef])
+
+  // Update the protected tail turns when navigation items change.
+  useLayoutEffect(() => {
+    recyclerRef.current?.updateTurns(loadedTurns)
+  }, [loadedTurns])
 
   return {
     listRef, columnRef, ...state, busyTurn, motion: viewport.motion,
