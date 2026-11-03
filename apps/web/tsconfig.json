@@ -94,6 +94,7 @@
     "tests/caption-overlays.e2e.ts",
     "tests/settings-appearance.e2e.ts",
     "tests/menu-material.e2e.ts",
+    "tests/mobile-viewport.e2e.ts",
     "tests/desktop-locale.e2e.ts",
     "tests/settings-import.e2e.ts",
     "tests/desktop-updates.e2e.ts",
@@ -216,6 +217,12 @@
     },
     {
       "path": "../../packages/test-support/remote-mock"
+    },
+    {
+      "path": "../../packages/test-support/llm-replay"
+    },
+    {
+      "path": "../../packages/test-support/session-snapshot"
     }
   ]
 }

@@ -9,6 +9,10 @@ import { clientBuildEnvironmentDefines } from '../../scripts/client-build-enviro
 import { productWebBundleIsolation } from './product-isolation.ts'
 
 const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url))
+
+/** Absolute path of the SW template processed at build time. */
+const SW_TEMPLATE = src('./src/sw-template.js')
+
 const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
   + 'From a repository checkout, run `pnpm dsh web`; an installed package uses `dsh web`. '
   + 'For client-plugin HMR, run `pnpm run dev:web`, which starts `dsh web` and the rebuild watchers together.'
@@ -91,6 +95,65 @@ function emitPreviewPage(): Plugin {
       if (anchor === -1) throw new Error('vite: built index.html lost its module entry tag')
       const tag = `<script type="module" crossorigin src="./${bootstrapFile}"></script>`
       await writeFile(resolve(outputDirectory, 'preview.html'), `${page.slice(0, anchor)}${tag}${page.slice(anchor)}`)
+    },
+  }
+}
+
+/**
+ * Emit the Service Worker file with the build-time cache version and the
+ * shell-asset URL list injected from the rollup bundle.  The template lives
+ * at src/sw-template.js; the emitted sw.js carries every entry chunk so the
+ * SW can pre-cache the complete app shell on install.
+ */
+function generateServiceWorker(): Plugin {
+  return {
+    name: 'dsh-generate-sw',
+    async generateBundle(_options, bundle) {
+      let swCode = await readFile(SW_TEMPLATE, 'utf8')
+      const version = String(Date.now())
+      const shellAssets = ['/', '/index.html']
+      for (const item of Object.values(bundle)) {
+        if (item.type === 'chunk' && (item.name === 'index' || item.name === 'vendor')) {
+          shellAssets.push(`/${item.fileName}`)
+        }
+        // Include CSS assets that belong to the entry chunks.
+        if (item.type === 'asset' && item.fileName.endsWith('.css')
+          && (item.fileName.includes('index') || item.fileName.includes('vendor'))) {
+          shellAssets.push(`/${item.fileName}`)
+        }
+      }
+      swCode = swCode.replaceAll('__CACHE_VERSION__', version)
+      swCode = swCode.replaceAll('__SHELL_ASSETS__', JSON.stringify(shellAssets))
+      this.emitFile({ type: 'asset', fileName: 'sw.js', source: swCode })
+    },
+  }
+}
+
+/**
+ * Inject resource-preload hints into the built index.html head:
+ * - modulepreload for the main entry chunks (index + vendor)
+ * - preload for woff2 brand fonts
+ * Only active during production builds (dev skips because the bundle
+ * parameter is absent).
+ */
+function injectPreloadHints(): Plugin {
+  return {
+    name: 'dsh-inject-preload-hints',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        if (!ctx.bundle) return html
+        const tags: string[] = []
+        for (const item of Object.values(ctx.bundle)) {
+          if (item.type === 'chunk' && (item.name === 'index' || item.name === 'vendor')) {
+            tags.push(`<link rel="modulepreload" crossorigin href="./${item.fileName}">`)
+          }
+          if (item.type === 'asset' && item.fileName.includes('.woff2')) {
+            tags.push(`<link rel="preload" as="font" crossorigin href="./${item.fileName}" type="font/woff2">`)
+          }
+        }
+        return tags.length > 0 ? html.replace('</head>', `  ${tags.join('\n  ')}\n</head>`) : html
+      },
     },
   }
 }
@@ -235,7 +298,8 @@ export default defineConfig({
   // directory, and the served index resolves identically from the site root.
   base: './',
   plugins: [
-    rejectStandaloneServe(), clientDocumentTitle(), brandFontLicense(), react(), emitPreviewPage(),
+    rejectStandaloneServe(), clientDocumentTitle(), brandFontLicense(), react(),
+    generateServiceWorker(), injectPreloadHints(), emitPreviewPage(),
     productWebBundleIsolation(src('../..'), src('.')),
     precompressAssets(),
   ],

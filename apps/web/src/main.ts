@@ -2,6 +2,18 @@
 import '@deepseek-ai/dsh-client-ui-theme/brand-font.css'
 import { AppWebEntry, applyIndexInjections } from '@deepseek-ai/dsh-client-web'
 
+// ── Service Worker ──────────────────────────────────────────────────────
+// Register the SW in production so the app shell and static assets are
+// cached for offline use.  The registration is eager (before run()) but
+// fire-and-forget — it must not block the app boot.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('SW registration failed:', err.message)
+    })
+  })
+}
+
 interface DesktopBootGlobal {
   dshDesktopBoot?: {
     failed(message: string): Promise<void>
