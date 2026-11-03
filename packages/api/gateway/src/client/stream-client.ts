@@ -255,12 +255,18 @@ export class RemoteStreamMuxClient {
         this.lost(socket, error)
         socket.close()
       }
-      const closed = (): void => {
+      const closed = (event: CloseEvent): void => {
         if (!settled) {
           rejectCandidate(new RemoteStreamCarrierError(
-            'api gateway: Remote stream WebSocket closed before opening',
+            `api gateway: Remote stream WebSocket closed before opening (code ${String(event.code)}${event.reason ? `: ${event.reason}` : ''})`,
           ))
           return
+        }
+        // Log close diagnostics on abnormal closures. 1000 (normal) and
+        // 4000 (reconnect requested) are expected.  Ping failures (1006)
+        // and other abnormal codes are diagnostic signals.
+        if (event.code !== 1000 && event.code !== 4000) {
+          console.debug(`[api-gateway] Remote stream WebSocket closed: code=${String(event.code)} reason="${event.reason}" wasClean=${String(event.wasClean)}`)
         }
         this.lost(socket)
       }
@@ -294,7 +300,6 @@ export class RemoteStreamMuxClient {
         reject: (error) => {
           cleanup()
           // AbortSignal.reason belongs to the caller and may intentionally be a non-Error sentinel.
-          // oxlint-disable-next-line typescript/prefer-promise-reject-errors
           reject(error)
         },
       }

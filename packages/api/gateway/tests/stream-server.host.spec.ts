@@ -52,7 +52,7 @@ describe('Remote stream mux server carrier lifecycle', () => {
     await closed
   })
 
-  it('requires two missed heartbeats before terminating an unresponsive socket', async () => {
+  it('requires three missed heartbeats before terminating an unresponsive socket', async () => {
     const entry = await startMux(async (_endpoint, _payload, _uplink, _peer, control) => waitForAbort(control.signal), 20)
     const client = await connect(entry.url)
     const serverSocket = acceptedSocket(entry.mux)
@@ -60,6 +60,7 @@ describe('Remote stream mux server carrier lifecycle', () => {
     const terminated = vi.spyOn(serverSocket, 'terminate')
     const closed = once(client, 'close')
 
+    await once(client, 'ping')
     await once(client, 'ping')
     await once(client, 'ping')
     expect(terminated).not.toHaveBeenCalled()
@@ -79,6 +80,7 @@ describe('Remote stream mux server carrier lifecycle', () => {
     })
 
     try {
+      await once(client, 'ping')
       await once(client, 'ping')
       await once(client, 'ping')
       await vi.waitFor(() => { expect(finalCheck).toBeDefined() })

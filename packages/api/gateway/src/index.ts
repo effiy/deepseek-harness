@@ -134,7 +134,7 @@ interface PendingRemoteEvent {
 type ConnectionRpcResult = Awaited<ReturnType<ConnectionRpcHandler>>
 type ConnectionRpcError = Extract<ConnectionRpcResult, { readonly ok: false }>['error']
 const NEVER_ABORTED_SIGNAL = new AbortController().signal
-const DEFAULT_WEBSOCKET_HEARTBEAT_INTERVAL_MS = 2_000
+const DEFAULT_WEBSOCKET_HEARTBEAT_INTERVAL_MS = 10_000
 const DEFAULT_STREAM_INBOX_BYTES = 262_144
 const EMPTY_ASYNC_ITERABLE: AsyncIterable<never> = {
   [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve({ value: undefined, done: true }) }),
@@ -144,7 +144,7 @@ const SRC_JSON_CODEC: TypertCodec = { mode: 'src-json' }
 
 /** Gateway transport configuration. */
 export interface Config {
-  /** WebSocket Ping interval from 1 through 2,147,483,647 milliseconds. @default 2000 */
+  /** WebSocket Ping interval from 1 through 2,147,483,647 milliseconds. @default 10000 */
   readonly websocketHeartbeatIntervalMs?: number
   /** Buffered uplink frame bytes one logical stream may hold before it fails with `gateway/uplink-overflow`. @default 262144 */
   readonly streamInboxBytes?: number

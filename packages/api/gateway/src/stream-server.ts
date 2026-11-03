@@ -37,7 +37,7 @@ type BoundStreamOpener = (
 /** Convert an invocation or carrier failure to a stable wire value. */
 export type RemoteStreamFailureMapper = (error: unknown) => RemoteStreamFailure
 
-const MAX_MISSED_HEARTBEATS = 2
+const MAX_MISSED_HEARTBEATS = 3
 
 /** Own the no-server WebSocket acceptor and every active logical stream. */
 export class RemoteStreamMuxServer {
