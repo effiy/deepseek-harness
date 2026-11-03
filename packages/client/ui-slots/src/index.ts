@@ -8,11 +8,6 @@
  * consumer `declare module` augmentation merges with declarations lexically in
  * the augmented module, not with re-exports.
  */
-/* oxlint-disable typescript/no-redundant-type-constituents --
- * `keyof SlotMap & string` is the declare-merge key pattern: SlotMap is empty
- * in THIS compilation unit (so the intersection reads as `never`), but every
- * consumer merges keys in and the intersection is what keeps them string-typed.
- * The rule fires on the empty-map view, not on real redundancy. */
 import type { ReactNode } from 'react'
 import type {
   BoundActions, HandleOf, PropsStore, SnapshotSelectorHook, StoreDecl,
@@ -907,6 +902,8 @@ interface SlotRecord {
   version: number
   listeners: Set<() => void>
   declarationListeners: Set<() => void>
+  /** Number of active parent entries declaring this child slot; cleared only at zero. */
+  declarerCount: number
 }
 
 interface FactoryRecord {
@@ -1011,6 +1008,15 @@ export class SlotCore {
     root.spec = { kind: 'single', scope: 'root' }
     root.declaredBy = '(built-in)'
     root.declarationEpoch = 1
+    root.declarerCount = 1
+  }
+
+  /** Two SlotSpecs match when they share `kind` and `scope` — re-declaration is a no-op. */
+  private static specsMatch(
+    a: SlotSpec<SlotEntryDef>,
+    b: SlotSpec<SlotEntryDef>,
+  ): boolean {
+    return a.kind === b.kind && a.scope === b.scope
   }
 
   /** Register one reusable Factory definition. */
@@ -1029,10 +1035,14 @@ export class SlotCore {
     if (record.definition !== undefined) {
       throw new Error(`slot factory "${options.name}" already has a definition`)
     }
-    for (const childKey of Object.keys(options.children ?? {})) {
+    for (const [childKey, childSpec] of Object.entries(options.children ?? {})) {
       const childRecord = this.records.get(childKey)
       if (childRecord?.spec !== undefined) {
-        throw new Error(`slot "${childKey}" is already declared (by ${childRecord.declaredBy ?? 'an unknown entry'})`)
+        const factoryParent = `factory:${options.name}`
+        if (!SlotCore.specsMatch(childRecord.spec, childSpec as SlotSpec<SlotEntryDef>)
+          || childRecord.parent !== factoryParent) {
+          throw new Error(`slot "${childKey}" is already declared (by ${childRecord.declaredBy ?? 'an unknown entry'})`)
+        }
       }
     }
     if (options.store !== undefined && typeof options.store !== 'function') {
@@ -1060,7 +1070,10 @@ export class SlotCore {
     const declarations: [string, SlotRecord][] = []
     for (const [childKey, childSpec] of Object.entries(options.children ?? {})) {
       const childRecord = this.record(childKey)
-      childRecord.spec = childSpec
+      childRecord.declarerCount += 1
+      if (childRecord.spec === undefined) {
+        childRecord.spec = childSpec
+      }
       childRecord.declaredBy = `factory "${options.name}"${options.registrant ? ` (${options.registrant})` : ''}`
       childRecord.parent = `factory:${options.name}`
       childRecord.declarationEpoch += 1
@@ -1239,10 +1252,13 @@ export class SlotCore {
         break
     }
     if (options.children) {
-      for (const childKey of Object.keys(options.children)) {
+      for (const [childKey, childSpec] of Object.entries(options.children)) {
         const childRec = this.records.get(childKey)
         if (childRec?.spec) {
-          throw new Error(`slot "${childKey}" is already declared (by ${childRec.declaredBy ?? 'an unknown entry'})`)
+          if (!SlotCore.specsMatch(childRec.spec, childSpec as SlotSpec<SlotEntryDef>)
+            || childRec.parent !== options.name) {
+            throw new Error(`slot "${childKey}" is already declared (by ${childRec.declaredBy ?? 'an unknown entry'})`)
+          }
         }
       }
     }
@@ -1288,7 +1304,10 @@ export class SlotCore {
       const declarations: [key: string, record: SlotRecord][] = []
       for (const [childKey, childSpec] of Object.entries(options.children)) {
         const childRec = this.record(childKey)
-        childRec.spec = childSpec
+        childRec.declarerCount += 1
+        if (childRec.spec === undefined) {
+          childRec.spec = childSpec
+        }
         childRec.declaredBy = `an entry in "${options.name}"${options.registrant ? ` (${options.registrant})` : ''}`
         childRec.parent = options.name
         childRec.declarationEpoch += 1
@@ -1597,15 +1616,21 @@ export class SlotCore {
       const childRec = this.records.get(childKey)
       /* v8 ignore next -- defensive: declaring always creates the record */
       if (!childRec) continue
-      const doomed = childRec.entries
-      childRec.spec = undefined
-      childRec.declaredBy = undefined
-      childRec.parent = undefined
-      childRec.declarationEpoch += 1
-      childRec.entries = NO_ENTRIES
-      this.markDirty(childKey, childRec)
-      this.notifyDeclaration(childRec)
-      for (const dead of doomed) this.releaseEntry(dead)
+      childRec.declarerCount -= 1
+      if (childRec.declarerCount <= 0) {
+        const doomed = childRec.entries
+        childRec.spec = undefined
+        childRec.declaredBy = undefined
+        childRec.parent = undefined
+        childRec.declarationEpoch += 1
+        childRec.entries = NO_ENTRIES
+        this.markDirty(childKey, childRec)
+        this.notifyDeclaration(childRec)
+        for (const dead of doomed) this.releaseEntry(dead)
+      } else {
+        childRec.declarationEpoch += 1
+        this.notifyDeclaration(childRec)
+      }
     }
   }
 
@@ -1621,6 +1646,7 @@ export class SlotCore {
         version: 0,
         listeners: new Set(),
         declarationListeners: new Set(),
+        declarerCount: 0,
       }
       this.records.set(key, rec)
     }
