@@ -21,6 +21,31 @@ export const SIDEBAR_COLLAPSED = 56
  * LG breakpoint); a manual toggle below it re-expands over the squeezed center
  * (stores.ts narrowExpanded). */
 export const SIDEBAR_AUTO_COLLAPSE = 1024
+/** Viewport thresholds for responsive component decisions, mirrored from the
+ * design-token `--ds-bp-*` CSS variables. */
+export const BP_MOBILE = 640
+export const BP_TABLET = 900
+export const BP_DESKTOP = 1100
+export const BP_WIDE = 1400
+/** Fine-grained breakpoints matching `--dsh-bp-*` tokens, for component-level
+ * responsive logic that needs finer steps than the layout-level BP_* set. */
+export const BP_XS = 400
+export const BP_SM = 480
+export const BP_MD = 768
+export const BP_LG = 1024
+/** Named responsive range derived from the current viewport width. */
+export type Breakpoint = 'mobile' | 'tablet' | 'desktop' | 'wide'
+/**
+ * Map a viewport width to its canonical breakpoint slot.
+ * @param viewportWidth - current viewport width in px.
+ * @returns 'mobile', 'tablet', 'desktop', or 'wide'.
+ */
+export function computeBreakpoint(viewportWidth: number): Breakpoint {
+  if (viewportWidth <= BP_MOBILE) return 'mobile'
+  if (viewportWidth <= BP_TABLET) return 'tablet'
+  if (viewportWidth <= BP_DESKTOP) return 'desktop'
+  return 'wide'
+}
 /** Right column drag clamp floor. */
 export const RIGHTBAR_MIN = 300
 /** Maximum normal right panel width as a fraction of the frame. */

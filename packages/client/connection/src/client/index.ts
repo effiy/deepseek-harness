@@ -186,14 +186,45 @@ function watchBrowserNetwork(controller: ConnectionController): () => void {
   const browser = (globalThis as { readonly window?: BrowserNetworkTarget }).window
   const initiallyAvailable = browser?.navigator?.onLine
   if (browser === undefined || initiallyAvailable === undefined) return () => {}
-  const online = (): void => { controller.setNetworkAvailable(true) }
-  const offline = (): void => { controller.setNetworkAvailable(false) }
   controller.setNetworkAvailable(initiallyAvailable)
+
+  // Debounce rapid online/offline transitions that some platforms fire during
+  // Wi-Fi handoff or interface changes.  Without a hold-off window each
+  // on→off→on sequence resets the backoff and triggers a fresh generation
+  // attempt, which reads as a flickering reconnection indicator.
+  const DEBOUNCE_MS = 500
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined
+  let pendingState: boolean | undefined
+
+  const apply = (available: boolean): void => {
+    if (pendingState === available) return
+    pendingState = available
+    if (debounceTimer !== undefined) {
+      clearTimeout(debounceTimer)
+      debounceTimer = undefined
+    }
+    debounceTimer = setTimeout(() => {
+      debounceTimer = undefined
+      if (pendingState !== undefined) {
+        controller.setNetworkAvailable(pendingState)
+        pendingState = undefined
+      }
+    }, DEBOUNCE_MS)
+  }
+  const online = (): void => { apply(true) }
+  const offline = (): void => { apply(false) }
+
+  if (initiallyAvailable) pendingState = true
+
   browser.addEventListener('online', online)
   browser.addEventListener('offline', offline)
   return () => {
     browser.removeEventListener('online', online)
     browser.removeEventListener('offline', offline)
+    if (debounceTimer !== undefined) {
+      clearTimeout(debounceTimer)
+      debounceTimer = undefined
+    }
   }
 }
 

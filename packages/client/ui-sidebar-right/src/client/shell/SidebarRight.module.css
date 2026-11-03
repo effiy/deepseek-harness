@@ -63,6 +63,10 @@
 
 .panel[data-sidebar-right-panel='fullscreen'] {
   --dsh-dockkit-dock-layer: 40;
+  /* Push content below the device notch / status bar on mobile when the
+     right panel covers the full viewport. On desktop safe-area-inset-top
+     resolves to 0 so this adds no extra space. */
+  padding-top: var(--ds-safe-top, env(safe-area-inset-top, 0px));
 }
 
 /* No whole-box subtraction here: Electron drag regions are window geometry,

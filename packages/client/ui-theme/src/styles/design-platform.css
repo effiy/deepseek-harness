@@ -408,3 +408,32 @@ html[data-platform='darwin'] body {
 html[data-platform='darwin'] body[data-ds-dark-theme] {
   --dsw-specific-menu: rgba(48, 49, 54, 0.94);
 }
+
+/* ------------------------------------------------------------------
+ * Responsive breakpoints
+ *
+ * Design-token widths consumed by CSS container/media queries and
+ * mirrored as TS constants in ui-layout's columns.ts.  Components
+ * read these variables for consistent responsive thresholds and may
+ * also receive the active breakpoint name through the layout store.
+ * ------------------------------------------------------------------ */
+
+/* Fine-grained breakpoints for component-level responsive decisions.
+   CSS media queries cannot consume custom properties directly, so the
+   numeric values are repeated in @media conditions with a comment
+   referencing the token.  TS equivalents live in columns.ts. */
+body {
+  --dsh-bp-xs: 400px;   /* tiny screens */
+  --dsh-bp-sm: 480px;   /* phone landscape */
+  --dsh-bp-md: 768px;   /* tablet portrait (standardized from 760/767) */
+  --dsh-bp-lg: 1024px;  /* tablet landscape (standardized from 1023) */
+}
+
+/* Layout-level breakpoints consumed by AppFrame/sidebar/bottom-nav
+   switching.  Coarser than the component-level tokens above. */
+body {
+  --ds-bp-mobile: 640px;
+  --ds-bp-tablet: 900px;
+  --ds-bp-desktop: 1100px;
+  --ds-bp-wide: 1400px;
+}

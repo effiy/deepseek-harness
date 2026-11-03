@@ -89,7 +89,7 @@
   height: 20px;
 }
 
-/* ── Mobile (≤640px) ─────────────────────────────────────────────── */
+/* ── Mobile (≤640px) — matches --ds-bp-mobile ──────────────────── */
 
 @media (max-width: 640px) {
   .menu {

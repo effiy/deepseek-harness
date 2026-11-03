@@ -289,7 +289,7 @@
   pointer-events: auto;
 }
 
-/* Narrow viewports (≤640 px · mobile portrait & landscape phones):
+/* Narrow viewports (≤640px · mobile portrait & landscape phones):
  * the sidebar becomes a fixed overlay that slides in from the left without
  * pushing content — the grid column stays at 0 so the conversation fills
  * the viewport.
@@ -307,6 +307,7 @@
  * - The backdrop stays pointer-events:none in both states: the sidebar JS
  *   listens on document.body for mousedown outside .bt-side, so the backdrop
  *   only provides the visual dimming. */
+/* matches --ds-bp-mobile: 640px */
 @media (max-width: 640px) {
   .frame {
     grid-template-columns: 0px minmax(0px, 1fr) 0px !important;

@@ -1,6 +1,7 @@
 /* Full-viewport layer (figma Mask + Dialog 451:18655): mask + centered card.
    24px of air on every side; the top/bottom widen to the frame's published
-   overlay inset so a tall card stays clear of it.
+   overlay inset and the device safe-area so a tall card stays clear of both
+   desktop chrome and mobile notches.
    Cards size against this padding box: consumers cap growth with
    `max-height: 100%`, never their own viewport calc. */
 .root {
@@ -11,7 +12,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: max(24px, var(--dsh-frame-overlay-top, 24px)) 24px;
+  padding: calc(max(24px, var(--dsh-frame-overlay-top, 24px)) + var(--ds-safe-top, env(safe-area-inset-top, 0px)))
+            24px;
 }
 
 /* Only paint excludes the native caption; the root still blocks background clicks. */
@@ -52,6 +54,31 @@
   to { opacity: 1; }
 }
 
+/* ── Mobile sheet animation ───────────────────────────────────────────────
+ * On narrow viewports modals behave like bottom sheets: they slide up
+ * from the bottom edge with a gentle spring curve.  The dialog stays
+ * vertically centred on wider screens but enters from below on mobile,
+ * matching the native iOS/Android sheet transition. */
+/* matches --ds-bp-mobile: 640px */
+@media (max-width: 640px) {
+  @keyframes modalSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(32px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .dialog {
+    animation: modalSlideUp 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+/* Must come AFTER the mobile block so it overrides both modalEnter and
+ * modalSlideUp when the OS reduced-motion preference is enabled. */
 @media (prefers-reduced-motion: reduce) {
   .mask::after, .dialog { animation: none; }
 }

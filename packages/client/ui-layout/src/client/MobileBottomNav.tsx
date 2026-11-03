@@ -4,8 +4,8 @@
  * layout store instance as a bare observable (the framework binds it to
  * `useLayoutStore`) and the bound `actions`.
  *
- * The component always renders; CSS `@media (max-width: 1023px)` on `.root`
- * hides the bar above the SIDEBAR_AUTO_COLLAPSE breakpoint so the footer
+ * The component always renders; CSS `@media (max-width: 899px)` on `.root`
+ * hides the bar above the `--ds-bp-tablet` threshold (900 px) so the footer
  * row stays at zero height on wide viewports.
  */
 import { brandString } from '@deepseek-ai/dsh-brand'

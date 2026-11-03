@@ -149,6 +149,7 @@
   }
 }
 
+/* matches --dsh-bp-sm: 480px */
 @media (max-width: 480px) {
   .body {
     --dsh-chat-flow-gap: 8px;

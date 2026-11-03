@@ -1969,7 +1969,8 @@
   font: var(--dsw-font-xs-13);
 }
 
-@media (max-width: 760px) {
+/* matches --dsh-bp-md: 768px */
+@media (max-width: 768px) {
   .details {
     position: absolute;
     z-index: 5;

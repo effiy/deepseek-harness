@@ -1,6 +1,22 @@
 /* Shell-owned mount defaults. Theme tokens arrive with the ui-theme client
  * plugin before the loader roster activates. */
 
+/* ------------------------------------------------------------------
+ * Safe-area fallback variables
+ *
+ * Centralised aliases for env(safe-area-inset-*) so components never
+ * repeat the raw env call.  Platform CSS publishes the real values
+ * through the visualViewport/keyboard modules; these fallbacks are
+ * used when the platform hasn't published them yet (SSR / first paint).
+ * ------------------------------------------------------------------ */
+
+:root {
+  --ds-safe-top: env(safe-area-inset-top, 0px);
+  --ds-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ds-safe-left: env(safe-area-inset-left, 0px);
+  --ds-safe-right: env(safe-area-inset-right, 0px);
+}
+
 html,
 body,
 #root {

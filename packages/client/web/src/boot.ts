@@ -14,6 +14,7 @@ import { BootPage } from './boot-page.ts'
 import { mountClient } from './mount.ts'
 import { getStaticModules } from './seed.ts'
 import { installWindowDragRecall } from './window-drag/recall.ts'
+import { installKeyboardInset } from './keyboard-inset.ts'
 import './base.css'
 
 /** Module transport hook replaced by jsdom tests. */
@@ -48,6 +49,11 @@ export class AppWebEntry {
    */
   async run(onFailure?: (reason: unknown) => void): Promise<void> {
     try {
+      // Install the keyboard-height observer before the first paint so the
+      // composer seat can offset itself above the virtual keyboard from the
+      // very first focusin event.  The observer is pure DOM — no framework
+      // or loader dependency.
+      installKeyboardInset()
       // Boot-readiness gate: whichever bootstrap applies the injection table
       // settles this deferred once every row has taken effect — the served
       // index resolves it in the rendered tail, so the await returns on the

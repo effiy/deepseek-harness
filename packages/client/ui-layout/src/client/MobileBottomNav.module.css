@@ -1,6 +1,6 @@
 /* ------------------------------------------------------------------
  * Mobile bottom tab bar — rendered in the AppFrame's shell.bottom
- * slot on narrow viewports (≤1023 px).
+ * slot on narrow viewports (≤900 px, the `--ds-bp-tablet` threshold).
  *
  * Visual design:
  *   • Glassmorphism — backdrop-filter blur over a semi-transparent
@@ -33,7 +33,7 @@
   box-shadow: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -4px 16px rgb(0 0 0 / 0.06);
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 899px) {
   .root {
     display: flex;
   }

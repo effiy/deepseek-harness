@@ -200,6 +200,18 @@ function UserStyleBubble({
 
   // ── Context-menu state: long-press / right-click ──
   const bubbleRef = useRef<HTMLDivElement>(null)
+
+  // Mount animation: set data-message-fresh on the bubble so CSS triggers the
+  // message-bubble-enter animation.  Remove after animationend so the attribute
+  // does not re-trigger on subsequent re-renders or Recycler restores.
+  useEffect(() => {
+    const el = bubbleRef.current
+    if (el === null) return
+    el.setAttribute('data-message-fresh', '')
+    const onEnd = () => { el.removeAttribute('data-message-fresh') }
+    el.addEventListener('animationend', onEnd)
+    return () => { el.removeEventListener('animationend', onEnd) }
+  }, [])
   const [menu, setMenu] = useState<{
     items: ContextMenuItem[]
     top: number

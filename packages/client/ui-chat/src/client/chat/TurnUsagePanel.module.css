@@ -56,6 +56,7 @@
    `.action` geometry (28px circle, 6px padding, centered glyph); the
    label-padding rebate no longer applies, so the pair keeps the row's plain
    8px rhythm. The dialogs keep the words. */
+/* matches --dsh-bp-sm: 480px */
 @media (max-width: 480px) {
   .trigger {
     justify-content: center;

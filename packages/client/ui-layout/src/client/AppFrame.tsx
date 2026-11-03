@@ -271,6 +271,7 @@ export function AppFrame({
       data-rightbar-instant={layoutInfo.rightbarInstant || undefined}
       data-dragging={dragging || undefined}
       data-animating={animating > 0 || undefined}
+      data-bp={layoutInfo.breakpoint}
     >
       <DocumentTitle
         productTitle={productTitle}

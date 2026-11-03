@@ -20,6 +20,14 @@
   opacity: 0.4;
 }
 
+/* Touch press feedback: scale down to 0.97× on press for tactile feedback.
+ * Transform-only change runs on the compositor — no repaint, 60 fps.
+ * Duration kept short (100ms) so the release feels snappy. */
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 100ms var(--ds-ease-in-out);
+}
+
 .md {
   height: 36px;
 }
@@ -84,4 +92,11 @@
   height: 16px;
   align-items: center;
   justify-content: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button:active:not(:disabled) {
+    transform: none;
+    transition: none;
+  }
 }

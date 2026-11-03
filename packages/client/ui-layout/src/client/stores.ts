@@ -5,8 +5,10 @@
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from './service.ts'
 import {
-  clampWidth, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN,
-  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+  clampWidth, computeBreakpoint, RIGHTBAR_DEFAULT_RATIO,
+  RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE,
+  SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+  type Breakpoint,
 } from './columns.ts'
 
 /**
@@ -25,6 +27,12 @@ type LayoutInfo = {
   sidebar: number
   /** Last positive frame measurement; window width bootstraps the first render. */
   viewportWidth: number
+  /**
+   * Active responsive breakpoint slot derived from viewportWidth, mirrored from
+   * the design-token `--ds-bp-*` CSS variables. Components may read it instead
+   * of repeating a media-query threshold.
+   */
+  breakpoint: Breakpoint
   narrowExpanded: boolean
   /**
    * Saved right panel width in px, or null before its first opening. Resizing
@@ -82,6 +90,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       layoutInfo: {
         sidebar: SIDEBAR_DEFAULT,
         viewportWidth: window.innerWidth,
+        breakpoint: computeBreakpoint(window.innerWidth),
         narrowExpanded: false,
         rightbar: null,
         rightbarShown: false,
@@ -119,6 +128,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
           d.layoutInfo.narrowExpanded = false
         }
         d.layoutInfo.viewportWidth = width
+        d.layoutInfo.breakpoint = computeBreakpoint(width)
       },
       setRightbar: (d, px: number) => {
         d.layoutInfo.rightbarInstant = false

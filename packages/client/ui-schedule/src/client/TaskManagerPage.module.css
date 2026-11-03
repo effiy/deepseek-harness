@@ -1429,14 +1429,14 @@
 }
 
 /* The mock's `.automation-detail` gutter steps: 24px by default, 20px from the
-   `1100px` breakpoint down, and 16px at the narrowest one. */
+   `1100px` breakpoint down, and 16px at the narrowest one. — matches --ds-bp-desktop */
 @media (max-width: 1100px) {
   .detail {
     --detail-gutter: 20px;
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .hasDetails .listPane {
     display: none;
   }
@@ -1455,6 +1455,7 @@
   }
 }
 
+/* matches --dsh-bp-xs: 400px */
 @media (max-width: 400px) {
   .detail {
     --detail-gutter: 16px;
