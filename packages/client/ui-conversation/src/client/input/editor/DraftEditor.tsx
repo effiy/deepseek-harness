@@ -43,7 +43,7 @@ export function DraftEditor({
         <ComposerContentEditable
           editor={workspaceTrigger ? null : editor}
           editable={editable}
-          readOnly={readOnly}
+          {...readOnly !== undefined ? { readOnly } : {}}
           className={clsx(css.input, editorDisabled && css.inputDisabled)}
           data-phase={phase}
           aria-disabled={editorDisabled || undefined}

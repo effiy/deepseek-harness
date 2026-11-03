@@ -203,6 +203,7 @@
    less than 16px, changing the visual-viewport width and causing a horizontal
    scrollbar.  16px is also the designer-recommended floor for mobile body text
    (design audit T1). */
+/* matches --ds-bp-mobile: 640px */
 @media (max-width: 640px) {
   .input {
     font-size: 16px;
@@ -345,6 +346,38 @@
   cursor: default;
 }
 
+/* Virtual-keyboard toggle: same 28×28 px toolbar button footprint as
+   the attach (+) control, but transparent so it reads as a mode switch
+   rather than a primary action.  The icon color follows the tertiary
+   label to stay quiet while inactive. */
+.keyboard {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.keyboard:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.keyboard:active:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.keyboard:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Plan / Read-only / model — native <select>, chip-like closed chrome
    (figma ToggleButton: 13/20 medium secondary, 12px chevron). */
 .select {
@@ -410,6 +443,14 @@
   cursor: default;
 }
 
+/* Press feedback: scale down to 0.9× while keeping the row's translateY(-2px)
+ * seat correction.  Compound transform prevents the button from visually
+ * drifting during the press. */
+.primary:active:not(:disabled) {
+  transform: translateY(-2px) scale(0.9);
+  transition: transform 100ms var(--ds-ease-in-out);
+}
+
 .retry {
   margin-left: 8px;
   padding: 1px 8px;
@@ -444,6 +485,7 @@
    footprint and bring the toolbar closer to the text area.
    Side clearance comes from --dsh-composer-side-clearance (12px at
    ≤640px) — no override needed here. */
+/* matches --dsh-bp-sm: 480px */
 @media (max-width: 480px) {
   .root {
     /* Wider side clearance for mobile — prevents card from appearing
@@ -496,7 +538,8 @@
   background: var(--dsw-alias-interactive-bg-active);
 }
 
-@media (max-width: 1023px) {
+/* matches --dsh-bp-lg: 1024px */
+@media (max-width: 1024px) {
   .sidebarToggle {
     display: flex;
   }
@@ -506,5 +549,12 @@
   .sidebarToggle {
     min-width: 44px;
     min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary:active:not(:disabled) {
+    transform: translateY(-2px);
+    transition: none;
   }
 }

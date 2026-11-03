@@ -38,6 +38,14 @@ export function ComposerContentEditable({ editor, editable, readOnly, ...rest }:
   useLayoutEffect(() => {
     if (editor !== null) editor.setEditable(editable)
   }, [editor, editable])
+  // readOnly is not a standard HTMLDivElement attribute in React's types,
+  // so we set it imperatively on the DOM element for mobile keyboard control.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (el === null) return
+    if (readOnly) el.setAttribute('readonly', '')
+    else el.removeAttribute('readonly')
+  }, [readOnly])
   return (
     <div
       ref={ref}
@@ -45,10 +53,6 @@ export function ComposerContentEditable({ editor, editable, readOnly, ...rest }:
       // renders it, and setEditable above keeps the editor's own gate in step.
       contentEditable={editor !== null && editable}
       suppressContentEditableWarning
-      // On mobile the readOnly attribute prevents the system soft-keyboard
-      // while preserving focusability for caret visibility.  Lexical's
-      // programmatic editor.update() still mutates the DOM as normal.
-      readOnly={readOnly || undefined}
       role="textbox"
       aria-multiline="true"
       data-composer-input=""

@@ -35,7 +35,6 @@ import {
   keepDraftFocus, revealDraftSelection,
 } from '../input/editor/view-binding.ts'
 import { resolveSubmitMode } from '../input/submission-policy.ts'
-import { VirtualKeyboard } from '../virtual-keyboard/VirtualKeyboard.tsx'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { isImageMediaType } from '../service.ts'
 import { ContextMeter } from './ContextMeter.tsx'
@@ -61,10 +60,6 @@ export const InputBar = memo(function InputBar({
   void useLexicon // hook seat stays bound by the inject compartment; text-ref decoration rides the shell's editor transforms
   const commandMenuOpen = useMenuLauncher(source => source === 'command')
   const [activity, setActivity] = useState(false)
-  const [showVK, setShowVK] = useState(false)
-  // Only mobile devices expose the Visual Viewport API; suppress the
-  // system keyboard on mobile so the virtual keyboard can take over.
-  const suppressSysKb = typeof window !== 'undefined' && window.visualViewport !== null
   useEffect(() => { setActivity(false) }, [sessionId])
   const promptError = useSession(s => s.promptError) ?? null
   const running = useSession(s => s.running) ?? false
@@ -304,15 +299,6 @@ export const InputBar = memo(function InputBar({
     const target = e.target
     if (!(target instanceof Element) || !e.currentTarget.contains(target)) return
     if (target.closest('[data-composer-overlay]') !== null) return
-    // Mobile: intercept every card-area tap.  readOnly on the contentEditable
-    // prevents the system soft-keyboard; preventDefault stops the browser from
-    // focusing the editable element during the tap sequence so the viewport
-    // never adjusts.  Show the virtual keyboard instead.
-    if (suppressSysKb && editor !== null) {
-      e.preventDefault()
-      setShowVK(true)
-      return
-    }
     if (scrollRef.current?.contains(target)) return
     const control = target.closest('button, a, input, select, textarea, [role="button"], [contenteditable], [tabindex]')
     if (control !== null && e.currentTarget.contains(control)) return
@@ -450,7 +436,6 @@ export const InputBar = memo(function InputBar({
           scrollRef={scrollRef}
           editable={editable}
           editorDisabled={editorDisabled}
-          readOnly={suppressSysKb}
           phase={input?.phase ?? 'inert'}
           placeholderText={placeholderText}
           ariaLabel={workspaceTrigger ? t('hero.chooseWorkspace') : placeholderText}
@@ -459,7 +444,6 @@ export const InputBar = memo(function InputBar({
           onWorkspaceKeyDown={onWorkspaceKeyDown}
           hint={hint}
           showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
-          {...suppressSysKb ? { inputMode: 'none' as const } : {}}
         />
         <div ref={rowRef} className={css.row}>
           <div className={css.tools} hidden={activity}>
@@ -564,15 +548,6 @@ export const InputBar = memo(function InputBar({
           : null}
         {activity ? null : <ContextMeter useProjection={useProjection} t={t} />}
       </div>
-      {showVK && editor !== null && (
-        <VirtualKeyboard
-          editor={editor}
-          visible={showVK}
-          doneLabel={t('virtualKeyboard.done')}
-          spaceLabel={t('virtualKeyboard.space')}
-          onHide={() => { setShowVK(false) }}
-        />
-      )}
     </section>
   )
 })
