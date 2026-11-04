@@ -216,6 +216,15 @@
   padding-bottom: 0;
 }
 
+/* Touch devices have no hover — wide tables must always be scrollable
+   so the user can swipe horizontally to see hidden columns. */
+@media (pointer: coarse) {
+  .tableScroll:global(.md-table-wide) {
+    overflow-x: auto;
+    padding-bottom: 0;
+  }
+}
+
 /* Chromium keyboard-focuses scrollable containers by default; the ring uses
    the sheet's link focus color. */
 .tableScroll:focus-visible {
@@ -464,4 +473,19 @@
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 18px;
+}
+
+/* ── Mobile: compact markdown spacing ───────────────────────────────────
+ * Tighten heading and paragraph margins on narrow screens so the reader
+ * sees more content per screen without sacrificing hierarchy. */
+@media (max-width: 640px) {
+  .markdown :where(h1, h2, h3) {
+    margin: 20px 0 10px;
+  }
+  .markdown :where(h4, h5, h6) {
+    margin: 14px 0 6px;
+  }
+  .markdown p {
+    margin: 12px 0;
+  }
 }

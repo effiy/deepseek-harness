@@ -143,3 +143,13 @@
   content: counter(source-line);
   user-select: none;
 }
+
+/* ── Mobile: tighter code-block margins ────────────────────────────────── */
+@media (max-width: 640px) {
+  .block {
+    margin: 10px 0;
+  }
+  .block:not(:last-child) {
+    margin-bottom: 8px;
+  }
+}

@@ -51,4 +51,24 @@
   cursor: pointer;
 }
 
+/* Mobile: reduce padding so the image uses more of the small screen,
+   and push the close button into the safe area so it stays reachable
+   below the notch / above the home indicator.  44px touch target. */
+@media (max-width: 640px) {
+  .stage {
+    padding: 12px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+  }
+
+  .close {
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .close:focus-visible { outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 3px; }

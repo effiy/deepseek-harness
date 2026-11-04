@@ -358,15 +358,13 @@
       0 4px 12px rgba(0, 0, 0, 0.08);
   }
 
-  /* Collapsed: completely invisible — no border, no background, no
-     interaction. translate3d alone cannot guarantee full invisibility
-     on every mobile engine (iOS Safari can bleed compositor layers
-     from a fixed-position transform). */
+  /* Collapsed: fully removed from the render tree — no compositing,
+     no interaction, no visual trace.  display:none is the only way to
+     guarantee zero rendering on every mobile engine (visibility:hidden
+     can still bleed compositor layers from a fixed-position transform
+     on iOS Safari). */
   .frame[data-sidebar-collapsed] .sidebarCol {
-    visibility: hidden;
-    border-right: none;
-    background: transparent;
-    box-shadow: none;
+    display: none !important;
   }
 
   /* Visual backdrop: only rendered when the sidebar is expanded.

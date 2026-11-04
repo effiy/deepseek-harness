@@ -124,3 +124,40 @@ select,
 textarea {
   font-family: inherit;
 }
+
+/* ── Mobile touch optimisations ──────────────────────────────────────────
+ * Global defaults for touch-capable devices.  Component-level overrides
+ * (e.g. CodeBlock's `user-select: text`) take precedence. */
+
+/* Prevent iOS from flashing a grey tap highlight on every touch.
+ * Already set on individual components; this is the global safety net. */
+@media (pointer: coarse) {
+  :is(button, a, [role='button'], [role='link'], [role='tab'], [role='menuitem']) {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Prevent accidental text selection on interactive surfaces during
+ * rapid taps (common on mobile scroll-then-tap). */
+@media (pointer: coarse) {
+  :is(button, [role='button'], [role='tab'], nav) {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* Disable iOS long-press callout on interactive elements so the
+ * system "Look Up" / "Share" menu doesn't steal the tap. */
+@media (pointer: coarse) {
+  :is(button, a, [role='button']) {
+    -webkit-touch-callout: none;
+  }
+}
+
+/* Allow the root scrollable regions to declare touch-action so
+ * children can consume gestures without the viewport fighting back. */
+@media (pointer: coarse) {
+  html, body {
+    touch-action: manipulation;
+  }
+}
