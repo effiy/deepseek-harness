@@ -469,12 +469,17 @@
 .activity:empty { display: none; }
 .activityExpanded { flex: 1; min-width: 0; }
 
-/* Touch devices: enlarge the send button to a 44 px minimum touch
-   target (WeChat-style affordance for thumb-driven typing).  The
-   border-radius stays 999 px so it remains circular. */
+/* Touch devices: enlarge all toolbar buttons to a 44 px minimum touch
+   target (Apple HIG / WCAG 2.5.5).  The send button and toolbar controls
+   share the same minimum so the row height stays uniform. */
 @media (pointer: coarse) {
-  .primary {
+  .primary,
+  .add,
+  .keyboard {
     min-width: 44px;
+    min-height: 44px;
+  }
+  .select {
     min-height: 44px;
   }
 }

@@ -36,7 +36,7 @@
     "@deepseek-ai/dsh-launch-environment": "workspace:*",
     "@deepseek-ai/dsh-util-values": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
-    "undici": "^7.18.0"
+    "undici": "^7.30.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

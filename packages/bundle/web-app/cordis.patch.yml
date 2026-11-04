@@ -75,6 +75,12 @@
     - id: session-log-download
       name: '@deepseek-ai/dsh-session-log-export'
 
+    # Unauthenticated readiness check for load balancers and orchestrators.
+    # Answers 200 { status: "ok", uptime: <seconds> } without going through
+    # the browser authentication layer.
+    - id: health-endpoint
+      name: '@deepseek-ai/dsh-host-health-endpoint'
+
     # Session-header "Open In..." split button over the host application
     # resolution (macOS/Windows/Linux; a host with no resolved application
     # renders no button). Two halves: the host routes and the browser surface.

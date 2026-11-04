@@ -7,6 +7,7 @@ import {
 } from '../rpc.ts'
 import type { ClientConnectionRpc, ConnectionRpcResult } from '../rpc.ts'
 import { randomUuid } from './random-uuid.ts'
+import { createRetryFetch, type FetchRetryPolicy } from './retry-fetch.ts'
 
 const CHANNEL_PATTERN = /^\/[A-Za-z0-9._~-]+$/
 const ENDPOINT_SEGMENT_PATTERN = /^[A-Za-z0-9_$.-]+$/
@@ -29,10 +30,16 @@ export type RpcStreamOpen = (
  * Create the browser-backed generic RPC caller.
  * @param doFetch - transport override; defaults to the page's global fetch.
  * @param openStream - optional worker-local Gateway stream carrier.
+ * @param retryPolicy - retry timing for transient fetch failures; absent uses defaults (3 retries, 1s/2s/4s).
  * @returns caller that owns request correlation and response-envelope validation.
  */
-export function createWebConnectionRpc(doFetch?: RpcFetch, openStream?: RpcStreamOpen): ClientConnectionRpc {
-  const send: RpcFetch = doFetch ?? ((input, init) => globalThis.fetch(input, init))
+export function createWebConnectionRpc(
+  doFetch?: RpcFetch,
+  openStream?: RpcStreamOpen,
+  retryPolicy?: FetchRetryPolicy,
+): ClientConnectionRpc {
+  const rawSend: RpcFetch = doFetch ?? ((input, init) => globalThis.fetch(input, init))
+  const send = createRetryFetch(rawSend, retryPolicy)
   return {
     async call(channel, endpoint, payload, signal) {
       assertTarget(channel, endpoint)

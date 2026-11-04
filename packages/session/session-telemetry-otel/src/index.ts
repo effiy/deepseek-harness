@@ -1,9 +1,12 @@
 /**
  * OpenTelemetry Service Provider for the DeepSeek Harness telemetry capability.
  *
- * Authorizes feedback-bounded capture and hands complete event strings to the
- * Session-log reporter. This plugin owns resource identity and an outer
- * shutdown deadline; the reporter owns byte-bounded SDK delivery.
+ * Authorizes capture and hands complete event records to the Session-log
+ * reporter. This plugin owns resource identity and an outer shutdown deadline;
+ * the reporter owns byte-bounded SDK delivery. The deployment selects among
+ * three sharing policies: `FULL` (live capture of every event), `FEEDBACK_ONLY`
+ * (capture authorized only by explicit feedback submission), and `DISABLED`
+ * (no SDK pipeline).
  *
  * @module @deepseek-ai/dsh-session-telemetry-otel
  */
@@ -29,8 +32,12 @@ import { SeverityNumber } from '@opentelemetry/api-logs'
 
 /** Session-sharing policy selected by {@link Config.mode}. */
 export enum SessionTelemetryMode {
+  /** Capture and export session events only when the user explicitly submits feedback. */
   FEEDBACK_ONLY = 'FEEDBACK_ONLY',
+  /** Do not construct the SDK pipeline; no events are exported. */
   DISABLED = 'DISABLED',
+  /** Capture and export every session event in real time through the live coordinator. */
+  FULL = 'FULL',
 }
 
 /** Default session-sharing policy for schema and direct construction. */
@@ -56,6 +63,7 @@ function resolveMode(mode: SessionTelemetryMode | undefined): SessionTelemetryMo
   switch (resolved) {
     case SessionTelemetryMode.FEEDBACK_ONLY:
     case SessionTelemetryMode.DISABLED:
+    case SessionTelemetryMode.FULL:
       return resolved
     default:
       return assertNever(resolved)
@@ -72,6 +80,7 @@ function sharingStatusFor(mode: SessionTelemetryMode): SessionTelemetrySharingSt
   switch (mode) {
     case SessionTelemetryMode.FEEDBACK_ONLY: return 'feedback-only'
     case SessionTelemetryMode.DISABLED: return 'disabled'
+    case SessionTelemetryMode.FULL: return 'full'
     /* v8 ignore next 2 -- resolveMode already rejected unknown values before this switch; the closed enum cannot reach the default. */
     default: return assertNever(mode)
   }
@@ -83,7 +92,8 @@ function sharingStatusFor(mode: SessionTelemetryMode): SessionTelemetrySharingSt
  * and shutdown deadline at plugin load; `DISABLED` reads neither.
  */
 export interface Config {
-  /** Defaults to `FEEDBACK_ONLY`: capture session history only when feedback is explicitly submitted. */
+  /** Defaults to `FEEDBACK_ONLY`: capture session history only when feedback is explicitly submitted.
+   * `FULL` captures every event in real time. */
   mode?: SessionTelemetryMode
   /**
    * Explicit SDK HTTP transport settings, including optional routing headers.
@@ -137,9 +147,12 @@ const SEVERITY: Record<SessionTelemetrySeverity, SeverityNumber> = {
 
 /**
  * The backend plugin — the only entry a deployment loads. It always registers
- * the `sessionTelemetry` service (duplicate load throws). `FEEDBACK_ONLY` wires the SDK
- * pipeline and on-demand {@link SessionTelemetryCoordinator}; `DISABLED` constructs no
- * SDK state and listens only to warn when recorded feedback stays local.
+ * the `sessionTelemetry` service (duplicate load throws). `FULL` wires the SDK
+ * pipeline and a live-capture {@link SessionTelemetryCoordinator} that exports
+ * every session event in real time. `FEEDBACK_ONLY` wires the SDK pipeline and
+ * an on-demand coordinator triggered only by feedback events. `DISABLED`
+ * constructs no SDK state and listens only to warn when recorded feedback stays
+ * local.
  */
 export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
   static inject = ['sessions', 'otel']
@@ -217,30 +230,32 @@ export class OpenTelemetrySessionBackend extends SessionTelemetryBackend {
       shutdown: () => this.shutdown(),
     }
     const coordinator = new SessionTelemetryCoordinator(ctx, backend, {
-      capture: 'on-demand',
+      capture: mode === SessionTelemetryMode.FULL ? 'live' : 'on-demand',
       includeHistory: true,
     })
-    ctx.on('session/event', (session, event) => {
-      if (!isFeedback(session, event)) return
-      // Only the canonical appended event authorizes this exact prefix.
-      // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
-      if (session.eventAt(event.seq) !== event) {
-        ctx.logger.warn(NON_CANONICAL_EVENT_WARNING)
-        return
-      }
-      coordinator.captureSession(session, event.seq)
-    })
-    ctx.on('feedback/committed', (inspection) => {
-      const snapshot = structuredClone(inspection)
-      const committed = snapshot.events.at(-1)
-      if (committed === undefined) return
-      const session = Session.fromRestore(
-        snapshot.meta.id, snapshot.events, snapshot.meta, snapshot.inheritedEventCount,
-        'detached', ctx.sessions.messageProjections,
-      )
-      // fromRestore appends a lifecycle marker that this submission did not commit.
-      if (isFeedback(session, committed)) coordinator.captureSession(session, committed.seq)
-    })
+    if (mode === SessionTelemetryMode.FEEDBACK_ONLY) {
+      // Only explicit user feedback authorizes replay of the ledger prefix.
+      ctx.on('session/event', (session, event) => {
+        if (!isFeedback(session, event)) return
+        // Only the canonical appended event authorizes this exact prefix.
+        if (session.eventAt(event.seq) !== event) {
+          ctx.logger.warn(NON_CANONICAL_EVENT_WARNING)
+          return
+        }
+        coordinator.captureSession(session, event.seq)
+      })
+      ctx.on('feedback/committed', (inspection) => {
+        const snapshot = structuredClone(inspection)
+        const committed = snapshot.events.at(-1)
+        if (committed === undefined) return
+        const session = Session.fromRestore(
+          snapshot.meta.id, snapshot.events, snapshot.meta, snapshot.inheritedEventCount,
+          'detached', ctx.sessions.messageProjections,
+        )
+        // fromRestore appends a lifecycle marker that this submission did not commit.
+        if (isFeedback(session, committed)) coordinator.captureSession(session, committed.seq)
+      })
+    }
   }
 
   /**

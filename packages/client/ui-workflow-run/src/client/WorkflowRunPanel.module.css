@@ -258,10 +258,62 @@
   padding: 0;
 }
 
+/* ── Narrow viewports (≤560px): accordion-friendly compact layout ────
+
+   At phone widths the phase headers need more space for readable titles.
+   We relax the percentage cap so titles span most of the row, tighten
+   gaps and padding, and let the status tails wrap naturally.  The
+   DisclosureRow-based accordion toggle (open / onToggle) already works
+   without layout changes — this block only tunes the visual fit. */
+
 @media (max-width: 560px) {
   .phaseList,
   .members {
     padding-left: 12px;
+  }
+
+  /* Let the phase title take the room it needs instead of capping at
+     42% — on a 320 px screen that is only 134 px wide. */
+  .phaseTitle {
+    max-width: none;
+    flex: 1 1 auto;
+  }
+
+  /* The phase counts and statuses stay visible but may wrap when the
+     title is long; the row is tall enough to hold two text lines. */
+  .phaseHeader {
+    flex-wrap: wrap;
+    gap: 4px;
+    min-height: 44px;   /* 44 px touch target for toggling the accordion */
+    height: auto;
+    padding: 4px 0;
+  }
+
+  .phaseCount {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .phaseStatus {
+    flex: 0 0 auto;
+  }
+
+  /* Narrower gaps in the run header so its collapsed summary fits. */
+  .runHeader {
+    gap: 4px;
+    min-height: 44px;
+    height: auto;
+  }
+
+  .memberRow,
+  .memberButton {
+    gap: 8px;
+    min-height: 40px;
+  }
+
+  /* Compact the dot slot on narrow screens. */
+  .dotSlot {
+    width: 14px;
   }
 }
 

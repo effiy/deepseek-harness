@@ -179,3 +179,12 @@
 :global([data-ds-dark-theme]) .keySpecial:active {
   background: color-mix(in srgb, var(--dsw-alias-label-secondary) 14%, var(--dsw-alias-bg-base));
 }
+
+/* Touch devices: ensure each key meets the 44 px minimum touch target
+   (Apple HIG / WCAG 2.5.5).  Width is constrained by the flex row on
+   narrow screens, but height can always reach 44 px. */
+@media (pointer: coarse) {
+  .key {
+    min-height: 44px;
+  }
+}

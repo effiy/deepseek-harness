@@ -10,6 +10,8 @@
     "src/api-request-trust.ts",
     "src/browser-auth.ts",
     "src/client/random-uuid.ts",
+    "src/client/retry-fetch.ts",
+    "src/client/retry-fetch.ts",
     "src/client/rpc.ts",
     "src/http-bridge.ts",
     "src/index.ts",

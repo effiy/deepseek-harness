@@ -12,6 +12,7 @@ import { createWebConnectionRpc, type RpcFetch, type RpcStreamOpen } from './rpc
 import { isLoopbackHostname } from '../loopback-hostname.ts'
 import type { ClientConnectionRpc } from '../rpc.ts'
 import { resolveConnectionConfig } from '../recovery-config.ts'
+import { createOfflineQueueService, type OfflineQueueService } from './offline-queue.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -21,6 +22,10 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'connection/reset'(): void
+  }
+  interface Context {
+    /** Offline message queue — enqueue when offline, auto-drain when network returns. */
+    offlineQueue: OfflineQueueService
   }
 }
 
@@ -50,6 +55,12 @@ export type {
   ClientConnectionRpc, ConnectionRpcFailure, ConnectionRpcResult,
 } from '../rpc.ts'
 export type { RpcFetch } from './rpc.ts'
+export type {
+  DrainHandler,
+  OfflineQueueService,
+  QueuedMessage,
+  QueueStatus,
+} from './offline-queue.ts'
 
 /** Observable identity and Host facts for the active connection generation. */
 export interface ConnectionGenerationState {
@@ -125,6 +136,8 @@ export interface ConnectionInstallOptions {
   readonly recovery?: ConnectionRecoveryConfig
   /** Page location; omit for a non-browser composition. */
   readonly location?: ConnectionLocation
+  /** Offline message queue, auto-drained when the browser reports online. */
+  readonly offlineQueue?: OfflineQueueService
 }
 
 /**
@@ -182,7 +195,10 @@ interface BrowserNetworkTarget {
   removeEventListener(type: 'online' | 'offline', listener: () => void): void
 }
 
-function watchBrowserNetwork(controller: ConnectionController): () => void {
+function watchBrowserNetwork(
+  controller: ConnectionController,
+  onOnline?: () => void,
+): () => void {
   const browser = (globalThis as { readonly window?: BrowserNetworkTarget }).window
   const initiallyAvailable = browser?.navigator?.onLine
   if (browser === undefined || initiallyAvailable === undefined) return () => {}
@@ -207,6 +223,11 @@ function watchBrowserNetwork(controller: ConnectionController): () => void {
       debounceTimer = undefined
       if (pendingState !== undefined) {
         controller.setNetworkAvailable(pendingState)
+        // Drain the offline queue when the network returns.
+        // Delay 2s after online to let the connection re-establish first.
+        if (pendingState && onOnline !== undefined && !initiallyAvailable) {
+          setTimeout(() => { onOnline() }, 2_000)
+        }
         pendingState = undefined
       }
     }, DEBOUNCE_MS)
@@ -330,7 +351,8 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
           sinks.onStateChange?.(state)
         },
       }, { ...recovery, ...config })
-      const current = { token, source, controller, stopNetworkWatch: watchBrowserNetwork(controller) }
+      const stopNetworkWatch = watchBrowserNetwork(controller, () => { options.offlineQueue?.drain() })
+      const current = { token, source, controller, stopNetworkWatch }
       owner = current
       controller.start()
       return {
@@ -349,9 +371,12 @@ export function apply(ctx: Context): void {
   const globals = globalThis as ClientTransportGlobal
   const pageLocation = typeof location === 'undefined' ? undefined : location
   const transport = globals.__DSH_TRANSPORT__
+  const offlineQueue = createOfflineQueueService()
+  ctx.provide('offlineQueue', offlineQueue)
   installConnection(ctx, {
     ...(transport === undefined ? {} : { transport }),
     recovery: resolveConnectionConfig(globals.__DSH_CONNECTION_RECOVERY__),
     ...(pageLocation === undefined ? {} : { location: pageLocation }),
+    offlineQueue,
   })
 }
