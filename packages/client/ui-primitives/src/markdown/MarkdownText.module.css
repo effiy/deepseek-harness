@@ -320,6 +320,7 @@
   width: auto;
   max-width: 100%;
   height: auto;
+  min-height: 1.25rem;
   margin: 0;
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-base);

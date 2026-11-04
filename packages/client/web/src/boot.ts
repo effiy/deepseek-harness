@@ -15,6 +15,7 @@ import { mountClient } from './mount.ts'
 import { getStaticModules } from './seed.ts'
 import { installWindowDragRecall } from './window-drag/recall.ts'
 import { installKeyboardInset } from './keyboard-inset.ts'
+import { CrashRecovery, restoreSessionCheckpoint } from './crash-recovery.ts'
 import './base.css'
 
 /** Module transport hook replaced by jsdom tests. */
@@ -27,6 +28,7 @@ export class AppWebEntry {
   private readonly page: BootPage
   private ctx: Context | undefined
   private stopDragRecall: (() => void) | undefined
+  private crashRecovery: CrashRecovery | undefined
   private modules!: ClientModuleSystem
   private manifest!: BootManifest
 
@@ -101,6 +103,14 @@ export class AppWebEntry {
       // renderer draws is the one the first frame measures.
       this.stopDragRecall = installWindowDragRecall({ document: this.container.ownerDocument })
       await mountClient(ctx, this.container)
+      // ── Crash recovery ───────────────────────────────────────────────
+      this.crashRecovery = new CrashRecovery()
+      this.crashRecovery.start()
+      const restoredSessionId = restoreSessionCheckpoint()
+      if (restoredSessionId !== null) {
+        // Publish for the workspace plugin to consume on its next tick.
+        ;(globalThis as Record<string, unknown>).__DSH_RESTORE_SESSION__ = restoredSessionId
+      }
     } catch (reason) {
       console.error(reason)
       if (onFailure !== undefined) onFailure(reason)
@@ -112,6 +122,8 @@ export class AppWebEntry {
   async dispose(): Promise<void> {
     this.stopDragRecall?.()
     this.stopDragRecall = undefined
+    this.crashRecovery?.stop()
+    this.crashRecovery = undefined
     const ctx = this.ctx
     this.ctx = undefined
     if (ctx !== undefined) await ctx.fiber.dispose()

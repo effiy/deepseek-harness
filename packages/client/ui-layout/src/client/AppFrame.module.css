@@ -346,6 +346,11 @@
 @media (max-width: 640px) {
   .frame {
     grid-template-columns: 0px minmax(0px, 1fr) 0px !important;
+    /* Eliminate the iOS 300ms tap delay for all interactive elements
+       within the frame.  The sidebar backdrop ::after inherits this,
+       so overlay taps fire mousedown immediately without ghost clicks
+       passing through to conversation-area controls. */
+    touch-action: manipulation;
   }
 
   .sidebarCol {
@@ -412,5 +417,10 @@
 
   .frame:not([data-sidebar-collapsed])::after {
     opacity: 1;
+    /* Capture all pointer events while the backdrop is visible so iOS Safari
+       cannot pass touches through to conversation-area elements below.  Without
+       this, the backdrop is purely visual and ghost clicks on buttons / inputs
+       in the chat area can fire through the dimmed overlay. */
+    pointer-events: auto;
   }
 }

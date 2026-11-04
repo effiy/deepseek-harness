@@ -130,25 +130,29 @@ function generateServiceWorker(): Plugin {
 }
 
 /**
- * Inject resource-preload hints into the built index.html head:
- * - modulepreload for the main entry chunks (index + vendor)
- * - preload for woff2 brand fonts
- * Only active during production builds (dev skips because the bundle
- * parameter is absent).
+ * Inject font-preload hints for the Montserrat brand fonts into the built
+ * index.html head.  Modulepreload hints for entry chunks are handled by
+ * Vite's own injector; adding them here would duplicate tags.
+ *
+ * KaTeX math fonts are NOT preloaded — they are only needed on pages that
+ * render math, and preloading all 17 variants (~600 KB total) would compete
+ * with critical CSS/JS on the initial load.
+ *
+ * Only active during production builds (the bundle parameter is absent in dev).
  */
 function injectPreloadHints(): Plugin {
   return {
     name: 'dsh-inject-preload-hints',
     transformIndexHtml: {
-      order: 'post',
+      // Run before Vite's built-in modulepreload injector so only our font
+      // tags appear in the early head (order: 'pre'); Vite's modulepreload
+      // injection runs at 'post' and handles the entry chunks.
+      order: 'pre',
       handler(html, ctx) {
         if (!ctx.bundle) return html
         const tags: string[] = []
         for (const item of Object.values(ctx.bundle)) {
-          if (item.type === 'chunk' && (item.name === 'index' || item.name === 'vendor')) {
-            tags.push(`<link rel="modulepreload" crossorigin href="./${item.fileName}">`)
-          }
-          if (item.type === 'asset' && item.fileName.includes('.woff2')) {
+          if (item.type === 'asset' && item.fileName.includes('montserrat') && item.fileName.endsWith('.woff2')) {
             tags.push(`<link rel="preload" as="font" crossorigin href="./${item.fileName}" type="font/woff2">`)
           }
         }

@@ -1,9 +1,13 @@
 /**
  * Real-UI assembly closure. The whole layout tree hangs from the built-in
  * `root` slot, which is the only ctx-level slot render in the application.
+ * The returned factory produces a React tree protected by a root-level error
+ * boundary: any uncaught descendant crash renders a fallback face instead of
+ * a white screen.
  */
-import type { ReactNode } from 'react'
+import { createElement, type ReactNode } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
+import { AppErrorBoundary } from './AppErrorBoundary.tsx'
 
 /** Inputs available after the UI renderer's inject set activates. */
 export interface AssemblyDeps {
@@ -18,5 +22,5 @@ export interface AssemblyDeps {
  */
 export function buildRenderApp(deps: AssemblyDeps): () => ReactNode {
   const { ctx } = deps
-  return () => ctx.slots.renderSlot('root', {})
+  return () => createElement(AppErrorBoundary, null, ctx.slots.renderSlot('root', {}))
 }

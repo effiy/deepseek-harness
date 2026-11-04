@@ -22,6 +22,9 @@ import SessionStore, { SESSION_FORMAT_VERSION, Session, SessionId, SessionLogOff
 import MessageFeedbackService from '@deepseek-ai/dsh-message-feedback'
 import JsonlPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import OpenTelemetrySessionBackend, { Config, DEFAULT_TELEMETRY_MODE, SessionTelemetryMode } from '../src/index.ts'
+import type { Config as OtelConfig } from '../src/index.ts'
+
+type OtelMode = `${SessionTelemetryMode}`
 
 interface Capture {
   headers: import('node:http').IncomingHttpHeaders
@@ -101,12 +104,12 @@ async function mockCollector(
   return { url: `http://127.0.0.1:${address.port}/v1/logs`, captures }
 }
 
-async function boot(url: string) {
+async function boot(url: string, mode: SessionTelemetryMode = SessionTelemetryMode.FEEDBACK_ONLY) {
   const ctx = new Context()
   ctx.plugin(OTel)
   await ctx.plugin(SessionStore)
   const fiber = await ctx.plugin(OpenTelemetrySessionBackend, {
-    mode: SessionTelemetryMode.FEEDBACK_ONLY,
+    mode,
     exporter: { url, headers: { authorization: 'Bearer test-token' } },
   })
   return { ctx, fiber }
@@ -724,13 +727,69 @@ describe('OpenTelemetrySessionBackend route and feedback', () => {
   })
 })
 
+describe('FULL live capture', () => {
+  it('captures session events without requiring explicit feedback', async () => {
+    const { url, captures } = await mockCollector()
+    const { ctx, fiber } = await boot(url, SessionTelemetryMode.FULL)
+    const session = ctx.sessions.create(SessionId('full'), { meta: { cwd: '/tmp/f' } })
+    session.append('request/header', { header: { config: { provider: 'mock', model: 'mock' } }, reason: 'initial' })
+    session.append('turn/start', { turn: 1 })
+    session.append('assistant/message', {
+      turn: 1, step: 1,
+      message: createAssistantMessage({
+        content: [{ type: 'text', text: 'live event' }],
+        source: { provider: 'mock', model: 'mock' },
+      }),
+      stream: [],
+    }, { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    // No feedback record — FULL mode captures everything live.
+    await fiber.dispose()
+
+    expect(captures.length).toBeGreaterThan(0)
+    const types = eventTypes(captures)
+    expect(types).toContain('request/header')
+    expect(types).toContain('turn/start')
+    expect(types).toContain('assistant/message')
+    expect(types).toContain('turn/end')
+  })
+
+  it('reports sharing status as full independently of SDK delivery', async () => {
+    const ctx = new Context()
+    ctx.plugin(OTel)
+    await ctx.plugin(SessionStore)
+    const backend = new OpenTelemetrySessionBackend(ctx, {
+      mode: SessionTelemetryMode.FULL,
+      exporter: { url: 'http://localhost:4318/v1/logs' },
+    })
+    expect(backend.sharing).toBe('full')
+  })
+
+  it('still discards direct emit records (capture is event-driven, not push)', async () => {
+    const { url, captures } = await mockCollector()
+    const { ctx, fiber } = await boot(url, SessionTelemetryMode.FULL)
+    const session = ctx.sessions.create(SessionId('full-direct'), { meta: {} })
+    ctx.sessionTelemetry.emit({
+      channel: 'ledger', time: Date.now(), severity: 'info',
+      attributes: { 'session.id': 'full-direct', 'event.type': 'manual', 'event.seq': 1 },
+      body: { direct: true },
+    })
+    session.append('turn/start', { turn: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    await fiber.dispose()
+    const types = eventTypes(captures)
+    expect(types).not.toContain('manual')
+    expect(types).toContain('turn/start')
+  })
+})
+
 describe('OpenTelemetrySessionBackend config fails loud', () => {
   it('exposes modes through the nominal enum', () => {
-    expectTypeOf<Config['mode']>().toEqualTypeOf<SessionTelemetryMode | undefined>()
-    expectTypeOf<'FULL'>().not.toExtend<SessionTelemetryMode>()
-    expectTypeOf<SessionTelemetryMode.FEEDBACK_ONLY>().toExtend<SessionTelemetryMode>()
-    expect(Object.values(SessionTelemetryMode)).toEqual(['FEEDBACK_ONLY', 'DISABLED'])
-    expect(() => Config({ mode: 'FULL' } as unknown as Config)).toThrow()
+    expectTypeOf<OtelConfig['mode']>().toEqualTypeOf<OtelMode | undefined>()
+    expectTypeOf<'FULL'>().toExtend<OtelMode>()
+    expectTypeOf<SessionTelemetryMode.FEEDBACK_ONLY>().toExtend<OtelMode>()
+    expect(Object.values(SessionTelemetryMode)).toEqual(['FEEDBACK_ONLY', 'DISABLED', 'FULL'])
+    expect(() => Config({ mode: 'FULL' } as unknown as Config)).not.toThrow()
     expect(DEFAULT_TELEMETRY_MODE).toBe(SessionTelemetryMode.FEEDBACK_ONLY)
     expect(Config({}).mode).toBe(DEFAULT_TELEMETRY_MODE)
   })
@@ -742,7 +801,6 @@ describe('OpenTelemetrySessionBackend config fails loud', () => {
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'not a url' } }, /not a valid URL/],
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'ftp://collector' } }, /must be http\(s\)/],
     [{ mode: 'INVALID' }, /INVALID/],
-    [{ mode: 'FULL' }, /FULL/],
     // The SDK accepts a non-positive batch size but its shutdown drain then
     // splices empty batches forever — dispose would hang, so reject at load.
     [{ mode: SessionTelemetryMode.FEEDBACK_ONLY, exporter: { url: 'http://c/v1/logs' }, processor: { maxExportBatchSize: 0 } }, /maxExportBatchSize/],
@@ -756,7 +814,7 @@ describe('OpenTelemetrySessionBackend config fails loud', () => {
     await expect(ctx.plugin(OpenTelemetrySessionBackend, config as Config)).rejects.toThrow(message)
   })
 
-  it.each(['INVALID', 'FULL'])('rejects direct mode %s before reading transport config', async (mode) => {
+  it.each(['INVALID'])('rejects direct mode %s before reading transport config', async (mode) => {
     const ctx = new Context()
     ctx.plugin(OTel)
     await ctx.plugin(SessionStore)

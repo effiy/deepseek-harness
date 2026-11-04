@@ -14,7 +14,7 @@ lifecycle: active
 
 适配器注入 `otel`；[共享 OTel 插件](../../telemetry/otel/README.zh.md) 创建其独立 Session 日志通道。授权、脱敏、身份、scope 版本、配置和关闭期限仍由本包负责。
 
-`dsh-session-telemetry-otel` 仅在新的显式反馈后通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。`FEEDBACK_ONLY` 释放截至该反馈的权威日志前缀，包含上下文；后续记录等待下一次显式反馈。`DISABLED` 不构造传输。定时批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
+`dsh-session-telemetry-otel` 通过 OTel JS SDK 导出会话记录，适用于所有用户和提供方，包括 `deepseek-official`。部署方通过 `mode` 选择共享策略：`FULL` 实时捕获每个会话事件；`FEEDBACK_ONLY` 仅在新的显式反馈后释放截至该反馈的权威日志前缀，后续记录等待下一次显式反馈；`DISABLED` 不构造传输。定时批处理可完成已授权的上传，无需另一次用户交互或模型调用。部署方负责脱敏规则。
 
 ---
 
@@ -98,7 +98,7 @@ lifecycle: active
 - id: sessionTelemetry-otel
   name: '@deepseek-ai/dsh-session-telemetry-otel'
   config:
-    mode: FEEDBACK_ONLY       # optional; defaults to FEEDBACK_ONLY
+    mode: FEEDBACK_ONLY       # optional; FEEDBACK_ONLY | FULL | DISABLED
     shutdownTimeoutMillis: 3000 # optional; defaults to 3000
     exporter:                # explicit SDK transport settings
       url: https://collector.example.com/v1/logs
@@ -111,7 +111,7 @@ lifecycle: active
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `mode` | `FEEDBACK_ONLY` | 共享策略：`FEEDBACK_ONLY` 或 `DISABLED` |
+| `mode` | `FEEDBACK_ONLY` | 共享策略：`FULL`（实时捕获所有事件）、`FEEDBACK_ONLY`（仅反馈触发）或 `DISABLED` |
 | `exporter.url` | 上传模式必填 | 完整 OTLP 日志端点；必须能解析为 `http(s)` |
 | `exporter`, `processor` | — | SDK 传输及字节/条数聚合；不继承环境中的头部和 TLS 身份。agent 工厂负责返回实例的设置，包括 keepAlive |
 | `shutdownTimeoutMillis` | `3,000` | 所有排队 HTTP 请求的外层期限；到期后停止剩余排队发送 |
