@@ -229,6 +229,7 @@
     { "path": "./packages/experimental/badge-skill-bundle" },
     { "path": "./packages/experimental/session-titles-bundle" },
     { "path": "./packages/experimental/translator" },
+    { "path": "./packages/experimental/bot-status-public" },
     { "path": "./packages/client/product-analytics/tsconfig.host.json" },
     { "path": "./packages/telemetry/otel" },
     { "path": "./packages/experimental/speech-to-text" },

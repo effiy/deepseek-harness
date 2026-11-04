@@ -317,9 +317,6 @@ importers:
       '@deepseek-ai/dsh-experimental-tool-worktree':
         specifier: workspace:*
         version: link:../../packages/experimental/tool-worktree
-      '@deepseek-ai/dsh-experimental-voice-input-bundle':
-        specifier: workspace:*
-        version: link:../../packages/experimental/voice-input-bundle
       '@deepseek-ai/dsh-fs-local':
         specifier: workspace:*
         version: link:../../packages/fs/fs-local
@@ -863,12 +860,6 @@ importers:
       '@deepseek-ai/dsh-experimental-cot-translation-bundle':
         specifier: workspace:*
         version: link:../../packages/experimental/cot-translation-bundle
-      '@deepseek-ai/dsh-experimental-speech-to-text':
-        specifier: workspace:*
-        version: link:../../packages/experimental/speech-to-text
-      '@deepseek-ai/dsh-experimental-voice-input-bundle':
-        specifier: workspace:*
-        version: link:../../packages/experimental/voice-input-bundle
       '@deepseek-ai/dsh-experimental-webworker-packer':
         specifier: workspace:*
         version: link:../../packages/experimental/webworker-packer
@@ -7647,6 +7638,30 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+
+  packages/experimental/bot-status-public:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: workspace:*
+        version: link:../../host/webserver
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-title':
+        specifier: workspace:*
+        version: link:../../session/session-title
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
 
   packages/experimental/browser-use-chrome-devtools-mcp:
     dependencies:

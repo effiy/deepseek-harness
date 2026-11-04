@@ -18,7 +18,7 @@
   display: none;
 }
 
-@media (pointer: coarse) and (max-width: 640px) {
+@media (pointer: coarse) and (max-width: 900px) {
   .zone {
     display: block;
     position: fixed;

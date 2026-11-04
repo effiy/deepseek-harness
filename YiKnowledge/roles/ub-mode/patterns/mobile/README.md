@@ -9,16 +9,16 @@
 
 | 模式 | 状态 | 负责人 | 一句话 |
 |------|------|--------|--------|
-| [断点体系](#1-断点体系-breakpoint-system) | ✅ 已实现 | DSH·响应式工 | `--ds-bp-*` 设计令牌 + TS 常量 + store 字段 |
-| [键盘避让](#2-键盘避让-keyboard-avoidance) | ⚠️ 部分 | DSH·触控交互 | Visual Viewport API，3 个硬编码 setTimeout 兜底 |
-| [安全区适配](#3-安全区适配-safe-area) | ⚠️ 部分 | DSH·响应式工 | `env(safe-area-inset-*)` 已用，缺 fallback 变量 |
-| [触控交互](#4-触控交互-touch-interaction) | ⚠️ 部分 | DSH·触控交互 | 44px 触控区、`pointer: coarse`，缺统一 hook |
-| [手势导航](#5-手势导航-gesture-navigation) | ❌ 缺失 | DSH·动效实现 | 侧栏仅支持点击边缘区，无 swipe 手势 |
-| [下拉刷新](#6-下拉刷新-pull-to-refresh) | ⚠️ 错位 | DSH·UB实现 | 在 ui-sidebar 但对话区滚动 |
-| [Service Worker](#7-service-worker-offline) | ❌ 缺失 | DSH·离线缓存 | PWA manifest 有但无 SW |
-| [PWA 完备性](#8-pwa-完备性-pwa-completeness) | ⚠️ 部分 | DSH·离线缓存 | 有 manifest + SVG 图标，缺 viewport-fit |
+| [断点体系](#1-断点体系-breakpoint-system) | ✅ 已实现 | DSH·响应式工 + DSH·UB实现 | 两级令牌：`--ds-bp-*`（布局级）+ `--dsh-bp-*`（组件级），标准化 760→768/1023→1024 |
+| [键盘避让](#2-键盘避让-keyboard-avoidance) | ✅ 已实现 | DSH·触控交互 | overscroll + GPU compositor `translateY` + `scroll-padding` + `--dsh-keyboard-height-prev` |
+| [安全区适配](#3-安全区适配-safe-area) | ✅ 已实现 | DSH·响应式工 | `base.css` `--ds-safe-*` fallback + Modal/Toast/SidebarRight 适配 |
+| [触控交互](#4-触控交互-touch-interaction) | ✅ 已实现 | DSH·UB实现 | `useTouchCapability` hook → `ui-primitives` 导出 |
+| [手势导航](#5-手势导航-gesture-navigation) | ⚠️ swipe-right ✅ | DSH·UB实现 | `useSwipeGesture` + SidebarEdgeZone 集成；swipe-left-to-close 留待 v2 |
+| [下拉刷新](#6-下拉刷新-pull-to-refresh) | ✅ 已实现 | DSH·UB实现 | 迁移至 `ui-primitives` + TSX 组件 + `height→scaleY` compositor 优化 |
+| [Service Worker](#7-service-worker-offline) | ✅ 已实现 | DSH·离线缓存 | `sw-template.js` → Vite 插件 → 三层缓存（Shell/Static/API fallback） |
+| [PWA 完备性](#8-pwa-完备性-pwa-completeness) | ✅ 已实现 | DSH·离线缓存 + DSH·UB实现 | `viewport-fit=cover` + `description`/`categories` + PNG 192/512 + `display: standalone` |
 | [动态视口](#9-动态视口-dynamic-viewport) | ✅ 已实现 | — | `100dvh` + Visual Viewport 回退 |
-| [底部导航](#10-底部导航-bottom-navigation) | ✅ 已实现 | DSH·响应式工 | Glassmorphism 底部 tab bar，44px 触控区 |
+| [底部导航](#10-底部导航-bottom-navigation) | ✅ 已实现 | DSH·响应式工 | Glassmorphism + hamburger v2 + safe-area + 44px 触控区 |
 
 状态：✅ 已实现 · ⚠️ 部分实现 · ❌ 缺失
 
@@ -289,4 +289,5 @@ export function useTouchCapability(): TouchCapability {
 
 ## 变更日志
 
+- **2026-11-04**：全量状态更新。10 个模式中 9 个已完成——键盘避让（overscroll + GPU compositor）、安全区（base.css fallback）、触控交互（useTouchCapability）、手势导航（swipe-right ✅）、下拉刷新（ui-primitives + scaleY 优化）、Service Worker（三层缓存）、PWA（viewport-fit + PNG icons）均已就位。仅剩手势导航 swipe-left-to-close 待 v2。
 - **2026-11-03**：初始创建。从 UB 审计报告（`../reports/2026-11-03_dsh-mobile-ub-audit.md`）提取。断点体系已由 DSH·响应式工完成实现。

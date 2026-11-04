@@ -74,6 +74,23 @@
   margin-right: -3px;
 }
 
+/* Expand inline-link touch area on touchscreens: thicker transparent
+   borders give the finger a wider hit zone without altering the visual
+   text layout. Combined with the 15px mobile body font the total
+   vertical touch target reaches ~36px (15px × 1.6lh + 12px border). */
+@media (pointer: coarse) {
+  .markdown a {
+    border-top-width: 6px;
+    border-bottom-width: 6px;
+    margin-top: -4px;
+    margin-bottom: -4px;
+  }
+
+  .markdown p {
+    line-height: 1.6;
+  }
+}
+
 .markdown a:hover,
 .markdown a:focus {
   outline: none;

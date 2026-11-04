@@ -19,7 +19,7 @@ import type { ReactNode } from 'react'
 import type {
   PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
+import { CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
@@ -36,10 +36,16 @@ function CenterColumn(props: { children?: ReactNode }) {
   return <main className={css.centerCol}>{props.children}</main>
 }
 
-/** Subscribe to the main key without subscribing the column frame to each panel id. */
+/** Renders the active main panel (Chat / Workspace / Settings) and wraps it
+ *  in a keyed container so that React unmounts the old panel and mounts the
+ *  new one on switch, triggering a CSS panel-enter animation. */
 function MainPanel({ usePanelInfo, renderSlot }: Pick<PropsRuntime<'root'>, 'usePanelInfo'> & PropsRenderSlots<'main'>) {
   const panelId = usePanelInfo(info => info.activePanelId)
-  return renderSlot('main', {}, { entryKey: panelId ?? 'conversation' })
+  return (
+    <div key={panelId} className={css.panelTransition}>
+      {renderSlot('main', {}, { entryKey: panelId ?? 'conversation' })}
+    </div>
+  )
 }
 
 /**
@@ -159,13 +165,21 @@ export function AppFrame({
 
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
   const sidebarCollapsed = narrow ? !layoutInfo.narrowExpanded : layoutInfo.sidebar === 0
+  // On narrow viewports the overlay is managed entirely by CSS (position:fixed +
+  // translate3d slide in/out); the SidebarRoot must render wide content so the
+  // overlay shows the full sidebar, not the desktop 56px rail.
+  const sidebarSlotCollapsed = narrow ? false : sidebarCollapsed
   const sidebarPreference = sidebarCollapsed
     ? 0
     : layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : layoutInfo.sidebar
   const rightbarPreference = layoutInfo.rightbar ?? viewport * RIGHTBAR_DEFAULT_RATIO
+  // Desktop reopen controls occupy the frame's shell.leading seat (macOS) or
+  // the Windows caption row; neither platform keeps an icon rail.
   const darwin = document.documentElement.dataset.platform === 'darwin'
-  // Sidebar is either fully shown or fully hidden — no icon rail.
-  const collapsedWidth = 0
+  // Narrow viewports never show a rail: the sidebar is either hidden
+  // (collapsed) or a full overlay (expanded).
+  const collapsedWidth = narrow ? 0 : darwin
+    || document.documentElement.hasAttribute('data-windows-titlebar') ? 0 : SIDEBAR_COLLAPSED
   // Opening on a narrow frame collapses the left sidebar. Eligibility must
   // include that space before the occupant's first shown report arrives.
   const normal = computeColumns(viewport, !layoutInfo.rightbarShown && narrow ? 0 : sidebarPreference, rightbarPreference, collapsedWidth)
@@ -219,6 +233,56 @@ export function AppFrame({
       clearTimeout(timer)
     }
   }, [animating])
+
+  // On narrow viewports the expanded sidebar is a fixed overlay: clicking
+  // outside it (the backdrop area) closes it, matching mobile drawer
+  // conventions.  Use capture phase to beat other handlers.
+  useEffect(() => {
+    if (!narrow || sidebarCollapsed) return
+    const onPointerDown = (e: PointerEvent): void => {
+      const target = e.target as HTMLElement | null
+      if (target === null) return
+      // Respect open menus, modals, and dialogs — don't close the sidebar
+      // while the user interacts with a transient surface.
+      if (target.closest('[data-menu], [role="dialog"], [role="menu"], [role="listbox"]')) return
+      const sidebarCol = frameRef.current?.querySelector('[data-sidebar-col]')
+      if (sidebarCol !== null && sidebarCol !== undefined && sidebarCol.contains(target)) return
+      actions.toggleSidebar()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => { document.removeEventListener('pointerdown', onPointerDown, true) }
+  }, [narrow, sidebarCollapsed, actions])
+
+  // Auto-close the sidebar overlay when the user selects a panel or
+  // conversation — standard mobile drawer behaviour.  The ref skips
+  // the initial render so opening the sidebar itself doesn't trigger it.
+  const activePanelId = useStore(state => state.panelInfo.activePanelId)
+  const prevPanelId = useRef(activePanelId)
+  useEffect(() => {
+    if (!narrow || sidebarCollapsed) return
+    if (prevPanelId.current !== activePanelId) actions.toggleSidebar()
+    prevPanelId.current = activePanelId
+  }, [activePanelId, narrow, sidebarCollapsed, actions])
+
+  // Close the sidebar when the user taps any interactive element inside
+  // it — the most reliable way to catch both panel and session selections.
+  useEffect(() => {
+    if (!narrow || sidebarCollapsed) return
+    const sidebarCol = frameRef.current?.querySelector('[data-sidebar-col]')
+    if (sidebarCol === null || sidebarCol === undefined) return
+    const onClick = (e: Event): void => {
+      const target = e.target as HTMLElement | null
+      if (target === null) return
+      // Don't close on the sidebar's own toggle — it already toggles.
+      if (target.closest('[aria-label*="toggle sidebar" i], [aria-label*="collapse sidebar" i]')) return
+      if (target.closest('button, a, [role="button"], [role="link"], [role="option"]')) {
+        actions.toggleSidebar()
+      }
+    }
+    sidebarCol.addEventListener('click', onClick, true)
+    return () => { sidebarCol.removeEventListener('click', onClick, true) }
+  }, [narrow, sidebarCollapsed, actions])
+
   const onDragEnd = useCallback(() => { setDragging(false) }, [])
   const onSidebarStart = useCallback(() => { sidebarBase.current = colsRef.current.sidebar; setDragging(true) }, [])
   const onSidebarDrag = useCallback((dx: number) => {
@@ -238,9 +302,9 @@ export function AppFrame({
   // the discrete decisions (track present, collapse state) and the drag base.
   const rightbarMax = cols.rightbar === 0 ? 0 : clampWidth(rightbarPreference, RIGHTBAR_MIN, viewport * RIGHTBAR_MAX_RATIO)
   const sidebar = useMemo(() => renderSlot('sidebar', {
-    collapsed: sidebarCollapsed,
+    collapsed: sidebarSlotCollapsed,
     width: cols.sidebar,
-  }), [renderSlot, sidebarCollapsed, cols.sidebar])
+  }), [renderSlot, sidebarSlotCollapsed, cols.sidebar])
   const main = useMemo(() => (
     <MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} />
   ), [usePanelInfo, renderSlot])
@@ -264,6 +328,7 @@ export function AppFrame({
           `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
       }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
+      data-narrow={narrow || undefined}
       data-rightbar-collapsed={cols.rightbar === 0 || undefined}
       data-rightbar-fullscreen={layoutInfo.rightbarFullscreen || undefined}
       data-rightbar-instant={layoutInfo.rightbarInstant || undefined}
@@ -276,7 +341,7 @@ export function AppFrame({
         useSessions={useSessions}
         usePanelInfo={usePanelInfo}
       />
-      <aside className={css.sidebarCol} aria-hidden={sidebarCollapsed ? 'true' : undefined}>
+      <aside className={css.sidebarCol} data-sidebar-col>
         {sidebar}
       </aside>
       <>

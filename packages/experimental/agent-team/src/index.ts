@@ -39,7 +39,7 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-const DEFAULT_MAX_MEMBERS = 16
+const DEFAULT_MAX_MEMBERS = 200
 const DEFAULT_MAX_TASKS = 256
 const DEFAULT_MAX_MESSAGE_BYTES = 65_536
 const DEFAULT_DISPOSAL_TIMEOUT_MS = 5_000

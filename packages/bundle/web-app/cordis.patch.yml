@@ -175,6 +175,11 @@
     # by the web-runtime row below through the fallback seat. Routing and
     # browser-facing asset paths do not depend on the advertised URL, which the
     # web-runtime row owns; Connection reads trust authorities from webStartup.
+    # Public bot-status endpoint consumed by YiVad: exposes agent/status
+    # through an unauthenticated GET /api/bot-states with CORS headers.
+    - id: bot-status-public
+      name: '@deepseek-ai/dsh-bot-status-public'
+
     # This row rejects wildcard binds.
     - id: webserver
       name: '@deepseek-ai/dsh-host-webserver'

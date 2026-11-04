@@ -417,6 +417,9 @@ button.crumb:hover {
       min(calc(100% - 24px), 920px)
     );
     --dsh-composer-side-clearance: 12px;
+    /* 15px body text floor on mobile: one step above the 14px desktop default
+       and one step below the 16px input floor to prevent iOS auto-zoom. */
+    --dsh-content-font-size: 15px;
   }
 
   /* Mobile platforms use overlay scrollbars; reserving 2 px on the

@@ -20,6 +20,9 @@ export interface PullToRefreshProps {
  * callback); this component only renders the visual states — collapsed
  * at `idle`, arrow-reversed at `ready`, and a CSS spinner at `refreshing`.
  *
+ * Height switches instantaneously (no transition) to avoid per-frame
+ * layout; content visibility animates via `scaleY` on the GPU compositor.
+ *
  * Intended to sit above a scroll container with `overscroll-behavior: contain`.
  */
 export function PullToRefresh({ state, label = '', className }: PullToRefreshProps) {
@@ -28,10 +31,12 @@ export function PullToRefresh({ state, label = '', className }: PullToRefreshPro
       className={[styles.indicator, className].filter(Boolean).join(' ')}
       data-pull-state={state}
     >
-      <div className={styles.spinner} />
-      <div className={styles.label}>
-        <span className={styles.arrow}>↓</span>
-        {label && <span>{label}</span>}
+      <div className={styles.inner}>
+        <div className={styles.spinner} />
+        <div className={styles.label}>
+          <span className={styles.arrow}>↓</span>
+          {label && <span>{label}</span>}
+        </div>
       </div>
     </div>
   )

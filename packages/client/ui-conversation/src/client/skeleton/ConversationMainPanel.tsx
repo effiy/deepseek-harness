@@ -37,9 +37,9 @@ export function ConversationMainPanel(props: ConversationSlotProps) {
   const settling = sessionId !== undefined && (
     (shellPhase === 'blank' && openState === 'loading' && summaryBlank !== true)
     || parentAvailabilityPending
-  )
+  ) && session?.blank !== true
   const hero = sessionId === undefined
-    || (shellPhase === 'blank' && (openState === 'open' || summaryBlank === true))
+    || (shellPhase === 'blank' && (openState === 'open' || summaryBlank === true || session?.blank === true))
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
 
   return (

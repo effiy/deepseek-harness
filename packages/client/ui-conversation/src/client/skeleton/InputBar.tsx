@@ -17,7 +17,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
-  IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
+  IconPanelLeftOutlineRegular, IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -444,9 +444,23 @@ export const InputBar = memo(function InputBar({
           onWorkspaceKeyDown={onWorkspaceKeyDown}
           hint={hint}
           showPlaceholder={draft === '' && attachments.length === 0 && !claimActive}
+          enterKeyHint="send"
         />
         <div ref={rowRef} className={css.row}>
           <div className={css.tools} hidden={activity}>
+            {toggleSidebar && (
+              <Tooltip label={t('input.sidebarToggle')} delayMs={500}>
+                <button
+                  type="button"
+                  className={css.sidebarToggle}
+                  aria-label={t('input.sidebarToggle')}
+                  onPointerDown={(e) => { e.preventDefault() }}
+                  onClick={() => { toggleSidebar() }}
+                >
+                  <IconPanelLeftOutlineRegular size={16} />
+                </button>
+              </Tooltip>
+            )}
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>
               <button
                 type="button"
@@ -478,22 +492,6 @@ export const InputBar = memo(function InputBar({
               : renderSlot('conversation.input.left', {})}
           </div>
           <div className={clsx(css.trailing, activity && css.trailingActive)}>
-            {toggleSidebar && (
-              <Tooltip label={t('input.sidebarToggle')} delayMs={500}>
-                <button
-                  type="button"
-                  className={css.sidebarToggle}
-                  aria-label={t('input.sidebarToggle')}
-                  onMouseDown={keepFocus}
-                  onClick={() => { toggleSidebar() }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <rect x="2.5" y="2.5" width="4" height="11" rx="0.75" stroke="currentColor" strokeWidth="1.25" />
-                    <rect x="8.5" y="2.5" width="5" height="11" rx="0.75" stroke="currentColor" strokeWidth="1.25" />
-                  </svg>
-                </button>
-              </Tooltip>
-            )}
             <div className={css.standardControls} hidden={activity}>
               {input === undefined || sessionId === undefined
                 ? null

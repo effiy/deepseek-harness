@@ -1,7 +1,9 @@
 /* ── Pull-to-refresh indicator ─────────────────────────────────────────────
    A minimal touch-driven pull-to-refresh indicator that sits above the
    scrollable region.  Works with `overscroll-behavior: contain` on the
-   scroll container so the browser's own rubber-band doesn't fight it. */
+   scroll container so the browser's own rubber-band doesn't fight it.
+   Height switches instantaneously (1 layout); content visibility animates
+   via scaleY on the compositor (0 layouts). */
 
 .indicator {
   display: flex;
@@ -9,7 +11,6 @@
   justify-content: center;
   height: 0;
   overflow: hidden;
-  transition: height 200ms ease;
   color: var(--dsw-alias-label-tertiary);
   font-size: 13px;
 }
@@ -20,6 +21,19 @@
 
 .indicator[data-pull-state="refreshing"] {
   height: 48px;
+}
+
+/* ── Inner wrapper: animated via compositor-only scaleY ──────────────── */
+
+.inner {
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 200ms ease;
+}
+
+.indicator[data-pull-state="ready"] .inner,
+.indicator[data-pull-state="refreshing"] .inner {
+  transform: scaleY(1);
 }
 
 .spinner {

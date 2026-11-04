@@ -1,0 +1,467 @@
+{
+  "generated_at": "2026-11-04",
+  "summary": {
+    "critical": 0,
+    "high": 31,
+    "moderate": 37,
+    "low": 8
+  },
+  "advisories": {
+    "1102341": {
+      "module": "esbuild",
+      "severity": "moderate",
+      "title": "esbuild enables any website to send any requests to the development server and read the response",
+      "cves": []
+    },
+    "1108110": {
+      "module": "xlsx",
+      "severity": "high",
+      "title": "Prototype Pollution in sheetJS",
+      "cves": []
+    },
+    "1108111": {
+      "module": "xlsx",
+      "severity": "high",
+      "title": "SheetJS Regular Expression Denial of Service (ReDoS)",
+      "cves": []
+    },
+    "1116229": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "Vite Vulnerable to Path Traversal in Optimized Deps `.map` Handling",
+      "cves": []
+    },
+    "1119441": {
+      "module": "uuid",
+      "severity": "moderate",
+      "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+      "cves": []
+    },
+    "1120784": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: NTLMv2 hash disclosure via UNC path handling on Windows",
+      "cves": []
+    },
+    "1139346": {
+      "module": "extract-zip",
+      "severity": "high",
+      "title": "extract-zip unvalidated symlink path traversal",
+      "cves": []
+    },
+    "1164782": {
+      "module": "fflate",
+      "severity": "moderate",
+      "title": "fflate unzipSync can enter an infinite loop when parsing malformed ZIP64 archives",
+      "cves": []
+    },
+    "1193685": {
+      "module": "extract-zip",
+      "severity": "high",
+      "title": "extract-zip allows arbitrary file writes through symlink archive entries",
+      "cves": []
+    },
+    "1240912": {
+      "module": "node-forge",
+      "severity": "high",
+      "title": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
+      "cves": []
+    },
+    "1241206": {
+      "module": "katex",
+      "severity": "low",
+      "title": "KaTeX: Existing prototype pollution can bypass trust restrictions",
+      "cves": []
+    },
+    "1242622": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+      "cves": []
+    },
+    "1242625": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+      "cves": []
+    },
+    "1242647": {
+      "module": "@modelcontextprotocol/server",
+      "severity": "high",
+      "title": "MCP  TypeScript server SDK: Shared transport or server instances delivered one HTTP client's messages to another",
+      "cves": []
+    },
+    "1242648": {
+      "module": "@modelcontextprotocol/server",
+      "severity": "high",
+      "title": "MCP TypeScript SDK: One HTTP request within the default size limit could exhaust server memory during validation",
+      "cves": []
+    },
+    "1242651": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+      "cves": []
+    },
+    "1242654": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+      "cves": []
+    },
+    "1242658": {
+      "module": "vite",
+      "severity": "high",
+      "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+      "cves": []
+    },
+    "1242661": {
+      "module": "vite",
+      "severity": "high",
+      "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+      "cves": []
+    },
+    "1242666": {
+      "module": "@modelcontextprotocol/server",
+      "severity": "moderate",
+      "title": "MCP TypeScript SDK: Server bearer authentication accepted tokens issued for another service",
+      "cves": []
+    },
+    "1242724": {
+      "module": "vite",
+      "severity": "low",
+      "title": "Vite: Cross origin script execution through Vite custom middleware",
+      "cves": []
+    },
+    "1242727": {
+      "module": "vite",
+      "severity": "low",
+      "title": "Vite: Cross origin script execution through Vite custom middleware",
+      "cves": []
+    },
+    "1242730": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
+      "cves": []
+    },
+    "1242733": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
+      "cves": []
+    },
+    "1242736": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "Vite: First 4 bytes of files outside of `server.fs` setting is exposed by `?vite-wasm-instance`",
+      "cves": []
+    },
+    "1242767": {
+      "module": "@vitest/mocker",
+      "severity": "moderate",
+      "title": "Vitest: Code injection via unauthenticated manual mock registration",
+      "cves": []
+    },
+    "1242769": {
+      "module": "@vitest/mocker",
+      "severity": "moderate",
+      "title": "Vitest: Windows backslash traversal bypasses the @vitest/mocker redirect allowlist fix",
+      "cves": []
+    },
+    "1243071": {
+      "module": "electron",
+      "severity": "high",
+      "title": "Electron: Mitigation for compromised eMudhra intermediate certificates",
+      "cves": []
+    },
+    "1243074": {
+      "module": "body-parser",
+      "severity": "high",
+      "title": "body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body",
+      "cves": []
+    },
+    "1243077": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+      "cves": []
+    },
+    "1243078": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+      "cves": []
+    },
+    "1243079": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+      "cves": []
+    },
+    "1243080": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
+      "cves": []
+    },
+    "1243081": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
+      "cves": []
+    },
+    "1243084": {
+      "module": "happy-dom",
+      "severity": "high",
+      "title": "Happy DOM: Incomplete fix for CVE-2026-33943: unsanitized import alias leads to host code execution",
+      "cves": []
+    },
+    "1243098": {
+      "module": "fast-uri",
+      "severity": "moderate",
+      "title": "fast-uri vulnerable to URI scheme spoofing via percent-encoded scheme decoding",
+      "cves": []
+    },
+    "1243101": {
+      "module": "fast-uri",
+      "severity": "low",
+      "title": "fast-uri vulnerable to improper path equivalence in relative reference normalization",
+      "cves": []
+    },
+    "1243104": {
+      "module": "fast-uri",
+      "severity": "moderate",
+      "title": "fast-uri vulnerable to host confusion via unchecked WHATWG host canonicalization",
+      "cves": []
+    },
+    "1243107": {
+      "module": "fast-uri",
+      "severity": "low",
+      "title": "fast-uri vulnerable to scheme injection via an unescaped first-segment colon in suffix references",
+      "cves": []
+    },
+    "1243112": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+      "cves": []
+    },
+    "1243113": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+      "cves": []
+    },
+    "1243114": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+      "cves": []
+    },
+    "1243432": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "vite: `server.fs.deny` bypass on Windows alternate paths",
+      "cves": []
+    },
+    "1243472": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
+      "cves": []
+    },
+    "1243473": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
+      "cves": []
+    },
+    "1243474": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+      "cves": []
+    },
+    "1243475": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+      "cves": []
+    },
+    "1243476": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+      "cves": []
+    },
+    "1243477": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+      "cves": []
+    },
+    "1243478": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+      "cves": []
+    },
+    "1243479": {
+      "module": "undici",
+      "severity": "high",
+      "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+      "cves": []
+    },
+    "1243480": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+      "cves": []
+    },
+    "1243481": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+      "cves": []
+    },
+    "1243482": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+      "cves": []
+    },
+    "1243483": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici vulnerable to Denial of Service via unhandled exception in the decompress interceptor",
+      "cves": []
+    },
+    "1243484": {
+      "module": "undici",
+      "severity": "moderate",
+      "title": "undici vulnerable to Denial of Service via unhandled exception in the decompress interceptor",
+      "cves": []
+    },
+    "1243486": {
+      "module": "@modelcontextprotocol/node",
+      "severity": "high",
+      "title": "MCP TypeScript SDK: HTTP server transports and handlers did not limit request body size or JSON-RPC batch length",
+      "cves": []
+    },
+    "1243623": {
+      "module": "happy-dom",
+      "severity": "high",
+      "title": "Happy DOM: SSRF via iframe and link stylesheet when parsing untrusted HTML",
+      "cves": []
+    },
+    "1243661": {
+      "module": "@hono/node-server",
+      "severity": "moderate",
+      "title": "@hono/node-server: `serveStatic` decodes the request path a second time, leading to bypass of middleware on static paths",
+      "cves": []
+    },
+    "1243687": {
+      "module": "qs",
+      "severity": "moderate",
+      "title": "qs : qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements carrying a non-callable own toString (DoS)",
+      "cves": []
+    },
+    "1243858": {
+      "module": "vite",
+      "severity": "moderate",
+      "title": "Vite: `server.fs.deny` bypassed with queries",
+      "cves": []
+    },
+    "1244003": {
+      "module": "follow-redirects",
+      "severity": "high",
+      "title": "follow-redirects: Cross-realm sensitiveHeaders arrays are discarded and custom credentials can follow redirects",
+      "cves": []
+    },
+    "1244012": {
+      "module": "minimatch",
+      "severity": "moderate",
+      "title": "minimatch has potential denial of service via globparts amplification",
+      "cves": []
+    },
+    "1244013": {
+      "module": "glob",
+      "severity": "moderate",
+      "title": "Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal",
+      "cves": []
+    },
+    "1244014": {
+      "module": "node-forge",
+      "severity": "low",
+      "title": "Forge: ASN.1 OID first arc truncation in asn1.oidToDer",
+      "cves": []
+    },
+    "1244015": {
+      "module": "node-forge",
+      "severity": "moderate",
+      "title": "Forge: Prototype Pollution in forge.http cookie handling via a malicious Set-Cookie",
+      "cves": []
+    },
+    "1244016": {
+      "module": "node-forge",
+      "severity": "moderate",
+      "title": "Forge: TLS client crash when the server sends no certificate",
+      "cves": []
+    },
+    "1244017": {
+      "module": "node-forge",
+      "severity": "high",
+      "title": "Forge: Regular expression denial of service in PEM decoding (pem.decode)",
+      "cves": []
+    },
+    "1244018": {
+      "module": "node-forge",
+      "severity": "low",
+      "title": "Forge: Denial of Service via infinite loop in BigInteger.modInverse() with negative input (incomplete fix of CVE-2026-33891)",
+      "cves": []
+    },
+    "1244019": {
+      "module": "node-forge",
+      "severity": "low",
+      "title": "Forge: verifyCertificateChain() removes trusted CA certificates with the same subject from the CA store",
+      "cves": []
+    },
+    "1244020": {
+      "module": "node-forge",
+      "severity": "moderate",
+      "title": "Forge: AES-GCM authentication bypass via unvalidated tagLength option",
+      "cves": []
+    },
+    "1244021": {
+      "module": "node-forge",
+      "severity": "high",
+      "title": "Forge: PKCS#12 MAC forgery and constant-key PBE via zero iteration count",
+      "cves": []
+    },
+    "1244022": {
+      "module": "node-forge",
+      "severity": "high",
+      "title": "Forge: Denial of service in TLS record processing via a record interleaved with a fragmented handshake message",
+      "cves": []
+    },
+    "1244023": {
+      "module": "node-forge",
+      "severity": "high",
+      "title": "Forge: Denial of service in TLS record processing via call stack exhaustion",
+      "cves": []
+    },
+    "1244024": {
+      "module": "node-forge",
+      "severity": "high",
+      "title": "Forge: X.509 basicConstraints bypass in verifyCertificateChain() via deprecated extension OIDs 2.5.29.10 and 2.5.29.13",
+      "cves": []
+    },
+    "1244497": {
+      "module": "@modelcontextprotocol/client",
+      "severity": "moderate",
+      "title": "MCP TypeScript client SDK: HTTP client transports and OAuth requests followed cross-origin redirects and re-sent custom headers and request bodies",
+      "cves": []
+    }
+  }
+}

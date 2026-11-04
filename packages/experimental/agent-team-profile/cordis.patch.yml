@@ -17,7 +17,7 @@
     - id: agent-team
       name: '@deepseek-ai/dsh-experimental-agent-team'
       config:
-        maxMembers: 8
+        maxMembers: 200
         maxTasks: 256
         maxMessageBytes: 65536
         disposalTimeoutMs: 5000

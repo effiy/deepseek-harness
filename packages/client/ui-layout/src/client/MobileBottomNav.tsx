@@ -86,6 +86,7 @@ const NAV_BUTTONS: readonly NavButton[] = [
 /** The subset of LayoutState the bottom nav reads. */
 interface LayoutSnapshot {
   panelInfo: { activePanelId: MainPanelId | null }
+  layoutInfo: { narrowExpanded: boolean }
 }
 
 export interface MobileBottomNavProps {
@@ -95,22 +96,47 @@ export interface MobileBottomNavProps {
   useLayoutStore: SnapshotSelectorHook<LayoutSnapshot>
 }
 
+function HamburgerIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+      <path
+        d="M4 6h14M4 11h14M4 16h14"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function MobileBottomNav({ actions, useLayoutStore }: MobileBottomNavProps) {
   const activePanelId = useLayoutStore(s => s.panelInfo.activePanelId)
+  const narrowExpanded = useLayoutStore(s => s.layoutInfo.narrowExpanded)
 
   return (
     <nav className={css.root} role="navigation" aria-label="Main navigation">
-      {NAV_BUTTONS.map(btn => (
-        <button
-          key={btn.label}
-          className={`${css.button} ${activePanelId === btn.id ? css.active : ''}`}
-          onClick={() => { actions.selectPanel(btn.id) }}
-          aria-label={btn.label}
-          aria-current={activePanelId === btn.id ? 'page' : undefined}
-        >
-          <btn.Icon />
-        </button>
-      ))}
+      <button
+        className={css.hamburger}
+        onClick={() => { actions.toggleSidebar() }}
+        aria-label="Toggle sidebar"
+        aria-expanded={narrowExpanded}
+      >
+        <HamburgerIcon />
+      </button>
+      <span className={css.separator} aria-hidden="true" />
+      <div className={css.tabGroup}>
+        {NAV_BUTTONS.map(btn => (
+          <button
+            key={btn.label}
+            className={`${css.button} ${activePanelId === btn.id ? css.active : ''}`}
+            onClick={() => { actions.selectPanel(btn.id) }}
+            aria-label={btn.label}
+            aria-current={activePanelId === btn.id ? 'page' : undefined}
+          >
+            <btn.Icon />
+          </button>
+        ))}
+      </div>
     </nav>
   )
 }

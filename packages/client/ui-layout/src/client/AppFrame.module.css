@@ -60,6 +60,7 @@
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
   border-right: 0.5px solid var(--dsw-alias-border-l3);
+  grid-column: 1;
 }
 
 .centerCol {
@@ -67,6 +68,39 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  grid-column: 2;
+}
+
+/* ── Panel transition ─────────────────────────────────────────────────────
+ * Subtle fade + slide when switching between Chat / Workspace / Settings
+ * panels in the centre column.  The MainPanel component wraps each panel
+ * in a div keyed by activePanelId so React unmounts the old and mounts
+ * the new, triggering this CSS animation.
+ *
+ * Transform + opacity only — compositor thread, 60 fps. */
+.panelTransition {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: panel-enter 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panelTransition {
+    animation: none;
+  }
 }
 
 /* macOS desktop: the frame goes transparent so window vibrancy reaches the
@@ -268,6 +302,7 @@
   position: relative;
   min-width: 0;
   overflow: visible;
+  grid-column: 3;
 }
 
 .bottomRow {
@@ -327,60 +362,55 @@
     -webkit-overflow-scrolling: touch; /* iOS momentum scroll */
     overscroll-behavior: contain;      /* don't chain scroll to body */
 
-    /* Card-like drawer: rounded right edge + shadow that fades with the slide */
-    border-radius: 0 16px 16px 0;
-    box-shadow: none;
-
-    /* Slide off left edge — slightly longer, more natural deceleration */
+    /* Slide off left edge. Start fully transparent to prevent compositor
+        bleed on iOS — translate3d alone can leave a visible layer. */
     transform: translate3d(-100%, 0, 0);
-    transition:
-      transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1),
-      box-shadow 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
 
     /* Prevent subpixel flicker during animation on iOS */
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 
-    /* Safe-area insets: push content below the notch, above the
-     * home indicator, and right of any left-edge inset so nothing is
-     * clipped by the device chrome. */
+    /* Safe-area insets: push content below the notch and above the
+     * home indicator so nothing is clipped by the device chrome. */
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    padding-left: env(safe-area-inset-left, 0px);
   }
 
   .frame:not([data-sidebar-collapsed]) .sidebarCol {
     transform: translate3d(0, 0, 0);
-    /* Elevated drawer shadow — multi-layer for realistic depth */
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.04),
-      0 16px 48px rgba(0, 0, 0, 0.16),
-      0 4px 12px rgba(0, 0, 0, 0.08);
+    opacity: 1;
+    pointer-events: auto;
   }
 
-  /* Collapsed: fully removed from the render tree — no compositing,
-     no interaction, no visual trace.  display:none is the only way to
-     guarantee zero rendering on every mobile engine (visibility:hidden
-     can still bleed compositor layers from a fixed-position transform
-     on iOS Safari). */
+  /* Collapsed: the default .sidebarCol already has opacity:0 +
+     translate3d(-100%) + pointer-events:none.  When the expanded
+     rule is removed, the sidebar naturally slides out and fades
+     out in 300ms — no visibility:hidden snap to interrupt it. */
   .frame[data-sidebar-collapsed] .sidebarCol {
-    display: none !important;
+    border-right: none;
+    background: transparent;
   }
 
-  /* Visual backdrop: only rendered when the sidebar is expanded.
-   * When collapsed there is no ::after element at all — this avoids a
-   * position:fixed pseudo-element covering the viewport on mobile Safari,
-   * which can interfere with compositing and block content rendering.
-   * Click-to-close is handled by the sidebar's mousedown listener on
-   * document.body. */
-  .frame:not([data-sidebar-collapsed])::after {
+  /* Visual backdrop: always present but faded out when collapsed.
+     Uses opacity transition for a smooth fade-in/fade-out that
+     matches the sidebar slide animation.  translateZ(0) forces
+     GPU layer promotion to avoid compositing issues on iOS. */
+  .frame::after {
     content: '';
     position: fixed;
     inset: 0;
     z-index: 49;
-    /* Frosted-glass backdrop: semi-transparent dark + subtle blur */
-    background: rgba(0, 0, 0, 0.36);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(0, 0, 0, 0.46);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateZ(0);
+    transition: opacity 0.35s ease;
+  }
+
+  .frame:not([data-sidebar-collapsed])::after {
+    opacity: 1;
   }
 }

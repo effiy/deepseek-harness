@@ -17,10 +17,11 @@
 .root {
   display: none; /* hidden above the breakpoint, shown by media query */
   align-items: center;
-  justify-content: space-around;
+  justify-content: flex-start;
+  gap: 2px;
   box-sizing: border-box;
   height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding: 4px 12px env(safe-area-inset-bottom, 0px);
+  padding: 4px 8px env(safe-area-inset-bottom, 0px);
   background: color-mix(in srgb, var(--dsw-specific-sidebar-fill) 82%, transparent);
   border-top: 0.5px solid color-mix(in srgb, var(--dsw-alias-border-l3) 60%, transparent);
   color: var(--dsw-alias-label-secondary);
@@ -33,7 +34,7 @@
   box-shadow: 0 -1px 0 rgb(0 0 0 / 0.04), 0 -4px 16px rgb(0 0 0 / 0.06);
 }
 
-@media (max-width: 899px) {
+@media (max-width: 900px) {
   .root {
     display: flex;
   }
@@ -42,6 +43,65 @@
 /* ------------------------------------------------------------------
  * Tab button
  * ------------------------------------------------------------------ */
+
+/* ── Hamburger (sidebar toggle) ───────────────────────────────────
+ * Left-aligned, visually distinct from the pill-indicator tabs.
+ * Line-stroke icon with a subtle background on press — no pill. */
+.hamburger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 200ms var(--ds-ease-in-out), background 150ms var(--ds-ease-in-out);
+}
+
+.hamburger:active {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 8%, transparent);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.hamburger[aria-expanded='true'] {
+  color: var(--dsw-alias-label-primary);
+}
+
+.hamburger svg {
+  opacity: 0.64;
+  transition: opacity 200ms var(--ds-ease-in-out);
+}
+
+.hamburger:active svg,
+.hamburger[aria-expanded='true'] svg {
+  opacity: 1;
+}
+
+/* ── Separator ────────────────────────────────────────────────────
+ * Thin vertical rule between the hamburger and the tab row. */
+.separator {
+  width: 1px;
+  height: 24px;
+  background: color-mix(in srgb, var(--dsw-alias-border-l3) 40%, transparent);
+  margin: 0 4px;
+  flex: none;
+}
+
+/* ── Tab group ────────────────────────────────────────────────────
+ * Fills the remaining space and evenly distributes the 4 tab buttons. */
+.tabGroup {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex: 1;
+  min-width: 0;
+}
 
 .button {
   position: relative;

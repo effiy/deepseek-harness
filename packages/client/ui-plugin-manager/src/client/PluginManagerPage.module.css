@@ -20,6 +20,14 @@
   max-width: 960px;
 }
 
+/* Narrow viewports: drop the 960 px cap so content fills the screen.
+   matches --ds-bp-mobile: 640px */
+@media (max-width: 640px) {
+  .page > * {
+    max-width: 100%;
+  }
+}
+
 .pageHead {
   display: flex;
   align-items: flex-start;
@@ -212,6 +220,29 @@
   .card[data-plugin-highlight] {
     animation: none;
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
+  }
+}
+
+/* Narrow viewports: tighten the page layout for small screens.
+   matches --ds-bp-mobile: 640px */
+@media (max-width: 640px) {
+  .page {
+    gap: 24px;
+    padding: 0 16px 48px;
+  }
+
+  .cardHead {
+    gap: 10px;
+  }
+
+  .detailActions,
+  .actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .toolbar {
+    gap: 8px;
   }
 }
 
@@ -521,6 +552,14 @@
 
 .partsFilter {
   width: 200px;
+}
+
+/* Narrow viewports: the parts filter fills the available width.
+   matches --ds-bp-mobile: 640px */
+@media (max-width: 640px) {
+  .partsFilter {
+    width: 100%;
+  }
 }
 
 .partsFilter:focus-visible {

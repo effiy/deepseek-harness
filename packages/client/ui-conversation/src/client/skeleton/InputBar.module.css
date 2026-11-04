@@ -511,9 +511,8 @@
 /* ── Sidebar toggle button (mobile composer toolbar) ────────────────────────
    Hidden on desktop; shown on narrow viewports where the sidebar is
    collapsed and the composer toolbar is the primary thumb-accessible
-   surface.  The button sits in the trailing row alongside the model
-   selector and send controls. */
-
+   surface.  The button sits in the tools row alongside the add (+)
+   control. */
 .sidebarToggle {
   display: none;
   flex: none;

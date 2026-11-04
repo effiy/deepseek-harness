@@ -26,6 +26,9 @@ export interface DraftEditorProps {
   /** When true, adds `readOnly` to the contentEditable to prevent the
    *  system soft-keyboard on mobile while keeping the editor focusable. */
   readonly readOnly?: boolean
+  /** Mobile keyboard action key hint — \"send\" shows the Send icon on
+   *  the virtual keyboard, matching chat-app expectations. */
+  readonly enterKeyHint?: 'send' | 'done' | 'go' | 'next' | 'search'
 }
 
 /**
@@ -35,7 +38,7 @@ export interface DraftEditorProps {
  */
 export function DraftEditor({
   classNames: css, editor, scrollRef, editable, editorDisabled, phase, placeholderText, ariaLabel,
-  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder, inputMode, readOnly,
+  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder, inputMode, readOnly, enterKeyHint,
 }: DraftEditorProps): ReactNode {
   return (
     <div ref={scrollRef} className={css.scroll} data-input-scroll>
@@ -57,6 +60,7 @@ export function DraftEditor({
           onKeyDown={workspaceTrigger ? onWorkspaceKeyDown : undefined}
           style={hint === null ? undefined : { '--dsh-composer-hint': JSON.stringify(hint) } as CSSProperties}
           {...inputMode !== undefined ? { inputMode } : {}}
+          {...enterKeyHint !== undefined ? { enterKeyHint } : {}}
         />
         {showPlaceholder && (
           <div aria-hidden className={css.placeholder} data-composer-placeholder>
