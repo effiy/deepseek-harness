@@ -75,6 +75,7 @@
   max-width: 45%;
   min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 20px;
   opacity: 1;

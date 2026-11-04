@@ -327,22 +327,35 @@
     -webkit-overflow-scrolling: touch; /* iOS momentum scroll */
     overscroll-behavior: contain;      /* don't chain scroll to body */
 
-    /* Slide off left edge */
+    /* Card-like drawer: rounded right edge + shadow that fades with the slide */
+    border-radius: 0 16px 16px 0;
+    box-shadow: none;
+
+    /* Slide off left edge — slightly longer, more natural deceleration */
     transform: translate3d(-100%, 0, 0);
-    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+    transition:
+      transform 0.35s cubic-bezier(0.22, 0.61, 0.36, 1),
+      box-shadow 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
 
     /* Prevent subpixel flicker during animation on iOS */
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 
-    /* Safe-area insets: push content below the notch and above the
-     * home indicator so nothing is clipped by the device chrome. */
+    /* Safe-area insets: push content below the notch, above the
+     * home indicator, and right of any left-edge inset so nothing is
+     * clipped by the device chrome. */
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
   }
 
   .frame:not([data-sidebar-collapsed]) .sidebarCol {
     transform: translate3d(0, 0, 0);
+    /* Elevated drawer shadow — multi-layer for realistic depth */
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.04),
+      0 16px 48px rgba(0, 0, 0, 0.16),
+      0 4px 12px rgba(0, 0, 0, 0.08);
   }
 
   /* Collapsed: completely invisible — no border, no background, no
@@ -353,6 +366,7 @@
     visibility: hidden;
     border-right: none;
     background: transparent;
+    box-shadow: none;
   }
 
   /* Visual backdrop: only rendered when the sidebar is expanded.
@@ -366,6 +380,9 @@
     position: fixed;
     inset: 0;
     z-index: 49;
-    background: rgba(0, 0, 0, 0.46);
+    /* Frosted-glass backdrop: semi-transparent dark + subtle blur */
+    background: rgba(0, 0, 0, 0.36);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 }

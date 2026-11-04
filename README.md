@@ -34,38 +34,46 @@ The project is a TypeScript monorepo of **50+ packages** plus a Python SDK, with
 - **pnpm** (Corepack-enabled, pinned at 11.28.5)
 - **Git** 2.26+
 
-### Install
+### From Scratch (clone → build → run)
 
 ```bash
+# 1. Clone
 git clone https://github.com/deepseek-ai/deepseek-harness.git
 cd deepseek-harness
+
+# 2. Install dependencies
 pnpm install
-pnpm run typecheck   # verify setup
-```
 
-### Run
+# 3. Verify setup
+pnpm run typecheck              # full project type-check
 
-```bash
-# Web GUI (development)
-pnpm run dev:web
+# 4. Build (compile all packages + bundle Web frontend)
+pnpm run build                  # tsc → tsdown → Vite (~200s first run)
 
-# Headless mode
-pnpm dsh --profile headless "Explain quantum computing in one paragraph"
+# 5. Run Web GUI
+pnpm run dev:web                # starts at http://127.0.0.1:3080
 
-# Desktop application
+# Or run headless (needs DEEPSEEK_API_KEY)
+pnpm dsh --profile headless "Explain quantum computing"
+
+# Or run Desktop
 pnpm run dev:desktop
 ```
 
-Set `DEEPSEEK_API_KEY` in your environment for real-model inference.
+After the first build, `pnpm run dev:web --skip-build` reuses existing artifacts and starts faster. Source changes to client bundles are rebuilt automatically by the watcher.
 
-### Test
+### Verify Everything Works
 
 ```bash
-pnpm run test              # unit tests
-pnpm run test:coverage     # CI coverage gate (per-file 100%)
-pnpm run test:e2e          # real-API tests (self-skip without key)
-pnpm run test:snapshot     # recorded session replay
+pnpm run test                   # unit tests (~600 specs)
+pnpm run test:gui               # GUI + Host tests
+pnpm run test:web               # browser e2e (needs build:web + Playwright Chromium)
+pnpm run test:e2e               # real-API tests (needs DEEPSEEK_API_KEY)
 ```
+
+Set `DEEPSEEK_API_KEY` in your environment or a `.env` file for real-model inference. Tests that need the key will self-skip without it.
+
+See [Development Guide](docs/development.md) for Windows/WSL setup, CI organization, and daily workflow.
 
 ---
 
