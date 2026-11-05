@@ -2,9 +2,12 @@
  * DeepSeek Harness Service Worker
  *
  * Three-layer cache strategy:
- *   1. Shell — pre-cached on install (HTML entry + entry JS chunks)
+ *   1. Shell — pre-cached on install (HTML entry + entry JS/CSS chunks)
  *   2. Static — cache-first for /assets/* with background revalidation
- *   3. API/other — network-first, no stale cache
+ *   3. API — network-first, never serve stale data
+ *
+ * Statistics are tracked per-layer and exposed to the client via
+ * postMessage so the app can report cache-hit ratios.
  *
  * Placeholders __CACHE_VERSION__ and __SHELL_ASSETS__ are replaced at
  * build time by the dsh-generate-sw Vite plugin.
@@ -21,7 +24,40 @@ const SHELL_ASSETS = __SHELL_ASSETS__
 /** Pathname patterns served cache-first. */
 const STATIC_PATTERNS = [/^\/assets\//, /\.(?:svg|png|jpe?g|webp|woff2?|webmanifest|ico)$/]
 
-/** Minimal offline fallback page served when nothing is cached. */
+// ── Cache-hit statistics ────────────────────────────────────────────────
+
+/** @type {{ shellHits: number, staticHits: number, staticMisses: number, navFallbacks: number, errors: number, installTime: number }} */
+const stats = {
+  shellHits: 0,      // pre-cached shell assets served
+  staticHits: 0,     // cache-first assets served from cache
+  staticMisses: 0,   // cache-first assets fetched online then cached
+  navFallbacks: 0,   // navigation requests fell back to cache or offline page
+  errors: 0,         // fetch failures not served from cache
+  installTime: 0,    // epoch ms of the activating install
+}
+
+/** Track a hit/miss event. */
+function recordHit(layer) {
+  if (layer === 'shell') stats.shellHits++
+  else if (layer === 'static') stats.staticHits++
+  else if (layer === 'static-miss') stats.staticMisses++
+  else if (layer === 'nav-fallback') stats.navFallbacks++
+  else if (layer === 'error') stats.errors++
+}
+
+/** Answer a cache-stats query from the client. */
+function getStatsReport() {
+  const total = stats.shellHits + stats.staticHits + stats.staticMisses
+  return {
+    ...stats,
+    totalStaticRequests: stats.staticHits + stats.staticMisses,
+    hitRate: total > 0 ? ((stats.shellHits + stats.staticHits) / total * 100).toFixed(1) : '0.0',
+    uptime: stats.installTime > 0 ? Date.now() - stats.installTime : 0,
+  }
+}
+
+// ── Offline fallback page ───────────────────────────────────────────────
+
 const OFFLINE_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -32,27 +68,56 @@ const OFFLINE_HTML = `<!DOCTYPE html>
 <title>Offline — DeepSeek Harness</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;background:#f5f5f5;color:#333}
+  body{font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;min-height:100dvh;background:#f5f5f5;color:#333;transition:background .3s,color .3s}
   @media(prefers-color-scheme:dark){body{background:#171717;color:#e5e5e5}}
-  .card{text-align:center;padding:2rem;max-width:24rem}
-  .icon{font-size:3rem;margin-bottom:1rem}
+  .card{text-align:center;padding:2rem;max-width:28rem}
+  .icon{font-size:3rem;margin-bottom:1rem;line-height:1}
   h1{font-size:1.25rem;font-weight:500;margin-bottom:.5rem}
-  p{color:#666;font-size:.875rem;line-height:1.5}
+  p{color:#666;font-size:.875rem;line-height:1.5;margin-bottom:1.5rem}
   @media(prefers-color-scheme:dark){p{color:#999}}
+  .btn{display:inline-block;padding:.5rem 1.25rem;font-size:.875rem;font-weight:500;color:#fff;background:#2563eb;border:none;border-radius:.5rem;cursor:pointer;text-decoration:none;transition:background .2s}
+  .btn:hover{background:#1d4ed8}
+  .btn:active{background:#1e40af}
+  .status{font-size:.75rem;color:#888;margin-top:1rem}
+  @media(prefers-color-scheme:dark){.status{color:#666}}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="icon">&#x1F4E1;</div>
   <h1>No Connection</h1>
-  <p>You&rsquo;re offline. Check your network and try again.</p>
+  <p>You&rsquo;re offline. Your work is safe — cached pages and assets are still available.</p>
+  <button class="btn" onclick="window.location.reload()" aria-live="polite">Try Again</button>
+  <div class="status" id="status">Checking connection&hellip;</div>
 </div>
+<script>
+  // Auto-reconnect polling — when the network returns, reload.
+  var attempts = 0
+  var maxAttempts = 300 // ~5 minutes at 1 s intervals
+  var timer = setInterval(function check() {
+    attempts++
+    fetch('./', { method: 'HEAD', cache: 'no-store' })
+      .then(function(r) {
+        if (r.ok) {
+          clearInterval(timer)
+          document.getElementById('status').textContent = 'Connection restored! Reloading&hellip;'
+          setTimeout(function() { window.location.reload() }, 800)
+        }
+      })
+      .catch(function() {
+        document.getElementById('status').textContent =
+          'Checking connection&hellip; (' + attempts + ')'
+      })
+    if (attempts >= maxAttempts) clearInterval(timer)
+  }, 1000)
+</script>
 </body>
 </html>`
 
 // ── Install: pre-cache shell ────────────────────────────────────────────
 
 self.addEventListener('install', event => {
+  stats.installTime = Date.now()
   self.skipWaiting()
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
@@ -72,6 +137,23 @@ self.addEventListener('activate', event => {
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))),
     ).then(() => self.clients.claim()),
   )
+})
+
+// ── Message: respond to client queries ──────────────────────────────────
+
+self.addEventListener('message', event => {
+  const { type } = event.data || {}
+  if (type === 'DSH_CACHE_STATS') {
+    const report = getStatsReport()
+    if (event.ports && event.ports[0]) {
+      event.ports[0].postMessage(report)
+    } else if (event.source) {
+      event.source.postMessage({ type: 'DSH_CACHE_STATS_REPLY', stats: report })
+    }
+  }
+  if (type === 'DSH_SKIP_WAITING') {
+    self.skipWaiting()
+  }
 })
 
 // ── Fetch: routing by request type ──────────────────────────────────────
@@ -119,6 +201,7 @@ async function navigateHandler(request) {
     }
     return response
   } catch {
+    recordHit('nav-fallback')
     const cached = await caches.match(request)
     if (cached) return cached
     const shell = await caches.match('/index.html')
@@ -137,6 +220,7 @@ async function navigateHandler(request) {
 async function cacheFirstHandler(request) {
   const cached = await caches.match(request)
   if (cached) {
+    recordHit('static')
     // Background revalidation — silently refresh the cache.
     fetch(request).then(response => {
       if (response.ok) {
@@ -148,12 +232,14 @@ async function cacheFirstHandler(request) {
   try {
     const response = await fetch(request)
     if (response.ok) {
+      recordHit('static-miss')
       const cache = await caches.open(CACHE_NAME)
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       cache.put(request, response.clone())
     }
     return response
   } catch {
+    recordHit('error')
     return new Response('', { status: 503, statusText: 'Offline' })
   }
 }

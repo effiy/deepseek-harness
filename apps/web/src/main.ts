@@ -6,11 +6,74 @@ import { AppWebEntry, applyIndexInjections } from '@deepseek-ai/dsh-client-web'
 // Register the SW in production so the app shell and static assets are
 // cached for offline use.  The registration is eager (before run()) but
 // fire-and-forget — it must not block the app boot.
+//
+// Lifecycle:
+//   1. register('/sw.js') — kickoff, non-blocking
+//   2. updatefound  → new SW detected, installing…
+//   3. statechange  → installed → waiting → skipWaiting → activating → activated
+//   4. controllerchange → new SW is now in control; prompt user to refresh
+//
+// Cache stats are available through getSWCacheStats(); the SW exposes
+// per-layer hit/miss counters via postMessage.
+
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  let updatePromptVisible = false
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('SW registration failed:', err.message)
+    navigator.serviceWorker.register('/sw.js').then(registration => {
+      // ── Update detection ──────────────────────────────────────────
+      // When a new SW version is found (updatefound fires), track its
+      // installation so we can notify the user once it's ready.
+      registration.addEventListener('updatefound', () => {
+        const installing = registration.installing
+        if (!installing) return
+        installing.addEventListener('statechange', () => {
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            // New content is available — dispatch a custom event so the
+            // UI layer can show an update banner without importing SW code.
+            window.dispatchEvent(new CustomEvent('dsh-sw-update'))
+            console.info('[DSH SW] new version ready — refresh to activate')
+          }
+        })
+      })
+    }).catch((err) => {
+      console.warn('[DSH SW] registration failed:', err.message)
     })
+
+    // ── Controller change ───────────────────────────────────────────
+    // When skipWaiting() completes and the new SW takes over, prompt
+    // the user to reload if they haven't already been asked.
+    let refreshing = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return
+      refreshing = true
+      // The UI layer can listen for this event to show a refresh prompt.
+      if (!updatePromptVisible) {
+        window.dispatchEvent(new CustomEvent('dsh-sw-activated'))
+      }
+    })
+  })
+}
+
+/**
+ * Query cache-hit statistics from the active Service Worker.
+ *
+ * Returns a promise that resolves with the SW's stats report or null
+ * when no SW is in control.  The report includes per-layer hit/miss
+ * counters, overall hit rate, and uptime.
+ */
+export async function getSWCacheStats(): Promise<Record<string, number | string> | null> {
+  if (!navigator.serviceWorker?.controller) return null
+  return new Promise(resolve => {
+    const channel = new MessageChannel()
+    channel.port1.onmessage = event => resolve(event.data)
+    channel.port1.onmessageerror = () => resolve(null)
+    navigator.serviceWorker.controller!.postMessage(
+      { type: 'DSH_CACHE_STATS' },
+      [channel.port2],
+    )
+    // Timeout after 2 s — the SW might be busy.
+    setTimeout(() => resolve(null), 2000)
   })
 }
 
