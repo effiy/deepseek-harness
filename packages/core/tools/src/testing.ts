@@ -33,9 +33,11 @@ export function defineContentToolFixture<const S extends ParameterSchemaSpec>(
     ...options,
     output: {
       schema: CONTENT_VALUE_SCHEMA,
+      // SAFETY: test stubs — runtime value matches ContentBlock[] by construction
       render: (_args, value) => value as unknown as ContentBlock[],
     },
     async execute(args, exec) {
+      // SAFETY: test stub — execute returns JsonValue[] per the tool's schema
       return await execute(args, exec) as unknown as JsonValue[]
     },
   })

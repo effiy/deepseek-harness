@@ -209,7 +209,10 @@ export class ModelsSettingsStore {
     if (!declared.ok) { this.failLoad(declared.error.message); return }
     const mirrored = this.describeFace.getSnapshot()
     if (mirrored.view === undefined) {
-      this.failLoad(mirrored.error ?? 'settings are unavailable in this browser')
+      const message = mirrored.status === 'unavailable'
+        ? 'Settings are only available on the local machine. Open http://127.0.0.1:3080 to manage them.'
+        : mirrored.error ?? 'settings are unavailable in this browser'
+      this.failLoad(message)
       return
     }
     const providers = joinProviderDirectory(registered.value, declared.value)

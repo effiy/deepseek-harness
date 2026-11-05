@@ -1,8 +1,10 @@
 /**
- * @deepseek-ai/dsh-bot-status-public — public HTTP endpoint for bot status.
- * Listens to `agent/status` events, maintains an in-memory cache, and exposes
- * `GET /api/bot-states` without authentication so consumers like YiVad can
- * poll bot liveness.
+ * Unauthenticated GET /bot/status endpoint: answers live bot roster and
+ * running/idle status without going through the browser authentication layer.
+ * Consumed by YiVad's BotStatusBadge dashboard; CORS headers enable
+ * cross-origin polling.
+ *
+ * Pattern follows @deepseek-ai/dsh-host-health-endpoint.
  *
  * @module @deepseek-ai/dsh-bot-status-public
  */
@@ -54,7 +56,7 @@ const CORS_HEADERS: Record<string, string> = {
 /**
  * Public bot-status HTTP endpoint.
  *
- * Registers `GET /api/bot-states` on the webserver without authentication,
+ * Registers `GET /bot/status` on the webserver without authentication,
  * returning JSON with current bot states and CORS headers.
  *
  * @param ctx - plugin context carrying the webserver and agents services.
@@ -115,7 +117,7 @@ export function apply(ctx: Context): void {
   // Register the public route and keep it alive for the plugin's lifetime.
   const disposeRoute = ctx.webServer.register({
     kind: 'exact',
-    path: '/api/bot-states',
+    path: '/bot/status',
     handler(_req: IncomingMessage, res: ServerResponse): void {
       // OPTIONS preflight for CORS.
       if (_req.method === 'OPTIONS') {

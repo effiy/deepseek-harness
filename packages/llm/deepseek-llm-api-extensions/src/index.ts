@@ -42,7 +42,7 @@ async function acceptAll(callbacks: readonly (() => void | Promise<void>)[]): Pr
   const outcomes = await Promise.allSettled(callbacks.map(callback => Promise.resolve().then(callback)))
   const failures: unknown[] = outcomes
     .filter((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected')
-    .map(outcome => outcome.reason as unknown)
+    .map(outcome => outcome.reason as unknown) // PromiseRejectedResult.reason is `any` → narrow to `unknown`
   if (failures.length === 1) throw failures[0]
   if (failures.length > 1) throw new AggregateError(failures, 'DeepSeek LLM API extension acceptance failed')
 }

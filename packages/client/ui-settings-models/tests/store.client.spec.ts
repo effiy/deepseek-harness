@@ -456,7 +456,7 @@ describe('edge joins', () => {
     await store.load()
     expect(store.store.getSnapshot()).toMatchObject({
       status: 'error',
-      error: 'settings are unavailable in this browser',
+      error: 'Settings are only available on the local machine. Open http://127.0.0.1:3080 to manage them.',
     })
   })
 

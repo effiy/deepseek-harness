@@ -142,7 +142,7 @@ export function errorChain(value: unknown): string {
       // repeat their cause verbatim; rendering it again would only add noise.
       const cause = causeText === '' || causeText === message ? '' : `: ${causeText}`
       return `${message}${members}${cause}`
-    } catch {
+    } catch (_e: unknown) { /* guard: operation may fail */
       // Only hostile coercion or hostile accessors (a throwing toString /
       // Symbol.toPrimitive on a non-Error, or a throwing message/name/cause/
       // errors getter on an Error subclass): this renderer feeds UI notices

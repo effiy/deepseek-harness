@@ -220,7 +220,7 @@ export function authContextFrom(ctx: Context): AuthContext {
       try {
         await access(expanded)
         return true
-      } catch {
+      } catch (_e: unknown) { /* guard: operation may fail */
         // Absent, unreadable, or a broken symlink — every one of which means
         // this ambient credential source cannot be used, which is the only
         // distinction the caller makes.

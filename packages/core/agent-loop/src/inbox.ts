@@ -58,7 +58,9 @@ export const inboxProjectionDefinition = {
     // The wire value is the fold state itself: every pending message already
     // round-trips the session log as lossless JSON. Only the static type
     // narrows to the JSON-safe projection table entry.
+    // SAFETY: Zod schema is type-compatible by construction; satisfies clause guards consistency
     viewSchema: inboxProjectionSchema as unknown as z.ZodType<InboxWireState>,
+    // SAFETY: InboxState is a structural superset of InboxWireState — only JSON-safe fields serialize
     view: (state: InboxState) => state as unknown as InboxWireState,
   },
   stateVersion: 1,

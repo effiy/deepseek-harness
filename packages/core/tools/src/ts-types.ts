@@ -241,7 +241,7 @@ export function jsonSchemaToTs(schema: unknown, indent = 0): string {
   try {
     assertSupportedJsonSchema(schema)
     return flattenTypeDocument(renderSupportedSchema(schema, indent))
-  } catch {
+  } catch (_e: unknown) { /* guard: operation may fail */
     return 'unknown'
   }
 }

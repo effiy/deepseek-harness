@@ -6,7 +6,7 @@ Public HTTP endpoint exposing live DSH bot statuses for external consumers (e.g.
 
 - Listens to `agent/status` Cordis events to track every bot's lifecycle state (`idle` / `running`).
 - Maintains an in-memory cache keyed by agent session id.
-- Exposes `GET /api/bot-states` — an unauthenticated HTTP endpoint returning JSON with CORS headers.
+- Exposes `GET /bot/status` — an unauthenticated HTTP endpoint returning JSON with CORS headers.
 
 ## Response format
 
@@ -33,7 +33,7 @@ Add the plugin to a DSH profile:
   plugin: '@deepseek-ai/dsh-bot-status-public'
 ```
 
-The endpoint is then available at `http://<host>:<port>/api/bot-states`.
+The endpoint is then available at `http://<host>:<port>/bot/status`.
 
 ## Dependencies
 
@@ -47,7 +47,7 @@ DSH Agent Registry
   ▼
 bot-status-public plugin
   │  内存 Map<sessionId, BotStatusEntry>
-  │  GET /api/bot-states (public, CORS)
+  │  GET /bot/status (public, CORS)
   ▼
 YiVad botStatusService.ts
   │  fetchBotStates() → 30s polling

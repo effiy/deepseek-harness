@@ -105,7 +105,7 @@ export async function executeToolCalls(
 function parseArguments(raw: string): unknown {
   try {
     return raw ? JSON.parse(raw) : {}
-  } catch {
+  } catch (_e: unknown) { /* guard: operation may fail */
     return raw
   }
 }

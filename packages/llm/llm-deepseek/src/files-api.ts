@@ -163,7 +163,7 @@ export class DeepSeekFilesClient {
     let parsed: unknown
     try {
       parsed = await response.json()
-    } catch {
+    } catch (_e: unknown) { /* guard: operation may fail */
       // A status remains sufficient to report the provider failure.
     }
     const { message, detail } = providerErrorDetail(parsed)

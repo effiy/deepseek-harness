@@ -738,6 +738,7 @@ function resolveModelReasoning(
   // schema union — outside the field's declared type, hence the widening —
   // while an explicit `{}` arrives as an empty dict. Both declare nothing,
   // and neither is a spelling of "inherit" or "disable".
+  // efforts is `z.output<typeof reasoningEffortsSchema>` — null check is runtime guard
   if ((efforts as unknown) === null || Object.keys(efforts).length === 0) {
     invalid(provider, `model "${entry.id}" has an empty reasoningEfforts; declare the offered levels, set`
       + ' false for a non-reasoning model, or omit the field to keep the installed catalog\'s capability')

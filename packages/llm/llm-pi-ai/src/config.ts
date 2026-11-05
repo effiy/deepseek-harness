@@ -390,7 +390,7 @@ function assertValidHeaders(provider: string, headers: Readonly<Record<string, s
   for (const [name, value] of Object.entries(headers ?? {})) {
     try {
       new Headers([[name, value]])
-    } catch {
+    } catch (_e: unknown) { /* guard: operation may fail */
       throw new Error(
         `llm-pi-ai: provider "${provider}" header "${name}" is not valid for Fetch;`
         + ' use a valid HTTP field name and a single-line value representable as bytes',

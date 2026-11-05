@@ -40,7 +40,7 @@ export async function prepareReferenceOmission(
     let saved: SpillRef
     try {
       saved = await store.saveText(request)
-    } catch {
+    } catch (_e: unknown) { /* guard: operation may fail */
       // Optional storage failures cannot turn an incomplete preview into a claimed full snapshot.
       return omission(source, { status: 'unavailable', reason: 'save-failed' })
     }

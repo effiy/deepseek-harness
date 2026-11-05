@@ -580,6 +580,7 @@ export function defineTool<const S extends ParameterSchemaSpec, const O extends 
   const tool: ToolDefinition = {
     name: options.name,
     description: options.description,
+    // SAFETY: Zod schema output matches Record<string, unknown> by ToolParametersSchema definition
     parameters: parameters as unknown as Record<string, unknown>,
     output: {
       schema: outputSchema,

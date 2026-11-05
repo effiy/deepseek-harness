@@ -92,7 +92,7 @@ function applyPathOp(section: Record<string, unknown>, op: SettingsPathOp, schem
       if (!/^(0|[1-9][0-9]*)$/.test(head) || (Number(head) > value.length || Number(head) === value.length && (rest.length > 0 || op.op === 'unset'))) {
         throw new TypeError(`Config array index "${head}" is out of range`)
       }
-      const result: unknown[] = [...value as unknown[]]
+      const result: unknown[] = [...(value as readonly unknown[])]
       const index = Number(head)
       if (rest.length === 0 && op.op === 'unset') result.splice(index, 1)
       else result[index] = edit(value[index], rest, node?.inner)

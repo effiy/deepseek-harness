@@ -183,7 +183,7 @@ async function fsStatFile(
       kind: 'present',
       info: { target, version: info.version, ...info.size === undefined ? {} : { size: info.size } },
     }
-  } catch {
+  } catch (_e: unknown) { /* guard: file operation may fail */
     signal?.throwIfAborted()
     return { kind: 'unavailable' }
   }
@@ -409,7 +409,7 @@ async function readBounded(
     }
     signal?.throwIfAborted()
     return parts.join('')
-  } catch {
+  } catch (_e: unknown) { /* guard: file operation may fail */
     signal?.throwIfAborted()
     // A file may disappear or become unreadable after its metadata probe.
     return undefined
@@ -563,7 +563,7 @@ export async function probeScopeInstruction(
   try {
     target = await fileSystem.resolve(candidate.absolutePath, signalOptions(signal))
     info = await fileSystem.stat(target, signal)
-  } catch {
+  } catch (_e: unknown) { /* guard: file operation may fail */
     signal?.throwIfAborted()
     return { kind: 'unavailable' }
   }

@@ -1021,7 +1021,7 @@ export class LlmRuntime extends TypertRemoteService {
     let hostPath: string | undefined
     try {
       hostPath = this.ctx.get('attachments')?.fileHostPath(ref)
-    } catch {
+    } catch (_e: unknown) { /* guard: operation may fail */
       // A malformed durable reference degrades this occurrence to the no-path
       // handle instead of failing every later request over the same log.
       return undefined

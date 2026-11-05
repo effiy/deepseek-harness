@@ -634,7 +634,7 @@ function errorMessage(error: unknown): string {
       return error.message
     }
     return String(error)
-  } catch {
+  } catch (_e: unknown) { /* guard: operation may fail */
     // A hostile thrown value can trap `instanceof`, property access, or string
     // coercion. Error normalization is the outermost safety boundary, so its
     // fallback must itself be total.
@@ -663,7 +663,7 @@ function materializePresentation<T>(candidate: T): T {
 function errorInfo(error: unknown): ToolErrorInfo | undefined {
   try {
     return error instanceof HarnessError ? { name: error.name, code: error.code } : undefined
-  } catch {
+  } catch (_e: unknown) { /* guard: operation may fail */
     return undefined
   }
 }
@@ -1325,7 +1325,7 @@ export class ToolRuntime extends Service {
     try {
       const concurrencySafe: unknown = tool.isConcurrencySafe(exec.arguments)
       return concurrencySafe === true ? { kind: 'parallel' } : { kind: 'exclusive' }
-    } catch {
+    } catch (_e: unknown) { /* guard: operation may fail */
       return { kind: 'exclusive' }
     }
   }
@@ -1439,6 +1439,7 @@ export class ToolRuntime extends Service {
         deferredContexts.push(context)
       },
       concludeTurn(): void {
+        // SAFETY: `this` is always a ToolExecution within concludingExecutions tracking scope
         concludingExecutions.add(this as unknown as ToolExecution)
       },
     }

@@ -126,7 +126,7 @@ export async function loadWin32DialogBindings(): Promise<Win32DialogBindings> {
       let setContext: KoffiFunction
       try {
         setContext = user32.func('__stdcall', 'SetThreadDpiAwarenessContext', 'void *', ['intptr'])
-      } catch {
+      } catch (_e: unknown) { /* guard: operation may fail */
         // Symbol absent (pre-1607 Windows): no per-thread DPI control exists.
         // Proceed anyway — the cost is a blurry dialog above 100 % scaling on
         // museum hosts, and the modern picker still beats dropping to the

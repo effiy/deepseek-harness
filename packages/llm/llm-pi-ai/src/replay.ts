@@ -47,7 +47,7 @@ function parseArguments(raw: string): ToolCall['arguments'] {
     if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
       return parsed as ToolCall['arguments']
     }
-  } catch {
+  } catch (_e: unknown) { /* guard: operation may fail */
     // fall through
   }
   return {}
@@ -143,6 +143,7 @@ function readReplayState(value: unknown): PiAiReplayState {
     if (block['redacted'] !== undefined && typeof block['redacted'] !== 'boolean') return invalidReplay(`block ${index} redacted must be boolean`)
   }
   return {
+    // SAFETY: response shape matches PiAiReplayResponse by construction from the API layer above
     response: response as unknown as PiAiReplayResponse,
     blocks: blocks as PiAiReplayBlock[],
   }

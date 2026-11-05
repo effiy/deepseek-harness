@@ -182,7 +182,7 @@
     # browser-facing asset paths do not depend on the advertised URL, which the
     # web-runtime row owns; Connection reads trust authorities from webStartup.
     # Public bot-status endpoint consumed by YiVad: exposes agent/status
-    # through an unauthenticated GET /api/bot-states with CORS headers.
+    # through an unauthenticated GET /bot/status with CORS headers.
     - id: bot-status-public
       name: '@deepseek-ai/dsh-bot-status-public'
 

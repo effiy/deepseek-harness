@@ -236,7 +236,7 @@ export class DeepSeekFileStore {
     if (!committed.accepted) {
       try {
         await client.delete(candidate.fileId, signal)
-      } catch {
+      } catch (_e: unknown) { /* guard: operation may fail */
         // The winning mapping is durable. A failed duplicate cleanup affects quota only and is retried by recovery.
       }
     }

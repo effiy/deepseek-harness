@@ -96,7 +96,7 @@ function hasIntrinsicConstructor(prototype: object, name: 'Array' | 'Object'): b
     return constructor.name === name
       && constructor.prototype === prototype
       && Function.prototype.toString.call(constructor) === `function ${name}() { [native code] }`
-  } catch {
+  } catch (_e: unknown) { /* guard: native constructor checks may throw on proxies */
     return false
   }
 }
@@ -118,7 +118,7 @@ export function isPlainJsonRecord(value: unknown): value is Record<string, unkno
     const prototype: unknown = Object.getPrototypeOf(value)
     return prototype === null
       || typeof prototype === 'object' && isIntrinsicObjectPrototype(prototype)
-  } catch {
+  } catch (_e: unknown) { /* guard: may throw on proxies or revoked objects */
     return false
   }
 }
@@ -139,7 +139,7 @@ function hasOnlyEnumerableStringKeys(value: object): boolean {
   try {
     return Reflect.ownKeys(value)
       .every(key => typeof key === 'string' && Object.prototype.propertyIsEnumerable.call(value, key))
-  } catch {
+  } catch (_e: unknown) { /* guard: may throw on proxies or revoked objects */
     return false
   }
 }
@@ -166,7 +166,7 @@ export function isPlainJsonArray(value: unknown): value is unknown[] {
       if (!Object.hasOwn(value, index)) return false
     }
     return true
-  } catch {
+  } catch (_e: unknown) { /* guard: may throw on proxies or revoked objects */
     return false
   }
 }
@@ -259,7 +259,7 @@ function checkSchemaNode(root: unknown, rootPath: string, violations: string[], 
       if (ANNOTATION_KEYWORDS.has(key)) {
         try {
           if (!isJsonValue(node[key])) violations.push(`${path}.${key} annotation must be lossless JSON data`)
-        } catch {
+        } catch (_e: unknown) { /* guard: may throw on proxies or revoked objects */
           violations.push(`${path}.${key} annotation must be lossless JSON data`)
         }
         continue
@@ -408,7 +408,7 @@ export function assertObjectJsonSchema(schema: unknown): asserts schema is Objec
 function safelyIsJsonValue(value: unknown): boolean {
   try {
     return isJsonValue(value)
-  } catch {
+  } catch (_e: unknown) { /* guard: may throw on proxies or revoked objects */
     return false
   }
 }

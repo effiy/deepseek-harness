@@ -589,7 +589,8 @@ export function normalizeWeekdays(weekdays: unknown): number[] {
     throw new ScheduleInputError('invalid_rule', 'weekly.weekdays must be a non-empty array of ISO weekday numbers.')
   }
   const unique = new Set<number>()
-  for (const weekday of weekdays as unknown[]) {
+  const arr: readonly unknown[] = weekdays  // narrowed from unknown by Array.isArray guard above
+  for (const weekday of arr) {
     if (typeof weekday !== 'number' || !Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
       throw new ScheduleInputError(
         'invalid_rule', 'Each weekly.weekdays entry must be an integer from 1 (Monday) through 7 (Sunday).',
