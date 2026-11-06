@@ -517,3 +517,36 @@ label 轨 14 处文字消费随换值自动全修：ModelSelect 两端 ❌、Exc
 - commit：`f253725b9e`（fix 16 文件 36+/25− = 61 行）。
 
 *执行：暗骑；规格：针艺 success 候选值 + 招财批次单 faf66d8；复测签收待针艺（warn+success 合并复测：§8.9 备案三项 + §8.10 备案四项——Toast success 图标 1.70→6.19/4.91、SGR 92 暗端 8.81→7.55 微变、Reference:210 家族归属、ApprovalPanel:12 border 1.77）*
+
+---
+
+## 8.11 固定深底增补核验 — TerminalBlock:129 = 保留 error-label 零改动（2026-11-06 21:40，回应针艺 92d82ed）
+
+> 触发：针艺规格增补 `92d82ed`（固定深底消费规则 + Toast 双图标裁决 + SGR 31/91 亮端合并批准 + TerminalBlock:129 待核验）。核验结论：Toast 双图标裁决与已落地版**逐字一致**（两备案转签收）；SGR 31/91 批准收到（§8.8 备案销项）；**TerminalBlock:129 = 文字消费、分轨底、现状 error-label 已合规，零改动**——裁决的「固定深底」前提对该点位不成立，其 secondary 分支在真实表面上双端反而违例。
+
+### 8.11.1 TerminalBlock:129 核验（三层证据链）
+
+- **令牌现状**：`.status`（exit-code/signal 的 Pill 文字，12px 小字 → AA 4.5:1）现消费 `state-error-label`——`0242783893` 82 处迁移已从 error-primary 改轨（diff 唯一 ± 行 `-primary/+label`）；针艺表记「现消费 = primary」为迁移前快照。
+- **表面核实**：TerminalBlock.module.css:21 `background: var(--dsw-alias-markdown-code-block)` = 分轨底（亮 bluish-50 L246 / 暗 bluish-900 L372）——与针艺自己 L163 bash-sample 复核「markdown-code-block 为分轨底」归类一致；增补 L153「终端面（bluish-900 双主题）」在现库无对应实体。且 Pill 自带胶囊底 `bg-layer-2`（Pill.module.css:13；亮 bluish-00 = 纯白 rgb(255,255,255) L58/L145，暗 bluish-850 L312）——文字有效底为胶囊底。
+- **实测（脚本，两种底读数全列）**：
+
+| 表面读数 | error-label 亮端 | error-label 暗端 | secondary 亮端 | secondary 暗端 |
+|---------|-----------------|-----------------|---------------|---------------|
+| Pill 胶囊底（实际有效底）white / b850 | red-600 **4.92 ✓** | red-300 **5.52 ✓** | red-400 **3.29 ❌** | red-400 **4.24 ❌** |
+| 横幅卡底（备选读数）b50 / b900 | red-600 **4.71 ✓** | red-300 **6.82 ✓** | red-400 **3.15 ❌** | red-400 5.23 ✓ |
+| 裁决前提固定 b900（不存在的表面） | red-600 3.50（其图形分支值） | red-300 6.82 | — | red-400 5.23（其文字分支值） |
+
+- 现状 label **两种底读数均双端过 AA**；secondary 分支两种读数亮端均违例（3.29/3.15——正是 §8.8.1 SGR 91 同款违规）。附加：82 处迁移已顺带修复该处暗端旧值违规（primary 暗 red-400 on b850 = 4.24 ❌ → label 暗 red-300 = 5.52 ✓，§8.6.4 L2 原值）。**结论：保留 state-error-label，零改动。**
+
+### 8.11.2 固定深底规则适用域核验
+
+- toast-bg 全仓唯一消费文件 = Toast.module.css:31（grep 全覆盖）——规则实际范围 = Toast 双图标，已按裁决合规：§8.9.3 warn → warn-secondary（6.32/5.01）、§8.10.2 success → success-secondary（6.19/4.91），数值与针艺裁决表逐字一致，**两备案转签收**。
+- Band（experimental 终端调色板）为分轨底（亮 b60 / 暗 b875，§8.9.2），不涉案；ANSI 输出渲染于 markdown-code-block 分轨底（§8.8.1；针艺 L163 bash-sample 复核同归类），SGR 91/92/93 的 label 迁移数值均按分轨底计算，维持有效。
+
+### 8.11.3 SGR 31/91 批准收到 + 33/93 同构请确认
+
+- §8.8 备案「亮端 SGR 31/91 合并 red-600」获针艺四点理由批准，销项。
+- §8.9 备案③「亮端 SGR 33/93 合并 amber-700」理由同构：amber-400 族亮端 b50 = 1.83，过 AA 需加深、无更亮解，amber-700（5.18）为该族唯一解——请复测时按同一裁决逻辑确认。
+- 复测待办清单（更新）：§8.9 余两项（SGR 93 第 7 处确认、SGR 33/93 亮端合并）+ 填充反用判定（TrajectoryTimeline:212、TrajectoryCell:95/TrajectoryTable:701）；§8.10 余三项（SGR 92 暗端 8.81→7.55 微变、Reference:210 家族归属、ApprovalPanel:12 border 1.77）；本节 TerminalBlock:129 核验结论确认。
+
+*执行：暗骑；针艺 92d82ed 增补核验闭环，TerminalBlock:129 零改动（三层证据链）；待针艺确认核验结论 + warn/success 两批合并复测*
