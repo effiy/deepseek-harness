@@ -12,6 +12,15 @@
     'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
   --ds-font-family-code: var(--dsh-font-family-code-default);
   --ds-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Motion curve scale — consume the role token, never a new literal curve.
+   * spring: decelerating entry for overlay surfaces (drawers, sheets).
+   * emphasized: expo-out entrance for prominent content (panels, bubbles).
+   * accelerate: exit curve for dismissing surfaces; dismissals run shorter
+   * than presentations. pulse: symmetric loop for loading placeholders. */
+  --ds-ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --ds-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ds-ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --ds-ease-pulse: cubic-bezier(0.36, 0, 0.64, 1);
   --ds-transition-duration: 0.2s;
   --ds-transition-duration-fast: 0.1s;
   --ds-transition-duration-slow: 0.3s;
@@ -36,4 +45,21 @@ body {
 [data-dsh-automatic-focus]:focus,
 [data-dsh-automatic-focus]:focus:focus-visible {
   outline: none;
+}
+
+/* Global reduced-motion safety net (WCAG 2.3.3): every animation and
+ * transition collapses to its end state under the OS preference, so
+ * component-level prefers-reduced-motion blocks are only needed where the
+ * collapsed end state itself must change (a resting transform, a removed
+ * overlay). Infinite loaders stop after one pass; JS-driven motion probes
+ * matchMedia separately and skips its own animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
