@@ -1,11 +1,12 @@
 /* Invisible left-edge touch zone for sidebar expansion.
- * Only rendered on touch-capable mobile devices (≤640 px, matching the
- * `--ds-bp-mobile` design token) via the nested media queries. Desktop
- * (pointer: fine) never shows it.
+ * Only rendered on touch-capable narrow devices (≤900 px, matching
+ * the `--ds-bp-tablet` design token — same threshold MobileBottomNav
+ * uses) via the nested media queries. Desktop (pointer: fine) never
+ * shows it.
  *
  * Note: CSS `@media` queries cannot reference `var()` values, so the
- * 640 px threshold is hardcoded here — keep it in sync with
- * `--ds-bp-mobile` in ui-theme's design-platform.css and `BP_MOBILE` in
+ * 900 px threshold is hardcoded here — keep it in sync with
+ * `--ds-bp-tablet` in ui-theme's design-platform.css and `BP_TABLET` in
  * ui-layout's columns.ts.
  *
  * z-index: 48 sits between the sidebar overlay (50) and its backdrop (49,

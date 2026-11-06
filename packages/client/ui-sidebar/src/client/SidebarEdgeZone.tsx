@@ -1,7 +1,7 @@
 /**
  * Invisible 16px touch edge zone along the left screen edge that expands the
  * sidebar on tap or right-swipe. Only active on touch-capable narrow viewports
- * (≤640px) while the sidebar is collapsed — WeChat-style drawer gesture affordance.
+ * (≤900px) while the sidebar is collapsed — WeChat-style drawer gesture affordance.
  *
  * Desktop (pointer: fine) never activates it; the zone stays `display: none`
  * through the CSS media query.

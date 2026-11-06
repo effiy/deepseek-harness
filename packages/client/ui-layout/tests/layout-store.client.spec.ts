@@ -15,6 +15,7 @@ describe('createLayoutStore', () => {
       layoutInfo: {
         sidebar: 280,
         viewportWidth: 1920,
+        breakpoint: 'wide',
         narrowExpanded: false,
         rightbar: null,
         rightbarShown: false,

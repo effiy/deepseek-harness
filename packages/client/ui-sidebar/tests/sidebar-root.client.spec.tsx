@@ -3,7 +3,6 @@ import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ShortcutCatalogEntry, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ReactNode } from 'react'
 import type {
@@ -61,7 +60,6 @@ function mountShell({ collapsed = false, width = 300, shortcuts = [] }: {
       ) => {
         if (key === 'sidebar.brand.mark') return brandMark
         if (key === 'sidebar.brand.name') return brandName
-        if (key === 'sidebar.toggle.badge') return null
         if (key === 'sidebar.settings') {
           settingsOwner = owner
           return <div data-testid="settings-seat" data-wide={owner.wide} />
@@ -215,34 +213,11 @@ describe('SidebarRoot shell', () => {
   it('renders statically collapsed on a cold start (no crossfade classes)', () => {
     const b = mountShell({ collapsed: true })
     expect(b.regionOwner().wide).toBe(false)
-    expect(screen.getByRole('button', { name: 'Open sidebar' })).toBeTruthy()
-  })
-
-  it('shows only the badge bubble while the rail badge is hovered inside the toggle', () => {
-    vi.useFakeTimers()
-    render(<SidebarRoot
-      collapsed width={56}
-      useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
-      usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])} useShortcuts={selector => selector([])}
-      useResource={useResource} useWorkspaces={neverHook}
-      startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
-      renderSlot={((key: string) => key === 'sidebar.toggle.badge'
-        ? <Tooltip label="Update — V1.2.3"><span data-testid="badge" /></Tooltip>
-        : null) as SidebarRootComponentProps['renderSlot']}
-    />)
-    const toggle = screen.getByRole('button', { name: 'Open sidebar' })
-    fireEvent.mouseEnter(toggle)
-    act(() => { vi.advanceTimersByTime(500) })
-    expect(screen.getByRole('tooltip').textContent).toBe('Open sidebar')
-    // The badge's own bubble replaces the toggle's rather than stacking on it,
-    // even after the toggle's longer hover delay has elapsed.
-    fireEvent.mouseEnter(screen.getByTestId('badge'))
-    act(() => { vi.advanceTimersByTime(500) })
-    expect(screen.getAllByRole('tooltip').map(bubble => bubble.textContent)).toEqual(['Update — V1.2.3'])
-    fireEvent.mouseLeave(screen.getByTestId('badge'), { relatedTarget: toggle })
-    expect(screen.getByRole('tooltip').textContent).toBe('Open sidebar')
-    fireEvent.mouseLeave(toggle)
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    // The collapsed rail carries no open toggle: the reopen control lives in
+    // the frame's shell.leading seat (HeaderLeadingControls) or, on Windows,
+    // the caption row. The rail keeps its New session control.
+    expect(screen.queryByRole('button', { name: 'Open sidebar' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'New session' })).toBeTruthy()
   })
 })
 
@@ -278,16 +253,13 @@ describe('Windows caption tooltips', () => {
     act(() => { vi.advanceTimersByTime(500) })
   }
 
-  it.each([false, true])(
-    'drops the sidebar toggle bubble below the caption (collapsed=%s)',
-    (collapsed) => {
-      vi.useFakeTimers()
-      document.documentElement.setAttribute('data-windows-titlebar', '')
-      mountShell({ collapsed, width: collapsed ? 0 : 300 })
-      hover(screen.getByRole('button', { name: collapsed ? 'Open sidebar' : 'Collapse sidebar' }))
-      expect(screen.getByRole('tooltip').getAttribute('data-side')).toBe('bottom')
-    },
-  )
+  it('drops the sidebar toggle bubble below the caption', () => {
+    vi.useFakeTimers()
+    document.documentElement.setAttribute('data-windows-titlebar', '')
+    mountShell({ collapsed: false, width: 300 })
+    hover(screen.getByRole('button', { name: 'Collapse sidebar' }))
+    expect(screen.getByRole('tooltip').getAttribute('data-side')).toBe('bottom')
+  })
 
   it('drops the collapsed New Session bubble below the caption as well', () => {
     vi.useFakeTimers()
@@ -300,7 +272,9 @@ describe('Windows caption tooltips', () => {
   it('keeps the ordinary Web bubble beside its anchor', () => {
     vi.useFakeTimers()
     mountShell({ collapsed: true, width: 0 })
-    hover(screen.getByRole('button', { name: 'Open sidebar' }))
+    // The collapsed rail's remaining control is New session; without the
+    // Windows caption its bubble stays beside the anchor.
+    hover(screen.getByRole('button', { name: 'New session' }))
     expect(screen.getByRole('tooltip').getAttribute('data-side')).toBe('right')
   })
 })
@@ -312,4 +286,46 @@ it('uses the same effective sidebar binding for hover/focus hints and ARIA', () 
   expect(toggle.getAttribute('aria-keyshortcuts')).toBe('Meta+B')
   fireEvent.focus(toggle)
   expect(Array.from(screen.getByRole('tooltip').querySelectorAll('kbd'), key => key.textContent)).toEqual(['⌘', 'B'])
+})
+
+describe('drawer swipe-close (Story 2.6)', () => {
+  /** jsdom has no TouchEvent constructor: dispatch bubbling events carrying touches. */
+  function swipe(aside: Element, from: { x: number; y: number }, to: { x: number; y: number }): void {
+    const make = (type: string, x: number, y: number): Event => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'touches', {
+        value: type === 'touchend' ? [] : [{ clientX: x, clientY: y }],
+      })
+      return event
+    }
+    act(() => {
+      aside.dispatchEvent(make('touchstart', from.x, from.y))
+      aside.dispatchEvent(make('touchmove', to.x, to.y))
+      aside.dispatchEvent(make('touchend', to.x, to.y))
+    })
+  }
+
+  function mountedAside(): HTMLElement {
+    const aside = document.querySelector('aside')
+    if (aside === null) throw new Error('sidebar column not rendered')
+    return aside
+  }
+
+  it('closes the open drawer on a horizontal left swipe', () => {
+    const shell = mountShell()
+    swipe(mountedAside(), { x: 250, y: 100 }, { x: 180, y: 105 })
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+  })
+
+  it('ignores the vertical list scroll gesture', () => {
+    const shell = mountShell()
+    swipe(mountedAside(), { x: 250, y: 100 }, { x: 230, y: 400 })
+    expect(shell.toggleSidebar).not.toHaveBeenCalled()
+  })
+
+  it('never opens the collapsed rail on a left swipe', () => {
+    const shell = mountShell({ collapsed: true })
+    swipe(mountedAside(), { x: 250, y: 100 }, { x: 180, y: 100 })
+    expect(shell.toggleSidebar).not.toHaveBeenCalled()
+  })
 })
