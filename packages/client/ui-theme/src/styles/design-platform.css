@@ -465,3 +465,38 @@ body {
   --ds-bp-desktop: 1100px;
   --ds-bp-wide: 1400px;
 }
+
+/* ------------------------------------------------------------------
+ * Typography scale — 7-tier font-size tokens (Zhenyi spec v1,
+ * 2026-11-07).  px / line-height noted in comments; leading tokens
+ * to follow when components consume this scale.
+ *
+ *  Layer rule: ≤3 size tiers per view + 1 accent colour.
+ *  Adjacent-tier gap ≥1.25× (14/12 = 1.17 — skip to 16/12).
+ *  Body leading 1.5, dense tables down to 1.33, headings 1.4.
+ * ------------------------------------------------------------------ */
+
+body {
+  --dsw-text-display: 28px;        /* 28/34  onboarding, empty-state titles */
+  --dsw-text-title: 20px;          /* 20/28  page / panel titles */
+  --dsw-text-headline: 17px;       /* 17/24  section headings, modal titles */
+  --dsw-text-body: 16px;           /* 16/24  chat body, inputs, primary content */
+  --dsw-text-body-secondary: 14px; /* 14/20  secondary body, dense lists, metadata */
+  --dsw-text-caption: 12px;        /* 12/16  badges, timestamps, auxiliary */
+  --dsw-text-micro: 11px;          /* 11/14  dense table floor, mobile minimum */
+}
+
+/* ------------------------------------------------------------------
+ * Spacing scale — 4 px grid (Zhenyi spec v1, 2026-11-07).
+ *  Shadow grid (6 px, 10 px) frozen — no new usage, converge on touch.
+ *  3/5/7/9 px prohibited; 2 px optical-only for icons/borders.
+ * ------------------------------------------------------------------ */
+
+body {
+  --dsw-spacing-xs: 4px;
+  --dsw-spacing-sm: 8px;
+  --dsw-spacing-md: 12px;
+  --dsw-spacing-lg: 16px;
+  --dsw-spacing-xl: 24px;
+  --dsw-spacing-2xl: 32px;
+}
