@@ -83,7 +83,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  animation: panel-enter 180ms var(--ds-ease-emphasized);
+  animation: panel-enter 240ms var(--ds-ease-emphasized);
 }
 
 @keyframes panel-enter {
