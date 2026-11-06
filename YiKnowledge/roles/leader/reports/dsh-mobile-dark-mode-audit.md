@@ -479,3 +479,41 @@ label 轨 14 处文字消费随换值自动全修：ModelSelect 两端 ❌、Exc
 - commit：`f5fae739df`（fix 10 文件 23+/14−）。
 
 *执行：暗骑；规格：针艺 warn 候选值；复测签收待针艺（含备案三项：Toast 缺口解、SGR 93 第 7 处、亮端 SGR 33/93 合并）*
+
+---
+
+## 8.10 success 分轨执行 + warn 补遗 — green-800/green-500 换轨（2026-11-06 21:05，commit f253725b9e）
+
+> 规格来源：招财批次单 `faf66d8`（warn+success 同批、值以针艺更新版复议报告为唯一规格、每批 ≤200 行否则拆 commit、test:gui 绿）+ 针艺复议结论 success 候选值（L145）。warn 批在批次单送达前已按针艺「值到即执行」先行落地（f5fae739df，§8.9）；本节为 success 批，落地后两批逐项对照批次单核对无冲突（两 commit 合计 26 文件 59+/39−，各批 <200 行）。
+
+### 8.10.1 令牌换轨（针艺规格照单）
+
+| 项 | 变更 |
+|----|------|
+| static green-800 | 双主题块新增 rgb(22,101,52)（亮 L40 / 暗 L127，插于 green-500-a12 与 green-900 之间）；针艺实测白底 7.13 / green-100 6.54 / diff-added 合成底 ≥6.27 全 ✓；落选档 green-600（green-100 底 3.02 ❌）、green-700（diff-added 底 4.41 ❌） |
+| state-success-label（**新 alias**） | 亮 = green-800 / 暗 = green-500（= primary 暗端同值，**暗端零视觉变化**）；契约注释亮暗块各一行（照 error/warn 分轨先例），暗块注释取针艺保守值（diff-added 6.05 / green-900 5.26） |
+| state-success-primary | 亮 green-500→**green-800**（亮端圆点/描边 2.28 ❌→7.13 ✓，含 StateDot done；白字压 green-800 填充 7.13 ✓ 无副作用）；暗 green-500 不变 |
+| Tag.module.css 头注释 | 重写——原文 "fill and text share one token" 已过时：danger/warning/success 三 tone 均已文字/填充分轨，info 保持 business-primary 单令牌 |
+
+### 8.10.2 文字消费迁移（CSS 13 处 + ANSI SGR 92）
+
+- CSS 13 处迁 label：CordisRunRow:68、TrajectoryCell:55(.tagUser)、ToolRow:72(.diffAdded hover)、ToolDetails:92+:172(badge success)、ConnectionIndicator:65、PluginManagerPage:1011(.wizardIcon done，原 secondary 亮 1.95 ❌)、ChangedFiles:20(.added)、ReviewTab:12(.added)、DiffBlock:53(.add)、Tag:41(success tone，注释重写后移至 :43)、ModelsSection:40(.savedNotice)、Reference:209(.toastSuccess，原 secondary)。ChangedFiles/ReviewTab 的 `.deleted` 在 82 处迁移时已走 error-label，本批 `.added` 对齐后两文件内部一致。
+- **ANSI SGR 92 亮绿 = 第 8 处 TS 层文字消费**（与 SGR 93 同模式）：secondary green-400 亮端 on bluish-50 = **1.87 ❌❌**；迁 label：亮 6.82 ✓ / 暗 7.55 ✓。**暗端微视觉变化**：green-400→green-500（8.81→7.55，仍远高于 AA）——与 SGR 91/93 的「暗端零变化」不同，备案针艺复测。spec :49 不变、:50 改 label，JSDoc 映射契约同步（bright red/green/yellow 三处统一注明走 label 轨）。
+- SGR 32（→primary）不迁：primary 亮端换轨自动修 2.06 ❌→6.82 ✓、暗 7.55 ✓——与 SGR 31/33 保留 primary 先例同构。
+- Toast `.icon.success`(:54) → **success-secondary**（与 §8.9.3 warn 图标同构缺口）：primary 亮端切 green-800 后在恒深 toast-bg（亮 b800/暗 b750）= **1.70 ❌**（与针艺数分毫不差）；secondary green-400 固定值亮 6.19 ✓ / 暗 4.91 ✓。针艺 L145「图标维持排除判断」的前提（图标恒 green-500）在 primary 亮端换轨后不成立；唯一可行解与 warn 图标同构（primary 同批切档同病、label 亮端更差、tertiary 近白），数学必然非偏好，已迁 + 英文契约注释。Toast 无 error 变体；`.action`(deepseek-400) 不动。
+- primary 轨保留：StateDot:18/:98（亮端自动 2.28 ❌→7.13 ✓，spec 断言不动）、Band:58/:68（experimental 调色板，亮 b60 6.59 ✓ / 暗 b875 底 6.89 ✓，不迁对齐 SGR 31/32/33 先例）、DiffBlock:55 gutter（6.49 针艺）、Tag:42(success tone 填充，原 :40 注释重写后顺移)、ModelsSection:109(.credentialDotConfigured)、VoiceInput:48、TrajectoryCell:62、Timeline:179、Table:594/:661 填充与渐变、ConnectionIndicator:66 border-mix、PluginManagerPage:1140 bg-mix。
+
+### 8.10.3 warn 补遗（success 扫描时发现）
+
+- **Reference:210 `.toastError` = 第 7 处 warn 文字消费**（warn 批只扫了 primary，未扫 secondary 文字）：warn-secondary amber-400 作文字亮面板底 = **1.83 ❌❌**（与 SGR 93 并列当日最劣单点）；迁 warn-label：亮 5.41 ✓ / 暗 amber-400 同值零变化。⚠️ 类名 toastError 却挂 warn 家族——是否改挂 error 家族属设计决策，**颜色家族不动**，仅备案针艺定性。
+- ApprovalPanel:12 border（1px warn-secondary，amber-400 on amber-100 = **1.77**）：装饰性边框（状态已由同规则文字+填充承载），值未动不劣化，**不动**；若复测判定属 1.4.11 状态边界（须 3:1）再迁或加深， defer 针艺裁。
+- warn-secondary 全仓剩余消费盘点：Toast 图标（§8.9.3 修复 ✓）、ApprovalPanel:12 border（如上），其余皆填充无文字。
+
+### 8.10.4 测试与提交
+
+- 执行前独立复算（脚本）：核心 8 项与针艺全吻合 ✓——g800/white 7.13、g800/g100 6.54、白字压 g800 7.13、g500/g900 5.25（针艺 5.26 舍入）、g400/b800 6.19、g400/b750 4.91、g800/b800 1.70、落选 g600/g100 3.02；3 处合成底建模差：g800/亮 diff-added 我 6.66（白底）/6.39（b50 底）vs 针艺 6.27、g500/暗 diff-added 我 6.20 vs 6.05、g600/diff-added 我 3.08 vs 2.90——a08/a12 打底合成假设不同、针艺值更保守，判定零翻转。
+- 定向 ansi + state-dot spec 85/85 绿；**test:gui 全量 623 文件 / 10245 passed / 0 failed / 1 skipped（49.97s）**——连续第二次全绿（recycler-stress flake 未复现；日志 /tmp/dsh-testgui-success-split.log）。
+- BUILTIN_INSPECT_TOKENS：success-label 循 error-label/warn-label 先例不注册（registry 仅含 primary 条目、无完整性门禁，P1 挂账不变）。
+- commit：`f253725b9e`（fix 16 文件 36+/25− = 61 行）。
+
+*执行：暗骑；规格：针艺 success 候选值 + 招财批次单 faf66d8；复测签收待针艺（warn+success 合并复测：§8.9 备案三项 + §8.10 备案四项——Toast success 图标 1.70→6.19/4.91、SGR 92 暗端 8.81→7.55 微变、Reference:210 家族归属、ApprovalPanel:12 border 1.77）*
