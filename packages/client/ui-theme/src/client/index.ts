@@ -132,6 +132,25 @@ const BUILTIN_THEMES: readonly ThemeDefinition[] = Object.freeze([
   Object.freeze({ id: 'dark', colorScheme: 'dark' as const, tokens: Object.freeze({}) }),
 ])
 
+/** OLED pure-black theme: dark palette with #000 surface family. Floating
+ *  layers (overlay, toast, menu) keep the dark b900 family; body text drops
+ *  to bluish-100 for halation control on pure-black backgrounds per design
+ *  review (2026-11-07).  Battery saving is quantifiable: OLED pixels at #000
+ *  draw near-zero power. */
+const OLED_THEME: ThemeDefinition = Object.freeze({
+  id: 'oled' as const,
+  colorScheme: 'dark' as const,
+  tokens: Object.freeze({
+    '--dsw-alias-bg-base': '#000000',
+    '--dsw-alias-bg-layer-1': '#000000',
+    '--dsw-alias-bg-layer-2': '#000000',
+    '--dsw-alias-bg-layer-3': '#000000',
+    '--dsw-alias-label-primary': 'var(--dsw-static-neutral-bluish-100)',
+    '--dsw-specific-sidebar-fill': '#000000',
+    '--dsw-specific-keyboard-fill': '#000000',
+  }),
+})
+
 const BUILTIN_INSPECT_TOKENS: readonly ThemeTokenInspection[] = Object.freeze([
   { name: '--dsw-alias-bg-base', description: 'Application base background.', valueType: 'CSS color', requiresLightAndDark: true, cssVariable: '--dsw-alias-bg-base' },
   { name: '--dsw-alias-bg-layer-1', description: 'Primary raised surface background.', valueType: 'CSS color', requiresLightAndDark: true, cssVariable: '--dsw-alias-bg-layer-1' },
@@ -488,6 +507,7 @@ export function apply(ctx: ClientContext): void {
   const host = ctx.configForms.get<ThemeSettings>(THEME_SETTINGS_NAMESPACE)
   const theme = new ThemeRuntime(ctx, host)
   ctx.provide('theme', theme)
+  theme.register(OLED_THEME)
 
   ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh, en }), 'ui-theme: settings row dictionaries')
 

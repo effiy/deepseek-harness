@@ -27,10 +27,11 @@ export type AppearanceRowComponentProps =
   PropsRuntime<'settings.general.item'> & PropsStore<ReturnType<typeof createAppearanceRowStore>>
   & PropsLocale<'settings.theme'> & AppearanceRowInjected
 
-/** Cube order and icons (figma 501:30015-30017: Light, Dark, System). */
+/** Cube order and icons (figma 501:30015-30017: Light, Dark, OLED, System). */
 const CUBES: readonly { id: ThemePreference; labelKey: ThemeKey; Icon: typeof IconLightOutlineMedium }[] = [
   { id: 'light', labelKey: 'appearance.light', Icon: IconLightOutlineMedium },
   { id: 'dark', labelKey: 'appearance.dark', Icon: IconDarkOutlineMedium },
+  { id: 'oled', labelKey: 'appearance.oled', Icon: IconDarkOutlineMedium },
   { id: 'system', labelKey: 'appearance.system', Icon: IconFollowsystemOutlineMedium },
 ]
 

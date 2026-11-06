@@ -108,7 +108,7 @@ it('shares account actions across seats, publishes dialog ownership, and opens c
   expect(onTheme).toHaveBeenCalledOnce()
   probe()
   offTheme()
-  expect(theme.getTheme().themes.map(candidate => candidate.id)).toEqual(['light', 'dark'])
+  expect(theme.getTheme().themes.map(candidate => candidate.id)).toEqual(['light', 'dark', 'oled'])
   await actions.refreshAccount()
   expect(c.mock.remote.account.getProfile).not.toHaveBeenCalled()
   const listener = vi.fn()
