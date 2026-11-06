@@ -45,7 +45,7 @@ describe('parseAnsiLines: basic colors mapped onto theme tokens', () => {
     ['37', 'white', 'var(--dsw-alias-label-primary)'],
     ['90', 'bright black', 'var(--dsw-alias-label-tertiary)'],
     ['31', 'red', 'var(--dsw-alias-state-error-primary)'],
-    ['91', 'bright red', 'var(--dsw-alias-state-error-secondary)'],
+    ['91', 'bright red', 'var(--dsw-alias-state-error-label)'],
     ['32', 'green', 'var(--dsw-alias-state-success-primary)'],
     ['92', 'bright green', 'var(--dsw-alias-state-success-secondary)'],
     ['33', 'yellow', 'var(--dsw-alias-state-warn-primary)'],
@@ -407,7 +407,7 @@ describe('parseAnsiLines: bounded state and true widths', () => {
     ]])
     // A bright foreground and a bright background, the 90-97 / 100-107 arms.
     expect(parseAnsiLines(`${ESC}[91mA\r${ESC}[KB`)).toEqual([[
-      { text: 'B', style: { color: 'var(--dsw-alias-state-error-secondary)' } },
+      { text: 'B', style: { color: 'var(--dsw-alias-state-error-label)' } },
     ]])
     expect(parseAnsiLines(`${ESC}[101mA\r${ESC}[KB`)).toEqual([[
       { text: 'B', style: { backgroundColor: 'rgb(255, 85, 85)' } },
