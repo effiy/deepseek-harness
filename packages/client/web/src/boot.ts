@@ -111,6 +111,34 @@ export class AppWebEntry {
         // Publish for the workspace plugin to consume on its next tick.
         ;(globalThis as Record<string, unknown>).__DSH_RESTORE_SESSION__ = restoredSessionId
       }
+      // ── Network status indicator ─────────────────────────────────────
+      // Register the offline banner in shell.overlay after all plugins and
+      // the renderer are live.  Uses `slots.inject` so the banner follows
+      // the slot declaration lifecycle (collapses with the slot, reregisters
+      // on redeclaration).
+      const connHandle = ctx.get('connection') as
+        { readonly networkAvailable: { getSnapshot(): boolean; subscribe(cb: () => void): () => void } } | undefined
+      if (connHandle) {
+        const { networkAvailable } = connHandle
+        const { NetworkStatusBanner } = await import('./NetworkStatusBanner.tsx')
+        // Cast through `unknown`: the web package lacks a direct tsconfig
+        // reference to ui-layout, so SlotMap overloads for `shell.overlay`
+        // do not resolve `inject` / `register` parameter types here.
+        type OverlayAPI = {
+          inject(key: string, factory: () => void): void
+          register(options: {
+            name: string
+            id: string
+            inject: () => Record<string, unknown>
+          }, component: (props: Record<string, unknown>) => unknown): () => void
+        }
+        const overlay = ctx.slots as unknown as OverlayAPI
+        overlay.inject('shell.overlay', () => overlay.register({
+          name: 'shell.overlay',
+          id: 'network-status-indicator',
+          inject: () => ({ hooks: { networkAvailable } }),
+        }, NetworkStatusBanner))
+      }
     } catch (reason) {
       console.error(reason)
       if (onFailure !== undefined) onFailure(reason)

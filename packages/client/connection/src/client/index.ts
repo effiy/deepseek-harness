@@ -78,6 +78,14 @@ export interface ConnectionStateSource {
   subscribe(listener: () => void): () => void
 }
 
+/** Observable browser network availability (navigator.onLine). */
+export interface NetworkAvailabilitySource {
+  /** Whether the browser reports a network connection. */
+  getSnapshot(): boolean
+  /** Subscribe to online/offline transitions. */
+  subscribe(listener: () => void): () => void
+}
+
 /** Required services (none — this is the wire root). */
 export const inject: string[] = []
 
@@ -155,6 +163,8 @@ export interface ConnectionHandle {
   readonly generation: ConnectionGenerationState
   /** Current recovery lifecycle for connection-specific consumers. */
   readonly state: ConnectionStateSource
+  /** Browser network availability (navigator.onLine with 500ms debounce). */
+  readonly networkAvailable: NetworkAvailabilitySource
   /** Generic logical RPC channels over the same Connection transport. */
   readonly rpc: ClientConnectionRpc
   /** Reset retry progression and replace the current attempt immediately. */
@@ -198,6 +208,7 @@ interface BrowserNetworkTarget {
 function watchBrowserNetwork(
   controller: ConnectionController,
   onOnline?: () => void,
+  onNetworkChange?: (available: boolean) => void,
 ): () => void {
   const browser = (globalThis as { readonly window?: BrowserNetworkTarget }).window
   const initiallyAvailable = browser?.navigator?.onLine
@@ -223,6 +234,7 @@ function watchBrowserNetwork(
       debounceTimer = undefined
       if (pendingState !== undefined) {
         controller.setNetworkAvailable(pendingState)
+        onNetworkChange?.(pendingState)
         // Drain the offline queue when the network returns.
         // Delay 2s after online to let the connection re-establish first.
         if (pendingState && onOnline !== undefined && !initiallyAvailable) {
@@ -266,6 +278,20 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
   let state: ConnectionState | undefined
   const generationListeners = new Set<() => void>()
   const stateListeners = new Set<() => void>()
+  // networkAvailable observable — seeded true for non-browser; watchBrowserNetwork overrides it.
+  let networkAvailable = true
+  const networkListeners = new Set<() => void>()
+  const publishNetwork = (available: boolean): void => {
+    if (networkAvailable === available) return
+    networkAvailable = available
+    for (const listener of [...networkListeners]) {
+      try {
+        listener()
+      } catch (error) {
+        console.error('[connection] network listener threw:', error)
+      }
+    }
+  }
   const publishGeneration = (next: ConnectionGeneration | undefined): void => {
     if (Object.is(generation, next)) return
     generation = next
@@ -312,6 +338,13 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
         return () => { stateListeners.delete(listener) }
       },
     },
+    networkAvailable: {
+      getSnapshot: () => networkAvailable,
+      subscribe: (listener) => {
+        networkListeners.add(listener)
+        return () => { networkListeners.delete(listener) }
+      },
+    },
     rpc,
     reconnect() {
       owner?.controller.reconnect()
@@ -351,7 +384,7 @@ export function installConnection(ctx: Context, options: ConnectionInstallOption
           sinks.onStateChange?.(state)
         },
       }, { ...recovery, ...config })
-      const stopNetworkWatch = watchBrowserNetwork(controller, () => { options.offlineQueue?.drain() })
+      const stopNetworkWatch = watchBrowserNetwork(controller, () => { options.offlineQueue?.drain() }, publishNetwork)
       const current = { token, source, controller, stopNetworkWatch }
       owner = current
       controller.start()
