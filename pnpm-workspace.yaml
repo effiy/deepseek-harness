@@ -34,6 +34,11 @@ overrides:
   # which discards cross-realm sensitiveHeaders (1 high). http-proxy's "^1.0.0"
   # range accepts the patched release.
   'follow-redirects': '>=1.16.2'
+  # express (pulled by @modelcontextprotocol/sdk inside the genai and
+  # claude-agent-sdk chains) exact-pins body-parser 2.3.0, which crashes on
+  # trailing bytes after a compressed body (1 high). 2.4.0 is the patched
+  # release within the same major.
+  'body-parser': '>=2.4.0 <3'
 
 peerDependencyRules:
   allowedVersions:
