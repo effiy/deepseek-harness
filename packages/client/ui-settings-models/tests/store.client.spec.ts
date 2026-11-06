@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { RpcResponse } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
+import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { settingsSchema } from './settings-schema.client.ts'
 import { joinProviderDirectory, ModelsSettingsStore, providerUsable } from '../src/client/store.ts'
 
@@ -206,6 +207,22 @@ describe('ModelsSettingsStore', () => {
 
     expect(store.store.getSnapshot()).toMatchObject({
       status: 'error', error: 'configuration directory down',
+    })
+  })
+
+  it('surfaces mirrorUnavailable when the mirror has no view and no error text', async () => {
+    const { ctx } = api()
+    // A face stuck before its first answer: no view, no failure text.
+    const face: SettingsDescribeFace = {
+      ensure: () => Promise.resolve(),
+      getSnapshot: () => ({ status: 'idle', view: undefined, error: null }),
+      subscribe: () => () => {},
+      acceptView: () => {},
+    }
+    const store = new ModelsSettingsStore(ctx, settingsSchema, face)
+    await store.load()
+    expect(store.store.getSnapshot()).toMatchObject({
+      status: 'error', error: null, errorCopy: 'mirrorUnavailable',
     })
   })
 
@@ -456,7 +473,8 @@ describe('edge joins', () => {
     await store.load()
     expect(store.store.getSnapshot()).toMatchObject({
       status: 'error',
-      error: 'Settings are only available on the local machine. Open http://127.0.0.1:3080 to manage them.',
+      error: null,
+      errorCopy: 'settingsLocalOnly',
     })
   })
 

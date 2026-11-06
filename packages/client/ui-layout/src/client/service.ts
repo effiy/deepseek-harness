@@ -10,6 +10,7 @@
  */
 import type { BoundActions, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { Branded } from '@deepseek-ai/dsh-brand'
+import { createTapGuard, TAP_GUARD_WINDOW_MS } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { createLayoutStore } from './stores.ts'
 
 /** Identity shared by a sidebar panel entry and its main-slot occupant. */
@@ -30,6 +31,8 @@ export interface ILayout {
   readonly panelInfo: HostObservable<PanelInfo>
   /**
    * Select a global central panel without changing the current Session.
+   * A repeat selection of the same target inside the tap-guard window is
+   * ignored (double-tap deduplication, Story 5.6).
    * @param panelId - registered main key, or null to show the Conversation.
    * @throws if the selected main key is not registered; preserves the current selection.
    */
@@ -39,7 +42,10 @@ export interface ILayout {
    * @returns a signal aborted by the next navigation or layout disposal; check it before committing UI state.
    */
   beginNavigation(): AbortSignal
-  /** Toggle the sidebar panel (closed ⟷ contract default width). */
+  /**
+   * Toggle the sidebar panel (closed ⟷ contract default width). A repeat
+   * toggle inside the tap-guard window is ignored (double-tap deduplication).
+   */
   toggleSidebar(): void
   /**
    * Report the right panel's presentation without changing its expanded state.
@@ -58,6 +64,8 @@ export interface ILayout {
 /** Cross-plugin panel-action face (ctx.layout). */
 export class LayoutController implements ILayout {
   private navigation = new AbortController()
+  /** Double-tap deduplication for the touch-driven toggle and panel targets. */
+  private readonly taps = createTapGuard(TAP_GUARD_WINDOW_MS)
 
   /**
    * @param panels - actions of the instance shared with the root entry.
@@ -77,6 +85,7 @@ export class LayoutController implements ILayout {
     if (panelId !== null && !this.hasMainPanel(panelId)) {
       throw new Error(`layout.selectPanel: main panel "${panelId}" is not registered`)
     }
+    if (!this.taps.accept(`panel:${panelId ?? 'conversation'}`)) return
     this.navigation.abort()
     this.panels.selectPanel(panelId)
   }
@@ -95,6 +104,7 @@ export class LayoutController implements ILayout {
 
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void {
+    if (!this.taps.accept('sidebar')) return
     this.panels.toggleSidebar()
   }
 

@@ -954,6 +954,20 @@ workspaceDesktop(): { name: string; available: boolean; fileManager: 'finder' | 
 @Remote('updateQueue') updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue>
 
 /**
+ * Shadow one committed message or complete exchange from the model-visible surface.
+ * @param request - Session identity, exact message sequence, and optional cascade flag.
+ * @returns acknowledgement that the replacement was committed.
+ */
+@Remote('message-delete') messageDelete(request: SessionMessageDeleteRequest): Promise<SessionMessageDeleteValue>
+
+/**
+ * Replace one committed message's content on the model-visible surface.
+ * @param request - Session identity, exact message sequence, and replacement text content.
+ * @returns acknowledgement that the replacement was committed.
+ */
+@Remote('message-update') messageUpdate(request: SessionMessageUpdateRequest): Promise<SessionMessageUpdateValue>
+
+/**
  * Cancel one active Agent turn without dropping its pending inbox.
  * @param request - Session whose active Agent turn is cancelled.
  * @returns acknowledgement that cancellation was requested.

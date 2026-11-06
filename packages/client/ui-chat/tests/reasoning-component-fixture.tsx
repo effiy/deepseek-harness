@@ -15,9 +15,12 @@ function content(input: ReasoningContentInput) {
   return createElement(ReasoningContent, { ...input, t } as ComponentProps<typeof ReasoningContent>)
 }
 
-/** Render the production child component without emulating a registry or its dispatch. */
+/** Render the production child component without emulating a registry or its
+ * dispatch. Slots other than the reasoning Body (message actions) have no
+ * child under test in component units and render nothing. */
 export const renderReasoningSlot = (
-  (_key: 'conversation.chat.reasoning.body', input: ReasoningContentInput) => content(input)
+  (key: string, input: ReasoningContentInput) =>
+    key === 'conversation.chat.reasoning.body' ? content(input) : null
 ) as AssistantMarkdownProps['renderSlot']
 
 /** Supply the official component at the Factory call seam of a standalone component unit. */

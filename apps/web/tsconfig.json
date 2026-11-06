@@ -197,7 +197,9 @@
     "tests/complex-history.perf.ts",
     "tests/pwsh-terminal.e2e.ts",
     "tests/workflow-run.e2e.ts",
-    "tests/mobile-viewport.e2e.ts"
+    "tests/mobile-viewport.e2e.ts",
+    "tests/mobile-content-contract.e2e.ts",
+    "tests/keyboard-inset-acceptance.e2e.ts"
   ],
   "references": [
     { "path": "../../packages/experimental/auto-review" },

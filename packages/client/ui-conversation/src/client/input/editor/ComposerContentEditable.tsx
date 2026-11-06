@@ -14,12 +14,8 @@ import type { LexicalEditor } from 'lexical'
 export interface ComposerContentEditableProps extends HTMLAttributes<HTMLDivElement> {
   /** The shell-owned editor; null renders the same div unbound and inert. */
   readonly editor: LexicalEditor | null
-  /** Whether the user may edit (readOnly/disabled states fold in here). */
+  /** Whether the user may edit (locked and busy states fold in here). */
   readonly editable: boolean
-  /** When true, adds the HTML `readOnly` attribute to prevent the system
-   *  soft-keyboard on mobile while keeping the editor focusable for caret
-   *  visibility and programmatic updates via the virtual keyboard. */
-  readonly readOnly?: boolean
 }
 
 /**
@@ -27,7 +23,7 @@ export interface ComposerContentEditableProps extends HTMLAttributes<HTMLDivElem
  * @param props - editor binding, editability, and div passthroughs.
  * @returns the resident contenteditable div.
  */
-export function ComposerContentEditable({ editor, editable, readOnly, ...rest }: ComposerContentEditableProps): ReactNode {
+export function ComposerContentEditable({ editor, editable, ...rest }: ComposerContentEditableProps): ReactNode {
   const ref = useRef<HTMLDivElement | null>(null)
   useLayoutEffect(() => {
     const el = ref.current
@@ -38,16 +34,6 @@ export function ComposerContentEditable({ editor, editable, readOnly, ...rest }:
   useLayoutEffect(() => {
     if (editor !== null) editor.setEditable(editable)
   }, [editor, editable])
-  // On mobile the readOnly attribute prevents the system soft-keyboard
-  // while preserving focusability for caret visibility.  Lexical's
-  // programmatic editor.update() still mutates the DOM as normal.
-  // Applied through the DOM because React 18 JSX types reject readOnly on <div>.
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    if (readOnly) el.setAttribute('readOnly', '')
-    else el.removeAttribute('readOnly')
-  }, [readOnly])
   return (
     <div
       ref={ref}

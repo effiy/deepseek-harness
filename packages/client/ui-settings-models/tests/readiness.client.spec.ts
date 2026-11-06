@@ -45,6 +45,7 @@ function state(overrides: Partial<ModelsSettingsState> = {}): ModelsSettingsStat
   return {
     status: 'ready',
     error: null,
+    errorCopy: null,
     credentialError: null,
     writable: true,
     rows: [row()],

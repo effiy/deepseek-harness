@@ -121,6 +121,14 @@ Registry service for the prompt inputs assembled before each model step.
 
 ```ts cordis-catalog
 /**
+ * Invalidate the assembly cache so the next {@link assemble} call
+ * re-collects sections and tools. Called by external services that
+ * change state the registered providers depend on without changing
+ * prompt registrations themselves.
+ */
+invalidate(): void
+
+/**
  * Register an ordered prompt section in the calling context's scope. A scoped
  * section shadows a global section with the same name; duplicates within one
  * layer and non-finite orders throw. Registration and disposal emit
@@ -178,6 +186,15 @@ tools(provider: (context: AssembleContext) => ToolProviderResult): () => void
  * @returns the exact Cordis effect disposer.
  */
 variable(name: string, provider: (context: AssembleContext) => string | undefined): () => void
+
+/**
+ * Resolve registered prompt variables for one assembly without the
+ * full section/tool collection or waterfall. Providers are re-evaluated
+ * on every call; return values may be `undefined`.
+ * @param context - the optional scope and plugin-defined assembly fields.
+ * @returns the resolved variable name-to-value map.
+ */
+resolveVariables(context: AssembleContext = {}): Record<string, string | undefined>
 
 /**
  * Refresh accepted registered runtime facts for request admission. Contexts

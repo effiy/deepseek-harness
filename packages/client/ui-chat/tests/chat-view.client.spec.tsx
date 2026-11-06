@@ -4192,9 +4192,14 @@ describe('ChatView', () => {
     })
     const view = render(<h.ChatView {...h.props} />)
     expect(view.getByText(/历史加载失败：boom/)).toBeTruthy()
+    // An empty session loads as a skeleton announced through role=status.
     const loading = makeHarness({}, { openState: 'loading' })
     const lv = render(<loading.ChatView {...loading.props} />)
-    expect(lv.getByText('载入历史…')).toBeTruthy()
+    expect(lv.getByRole('status', { name: '载入历史…' })).toBeTruthy()
+    // A partially loaded session keeps the visible text hint.
+    const partial = makeHarness({ nodes: [user(1, 'earlier')] }, { openState: 'loading' })
+    const pv = render(<partial.ChatView {...partial.props} />)
+    expect(pv.getByText('载入历史…')).toBeTruthy()
   })
 
   it('renders command nodes as durable rows: settled text, error state, executing spinner, run-less soft-fall', () => {

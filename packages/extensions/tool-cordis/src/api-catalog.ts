@@ -2055,6 +2055,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'acknowledgement that the queue mutation was applied.',
       },
       {
+        signature: '@Remote(\'message-delete\') messageDelete(request: SessionMessageDeleteRequest): Promise<SessionMessageDeleteValue>',
+        description: 'Shadow one committed message or complete exchange from the model-visible surface.',
+        parameters: [{ name: 'request', description: 'Session identity, exact message sequence, and optional cascade flag.' }],
+        returns: 'acknowledgement that the replacement was committed.',
+      },
+      {
+        signature: '@Remote(\'message-update\') messageUpdate(request: SessionMessageUpdateRequest): Promise<SessionMessageUpdateValue>',
+        description: 'Replace one committed message\'s content on the model-visible surface.',
+        parameters: [{ name: 'request', description: 'Session identity, exact message sequence, and replacement text content.' }],
+        returns: 'acknowledgement that the replacement was committed.',
+      },
+      {
         signature: '@Remote(\'cancel\') cancel(request: SessionCancelRequest): SessionCancelValue',
         description: 'Cancel one active Agent turn without dropping its pending inbox.',
         parameters: [{ name: 'request', description: 'Session whose active Agent turn is cancelled.' }],
@@ -3046,6 +3058,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Registry service for the prompt inputs assembled before each model step.',
     methods: [
       {
+        signature: 'invalidate(): void',
+        description: 'Invalidate the assembly cache so the next assemble call re-collects sections and tools. Called by external services that change state the registered providers depend on without changing prompt registrations themselves.',
+        parameters: [],
+      },
+      {
         signature: 'section(section: PromptSection): () => void',
         description: 'Register an ordered prompt section in the calling context\'s scope. A scoped section shadows a global section with the same name; duplicates within one layer and non-finite orders throw. Registration and disposal emit `system-prompt/change`.',
         parameters: [{ name: 'section', description: 'the section to register.' }],
@@ -3086,6 +3103,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Register a prompt variable in the calling context\'s scope. Scoped values shadow globals; invalid or duplicate names throw. A provider may return `undefined`, but rendering a section that references that value then fails.',
         parameters: [{ name: 'name', description: 'the `[a-z][a-z0-9_]*` reference name.' }, { name: 'provider', description: 'evaluated for each assembly.' }],
         returns: 'the exact Cordis effect disposer.',
+      },
+      {
+        signature: 'resolveVariables(context: AssembleContext = {}): Record<string, string | undefined>',
+        description: 'Resolve registered prompt variables for one assembly without the full section/tool collection or waterfall. Providers are re-evaluated on every call; return values may be `undefined`.',
+        parameters: [{ name: 'context', description: 'the optional scope and plugin-defined assembly fields.' }],
+        returns: 'the resolved variable name-to-value map.',
       },
       {
         signature: 'refreshContext(assembly: PromptAssembly, context: AssembleContext = {}): PromptAssembly',
@@ -6407,7 +6430,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'QueueAction',
-    declaration: 'export type QueueAction = {\n    readonly kind: \'edit\';\n    readonly content: readonly TextBlock[];\n} | {\n    readonly kind: \'remove\';\n} | {\n    readonly kind: \'steer\';\n};',
+    declaration: 'export type QueueAction = {\n    readonly kind: \'edit\';\n    readonly content: readonly ContentBlock[];\n} | {\n    readonly kind: \'remove\';\n} | {\n    readonly kind: \'steer\';\n};',
   },
   {
     name: 'ReadFileLine',
@@ -6970,12 +6993,28 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SessionMessage {\n    role: \'user\' | \'assistant\';\n    text: string;\n    toolUses: ToolUseSummary[];\n}',
   },
   {
+    name: 'SessionMessageDeleteRequest',
+    declaration: 'export interface SessionMessageDeleteRequest {\n    readonly sessionId: SessionId;\n    readonly messageSeq: number;\n    readonly cascade?: boolean;\n}',
+  },
+  {
+    name: 'SessionMessageDeleteValue',
+    declaration: 'export interface SessionMessageDeleteValue {\n    readonly accepted: true;\n}',
+  },
+  {
     name: 'SessionMessageProjection',
     declaration: 'export interface SessionMessageProjection<T extends SessionEventType = SessionEventType> {\n    type: T;\n    project(event: SessionEvent<T>, context: SessionMessageProjectionContext): ReadonlyMap<SessionSeq, Message>;\n}',
   },
   {
     name: 'SessionMessageProjectionContext',
     declaration: 'export interface SessionMessageProjectionContext {\n    nodes: readonly SessionSeq[];\n    events: readonly SessionEvent[];\n    baseSeq: SessionLogOffset;\n    messages: ReadonlyMap<SessionSeq, Message>;\n}',
+  },
+  {
+    name: 'SessionMessageUpdateRequest',
+    declaration: 'export interface SessionMessageUpdateRequest {\n    readonly sessionId: SessionId;\n    readonly messageSeq: number;\n    readonly content: readonly ContentBlock[];\n}',
+  },
+  {
+    name: 'SessionMessageUpdateValue',
+    declaration: 'export interface SessionMessageUpdateValue {\n    readonly accepted: true;\n}',
   },
   {
     name: 'SessionObservation',
@@ -7707,7 +7746,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SystemPrompt',
-    declaration: 'export class SystemPrompt extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    section(section: PromptSection): () => void;\n    getSectionOrder(name: PromptSectionOrderName): number;\n    getContextOrder(name: PromptContextOrderName): number;\n    context(context: PromptContext): () => void;\n    suppressRuntimeContext(): () => void;\n    tools(provider: (context: AssembleContext) => ToolProviderResult): () => void;\n    variable(name: string, provider: (context: AssembleContext) => string | undefined): () => void;\n    refreshContext(assembly: PromptAssembly, context: AssembleContext = {}): PromptAssembly;\n    async assemble(context: AssembleContext = {}): Promise<PromptAssembly>;\n}',
+    declaration: 'export class SystemPrompt extends Service {\n    static Config: z<Config>;\n    constructor(ctx: Context, config: Config);\n    get revision(): number;\n    invalidate(): void;\n    section(section: PromptSection): () => void;\n    getSectionOrder(name: PromptSectionOrderName): number;\n    getContextOrder(name: PromptContextOrderName): number;\n    context(context: PromptContext): () => void;\n    suppressRuntimeContext(): () => void;\n    tools(provider: (context: AssembleContext) => ToolProviderResult): () => void;\n    variable(name: string, provider: (context: AssembleContext) => string | undefined): () => void;\n    resolveVariables(context: AssembleContext = {}): Record<string, string | undefined>;\n    refreshContext(assembly: PromptAssembly, context: AssembleContext = {}): PromptAssembly;\n    async assemble(context: AssembleContext = {}): Promise<PromptAssembly>;\n}',
   },
   {
     name: 'SystemPromptMessageSource',
@@ -8019,7 +8058,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolRuntime',
-    declaration: 'export class ToolRuntime extends Service {\n    static inject;\n    static Config: z<Config>;\n    readonly [TOOL_RUNTIME_SCHEDULER]: ToolRuntimeScheduler;\n    constructor(ctx: Context, config: Config = {});\n    presentAs(mode: ToolPresentationMode): () => void;\n    register(definition: ToolDefinition): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    guard(guard: ToolGuard): () => void;\n    get(name: string, scope?: ScopeKey): ToolDefinition | undefined;\n    schemas(scope?: ScopeKey): ToolSchema[];\n    executionMode(exec: ToolExecutionInput): ToolExecutionMode;\n    async execute(exec: ToolExecutionInput): Promise<ToolExecutionResult>;\n}',
+    declaration: 'export class ToolRuntime extends Service {\n    static inject;\n    static Config: z<Config>;\n    readonly [TOOL_RUNTIME_SCHEDULER]: ToolRuntimeScheduler;\n    constructor(ctx: Context, config: Config = {});\n    get revision(): number;\n    presentAs(mode: ToolPresentationMode): () => void;\n    register(definition: ToolDefinition): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    guard(guard: ToolGuard): () => void;\n    get(name: string, scope?: ScopeKey): ToolDefinition | undefined;\n    schemas(scope?: ScopeKey): ToolSchema[];\n    executionMode(exec: ToolExecutionInput): ToolExecutionMode;\n    async execute(exec: ToolExecutionInput): Promise<ToolExecutionResult>;\n}',
   },
   {
     name: 'ToolRuntimeScheduler',

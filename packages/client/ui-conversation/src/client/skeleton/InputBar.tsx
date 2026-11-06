@@ -17,7 +17,8 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
-  IconPanelLeftOutlineRegular, IconPlusOutlineMedium, IconWarningOutlineRegular, Toast, Tooltip,
+  createTapGuard, IconPanelLeftOutlineRegular, IconPlusOutlineMedium, IconWarningOutlineRegular,
+  TAP_GUARD_WINDOW_MS, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
@@ -31,7 +32,7 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { DraftEditor } from '../input/editor/DraftEditor.tsx'
 import {
-  installDraftFilePicker, installDraftKeymap, installDraftWheel,
+  focusDraftEditor, installDraftFilePicker, installDraftKeymap, installDraftWheel,
   keepDraftFocus, revealDraftSelection,
 } from '../input/editor/view-binding.ts'
 import { resolveSubmitMode } from '../input/submission-policy.ts'
@@ -303,10 +304,20 @@ export const InputBar = memo(function InputBar({
     const control = target.closest('button, a, input, select, textarea, [role="button"], [contenteditable], [tabindex]')
     if (control !== null && e.currentTarget.contains(control)) return
     e.preventDefault()
+    // The whole capsule is the typing target: a background press raises the
+    // system keyboard. Lexical's stored selection can lag behind native caret
+    // moves, so focusing an already-focused editor could restore an older
+    // caret — only hand focus when the editor does not already hold it.
+    if (document.activeElement !== editor.getRootElement()) focusDraftEditor(editor, revealSelection)
   }
 
   const onToggleCommandMenu = (): void => {
     if (keyboard === undefined) return
+    // The menu is a combobox over the editor, so the keyboard has to be there
+    // before the launcher opens it: activating the button from the keyboard
+    // leaves focus on the button, and restoring it afterwards would re-track
+    // an empty draft and close the menu again.
+    if (editor !== null) focusDraftEditor(editor, revealSelection)
     toggleCommandMenu?.(keyboard.caretSpan())
   }
 
@@ -340,12 +351,18 @@ export const InputBar = memo(function InputBar({
     : running && steeringAvailable && !disabled && !uploadsPending && plainMessageDraft
       ? t(primarySubmitMode === 'steer' ? 'input.send.steer' : 'input.send.queue')
       : t('input.send')
+  // Double-tap deduplication (Story 5.6): one physical double-tap on Send or
+  // Stop fires its action once even when both clicks land before a re-render
+  // can disable the seat. Distinct actions keep distinct windows, so a
+  // Stop-then-Send sequence on the same seat stays immediate.
+  const tapGuard = useMemo(() => createTapGuard(TAP_GUARD_WINDOW_MS), [])
   const onPrimary = (): void => {
     if (primaryStops) {
-      stop?.()
+      if (tapGuard.accept('stop')) stop?.()
       return
     }
     if (keyboard === undefined) return // absent machine: the button is disabled
+    if (!tapGuard.accept('send')) return
     /* v8 ignore next -- defensive: the primary button is disabled for empty, disabled, and pending-upload states. */
     if (!empty && !disabled && !machineBusy && !uploadsPending) keyboard.submit(primarySubmitMode, 'click')
   }
@@ -509,7 +526,7 @@ export const InputBar = memo(function InputBar({
                   aria-label={t('input.stop')}
                   disabled={stop === undefined}
                   onMouseDown={keepFocus}
-                  onClick={stop}
+                  onClick={() => { if (tapGuard.accept('stop')) stop?.() }}
                 >
                   <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
                     <rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor" />

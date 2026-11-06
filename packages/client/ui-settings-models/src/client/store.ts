@@ -97,6 +97,8 @@ export interface ModelsSettingsState {
   status: 'idle' | 'loading' | 'ready' | 'error'
   /** Whole-load failure text; row-level write failures stay in the editor. */
   error: string | null
+  /** Dictionary key for a localized whole-load failure; set exclusively with {@link error}. */
+  errorCopy: 'settingsLocalOnly' | 'mirrorUnavailable' | null
   /** Credential enrichment failure; provider/settings rows remain usable. */
   credentialError: string | null
   /** Whether the settings provider accepts writes. */
@@ -155,7 +157,7 @@ function apiKeyEnvOf(
 export class ModelsSettingsStore {
   /** The snapshot the section renders from (uSES-safe store). */
   readonly store: SnapshotStore<ModelsSettingsState> = createSnapshotStore<ModelsSettingsState>({
-    status: 'idle', error: null, credentialError: null, writable: false, rows: [], namespaces: new Map(),
+    status: 'idle', error: null, errorCopy: null, credentialError: null, writable: false, rows: [], namespaces: new Map(),
   })
 
   /** Latest load wins; an older response never overwrites a newer one. */
@@ -198,7 +200,7 @@ export class ModelsSettingsStore {
 
   /** Publish one joined answer; stale answers leave the current refresh in charge. */
   private async read(generation: number): Promise<void> {
-    this.store.update((s) => { s.status = 'loading'; s.error = null })
+    this.store.update((s) => { s.status = 'loading'; s.error = null; s.errorCopy = null })
     const [registered, declared] = await Promise.all([
       this.ctx.remote.llm.listProviders(),
       this.ctx.remote.llm.listConfigurableProviders(),
@@ -209,10 +211,9 @@ export class ModelsSettingsStore {
     if (!declared.ok) { this.failLoad(declared.error.message); return }
     const mirrored = this.describeFace.getSnapshot()
     if (mirrored.view === undefined) {
-      const message = mirrored.status === 'unavailable'
-        ? 'Settings are only available on the local machine. Open http://127.0.0.1:3080 to manage them.'
-        : mirrored.error ?? 'settings are unavailable in this browser'
-      this.failLoad(message)
+      if (mirrored.status === 'unavailable') { this.failLoadCopy('settingsLocalOnly'); return }
+      if (mirrored.error !== null) { this.failLoad(mirrored.error); return }
+      this.failLoadCopy('mirrorUnavailable')
       return
     }
     const providers = joinProviderDirectory(registered.value, declared.value)
@@ -257,6 +258,7 @@ export class ModelsSettingsStore {
     this.store.update((s) => {
       s.status = 'ready'
       s.error = null
+      s.errorCopy = null
       s.credentialError = credentialError
       s.writable = writable
       s.rows = rows.filter(row => row.entry.provider !== 'deepseek-account' || row.accountAvailable === true).map((row) => {
@@ -286,6 +288,16 @@ export class ModelsSettingsStore {
     this.store.update((s) => {
       s.status = 'error'
       s.error = message
+      s.errorCopy = null
+    })
+  }
+
+  /** Publish a localized whole-load failure as a dictionary key; the section owns the copy. */
+  private failLoadCopy(copy: 'settingsLocalOnly' | 'mirrorUnavailable'): void {
+    this.store.update((s) => {
+      s.status = 'error'
+      s.error = null
+      s.errorCopy = copy
     })
   }
 }

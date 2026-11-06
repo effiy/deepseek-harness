@@ -17,10 +17,8 @@ import { AppWebEntry, applyIndexInjections } from '@deepseek-ai/dsh-client-web'
 // per-layer hit/miss counters via postMessage.
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  let updatePromptVisible = false
-
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(registration => {
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
       // ── Update detection ──────────────────────────────────────────
       // When a new SW version is found (updatefound fires), track its
       // installation so we can notify the user once it's ready.
@@ -36,8 +34,8 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
           }
         })
       })
-    }).catch((err) => {
-      console.warn('[DSH SW] registration failed:', err.message)
+    }).catch((err: unknown) => {
+      console.warn('[DSH SW] registration failed:', err instanceof Error ? err.message : String(err))
     })
 
     // ── Controller change ───────────────────────────────────────────
@@ -48,9 +46,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
       if (refreshing) return
       refreshing = true
       // The UI layer can listen for this event to show a refresh prompt.
-      if (!updatePromptVisible) {
-        window.dispatchEvent(new CustomEvent('dsh-sw-activated'))
-      }
+      window.dispatchEvent(new CustomEvent('dsh-sw-activated'))
     })
   })
 }
@@ -63,17 +59,26 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
  * counters, overall hit rate, and uptime.
  */
 export async function getSWCacheStats(): Promise<Record<string, number | string> | null> {
-  if (!navigator.serviceWorker?.controller) return null
-  return new Promise(resolve => {
+  // `navigator.serviceWorker` is undefined outside secure contexts (plain-HTTP
+  // LAN access); the DOM types do not model that absence.
+  if (!('serviceWorker' in navigator)) return null
+  const controller = navigator.serviceWorker.controller
+  if (controller === null) return null
+  return new Promise((resolve) => {
     const channel = new MessageChannel()
-    channel.port1.onmessage = event => resolve(event.data)
-    channel.port1.onmessageerror = () => resolve(null)
-    navigator.serviceWorker.controller!.postMessage(
-      { type: 'DSH_CACHE_STATS' },
-      [channel.port2],
-    )
     // Timeout after 2 s — the SW might be busy.
-    setTimeout(() => resolve(null), 2000)
+    const timer = setTimeout(() => {
+      resolve(null)
+    }, 2000)
+    channel.port1.onmessage = (event: MessageEvent<Record<string, string | number> | null>) => {
+      clearTimeout(timer)
+      resolve(event.data)
+    }
+    channel.port1.onmessageerror = () => {
+      clearTimeout(timer)
+      resolve(null)
+    }
+    controller.postMessage({ type: 'DSH_CACHE_STATS' }, [channel.port2])
   })
 }
 

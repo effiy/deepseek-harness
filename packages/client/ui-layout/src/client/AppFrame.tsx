@@ -31,9 +31,11 @@ export type AppFrameProps =
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
-/** Center column grid item (session-body building block). */
+/** Center column grid item (session-body building block). The id and
+ *  programmatic tabindex are the skip-link target: `#dsh-main` receives
+ *  sequential focus when the link activates, without joining the Tab order. */
 function CenterColumn(props: { children?: ReactNode }) {
-  return <main className={css.centerCol}>{props.children}</main>
+  return <main id="dsh-main" tabIndex={-1} className={css.centerCol}>{props.children}</main>
 }
 
 /** Renders the active main panel (Chat / Workspace / Settings) and wraps it
@@ -336,6 +338,8 @@ export function AppFrame({
       data-animating={animating > 0 || undefined}
       data-bp={layoutInfo.breakpoint}
     >
+      {/* First in the Tab order; fixed-position, so it never joins the grid. */}
+      <a className={css.skipLink} href="#dsh-main">{t('nav.skipToMain')}</a>
       <DocumentTitle
         productTitle={productTitle}
         useSessions={useSessions}

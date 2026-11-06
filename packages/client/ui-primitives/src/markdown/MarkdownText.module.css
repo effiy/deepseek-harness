@@ -74,11 +74,30 @@
   margin-right: -3px;
 }
 
-/* Expand inline-link touch area on touchscreens: thicker transparent
-   borders give the finger a wider hit zone without altering the visual
-   text layout. Combined with the 15px mobile body font the total
-   vertical touch target reaches ~36px (15px × 1.6lh + 12px border). */
+/* Story 3.3: a ≥44×44 touch zone for inline links. The centered
+   pseudo-element expands the hit area with zero layout cost, and
+   z-index:-1 paints it below every inline glyph — text on this or a
+   neighboring line always wins the hit test, so vertically stacked
+   links cannot mis-touch one another; the zone only catches taps that
+   would otherwise hit nothing. Where a painted background sits between
+   the link and its stacking context (tinted message bubbles), the zone
+   is covered and the transparent borders below remain the fallback
+   (~36px vertical at the 15px mobile body font: 15px × 1.6lh + 12px
+   border). The base rule's `position: relative` anchors the zone. */
 @media (pointer: coarse) {
+  .markdown a::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+    z-index: -1;
+  }
+
   .markdown a {
     border-top-width: 6px;
     border-bottom-width: 6px;

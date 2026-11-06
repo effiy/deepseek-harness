@@ -102,21 +102,15 @@
   -webkit-app-region: no-drag;
 }
 
-:global([data-windows-titlebar]) .railIn .iconButton,
 :global([data-windows-titlebar]) .railIn .newSession {
   animation: none;
 }
 
-:global([data-windows-titlebar]) .collapsed .toggle,
 :global([data-windows-titlebar]) .collapsed .newSession {
   width: 28px;
   height: 28px;
   border-radius: var(--dsw-radius-sm);
   color: var(--dsw-alias-label-secondary);
-}
-
-:global([data-windows-titlebar]) .collapsed .toggle .panelIcon {
-  display: inline;
 }
 
 /* Scrollbars in the column are a pointer affordance: the shell adds this
@@ -236,8 +230,9 @@
   padding: 0;
   margin-bottom: 12px;
   justify-content: flex-start;
-  /* The settled rail's 36px toggle is wider than this 35px row; the base row's clip would cut
-     the control's right edge, so the rail stops clipping once the slide has settled. */
+  /* The settled rail's controls ride the row's 36px pitch; the base row's
+     clip would cut their right edge, so the rail stops clipping once the
+     slide has settled. */
   overflow: visible;
 }
 
@@ -348,40 +343,6 @@
     min-width: 44px;
     min-height: 44px;
   }
-}
-
-.collapsed .iconButton {
-  width: 36px;
-  height: 36px;
-  /* Rail hovers share the panel rows' and New Session's 12px rounding. */
-  border-radius: var(--dsw-radius-md);
-}
-
-/* Rail logo swap: collapsed, the toggle rests as the whale mark (brand ink,
-   no hover circle) and hovering reveals the panel icon — the expand
-   affordance (figma sidebar-hover flow). Expanded it is a plain panel icon. */
-.collapsed .toggle .panelIcon {
-  display: none;
-}
-
-.collapsed .toggle:hover .panelIcon {
-  display: inline;
-}
-
-.collapsed .toggle:hover .railMark {
-  display: none;
-}
-
-.railMark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Rail icons ride the primary ink (figma rail spec); expanded keeps the
-   secondary icon-button ink. */
-.collapsed .iconButton {
-  color: var(--dsw-alias-label-primary);
 }
 
 .buildVersion {

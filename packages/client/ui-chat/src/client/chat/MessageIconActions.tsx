@@ -80,36 +80,37 @@ export function MessageIconActions({
     </span>
   )
   return (
-    <div className={className === undefined ? css.actions : `${css.actions} ${className}`} data-clock={clock}>
-      {clock === 'start' ? clockEl : null}
-      <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
-        <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
-          {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
-        </button>
-      </Tooltip>
-      {extraActions}
-      {onBranch !== undefined && (
-        <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">
-          {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
-          <button
-            type="button"
-            className={css.action}
-            aria-label={t('message.branch')}
-            aria-disabled={branchUnavailable || undefined}
-            aria-describedby={branchUnavailable ? reasonId : undefined}
-            data-unavailable={branchUnavailable || undefined}
-            onClick={branchUnavailable ? undefined : onBranch}
-          >
-            <IconBranchOutlineRegular />
+    <span className={css.row} data-clock={clock}>
+      <span className={className === undefined ? css.actions : `${css.actions} ${className}`} data-clock={clock}>
+        {clock === 'start' ? clockEl : null}
+        <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
+          <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
+            {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
           </button>
         </Tooltip>
-      )}
-      {onBranch !== undefined && branchUnavailable && (
-        <span id={reasonId} className={css.visuallyHidden}>{t('message.branchUnavailable')}</span>
-      )}
+        {onBranch !== undefined && (
+          <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">
+            {/* Native disabled buttons do not deliver the hover/focus events Tooltip needs. */}
+            <button
+              type="button"
+              className={css.action}
+              aria-label={t('message.branch')}
+              aria-disabled={branchUnavailable || undefined}
+              aria-describedby={branchUnavailable ? reasonId : undefined}
+              data-unavailable={branchUnavailable || undefined}
+              onClick={branchUnavailable ? undefined : onBranch}
+            >
+              <IconBranchOutlineRegular />
+            </button>
+          </Tooltip>
+        )}
+        {onBranch !== undefined && branchUnavailable && (
+          <span id={reasonId} className={css.visuallyHidden}>{t('message.branchUnavailable')}</span>
+        )}
+      </span>
       {clock === 'end'
-        ? <span className={css.endInfo}>{usageAction}{clockEl}</span>
-        : usageAction}
-    </div>
+        ? <span className={css.endInfo}>{usageAction}{clockEl}{extraActions}</span>
+        : <>{extraActions}{usageAction}</>}
+    </span>
   )
 }

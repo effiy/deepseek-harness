@@ -172,9 +172,11 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Static assets: cache-first with background revalidation.
-  if (isStaticAsset(url.pathname)) {
-    event.respondWith(cacheFirstHandler(request))
+  // Static assets: cache-first.  Content-addressed URLs (build hashes,
+  // plugin revisions) skip background revalidation — the URL *is* the
+  // version, so a re-fetch can only return identical bytes.
+  if (isStaticAsset(url)) {
+    event.respondWith(cacheFirstHandler(request, !isContentAddressed(url)))
     return
   }
 
@@ -201,11 +203,17 @@ async function navigateHandler(request) {
     }
     return response
   } catch {
-    recordHit('nav-fallback')
     const cached = await caches.match(request)
-    if (cached) return cached
+    if (cached) {
+      recordHit('shell')
+      return cached
+    }
     const shell = await caches.match('/index.html')
-    if (shell) return shell
+    if (shell) {
+      recordHit('shell')
+      return shell
+    }
+    recordHit('nav-fallback')
     return new Response(OFFLINE_HTML, {
       status: 200,
       headers: { 'content-type': 'text/html; charset=utf-8' },
@@ -214,19 +222,25 @@ async function navigateHandler(request) {
 }
 
 /**
- * Static assets: serve from cache immediately; revalidate in background
- * for the next visit.
+ * Static assets: serve from cache immediately.  When `revalidate` is set,
+ * refresh the cache in the background for the next visit; content-addressed
+ * URLs pass false and keep the cached bytes as-is.
+ *
+ * @param {Request} request
+ * @param {boolean} revalidate
  */
-async function cacheFirstHandler(request) {
+async function cacheFirstHandler(request, revalidate) {
   const cached = await caches.match(request)
   if (cached) {
     recordHit('static')
-    // Background revalidation — silently refresh the cache.
-    fetch(request).then(response => {
-      if (response.ok) {
-        caches.open(CACHE_NAME).then(cache => cache.put(request, response))
-      }
-    }).catch(() => { /* offline — keep the cached copy */ })
+    if (revalidate) {
+      // Background revalidation — silently refresh the cache.
+      fetch(request).then(response => {
+        if (response.ok) {
+          caches.open(CACHE_NAME).then(cache => cache.put(request, response))
+        }
+      }).catch(() => { /* offline — keep the cached copy */ })
+    }
     return cached
   }
   try {
@@ -249,7 +263,24 @@ async function networkOnlyHandler(request) {
   return fetch(request)
 }
 
-/** Returns true when `pathname` matches a static-asset pattern. */
-function isStaticAsset(pathname) {
-  return STATIC_PATTERNS.some(p => p.test(pathname))
+/** Returns true when `url` should be served cache-first. */
+function isStaticAsset(url) {
+  const { pathname, search } = url
+  if (STATIC_PATTERNS.some(p => p.test(pathname))) return true
+  // Runtime plugin bundles: combo URLs carry the whole file list in the
+  // query (`/plugins/??a/client.js,b/client.js&rev=x`), so their pathname
+  // is bare `/plugins/` and pattern-matching on it alone never fires.
+  // The rev query pins content, making cache-first safe.  The
+  // /plugins/events stream has a distinct pathname and no .js payload,
+  // so it stays network-only.
+  return pathname.startsWith('/plugins/') && (search.includes('.js') || pathname.endsWith('.js'))
+}
+
+/**
+ * Content-addressed URLs never change in place: Vite build hashes under
+ * /assets/ and rev-pinned plugin bundles.  A cache hit needs no background
+ * revalidation — re-fetching identical bytes only wastes mobile data.
+ */
+function isContentAddressed(url) {
+  return url.pathname.startsWith('/assets/') || url.pathname.startsWith('/plugins/')
 }

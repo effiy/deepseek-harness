@@ -167,14 +167,16 @@ const processBoundTests = [
 ]
 
 // Claude Code's test-kit module names, served by the mods bridge's test support so the example mods' tests import them unchanged.
-const claudeCodeTestingAliases = {
-  'claude-code/testing': fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code-testing.ts', import.meta.url)),
-  'claude-code': fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code.ts', import.meta.url)),
-}
+// xlsx ships a CJS `main` and an ESM `module` build with no exports map. Node-side resolution of the externalized dependency picks the CJS build, which lacks `set_cptable`; browser bundlers pick the ESM build through `module`. The bare-specifier alias makes test resolution match the production client bundle; subpaths (xlsx/dist/cpexcel.full.mjs) resolve normally.
+const testingAliases = [
+  { find: 'claude-code/testing', replacement: fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code-testing.ts', import.meta.url)) },
+  { find: 'claude-code', replacement: fileURLToPath(new URL('./packages/experimental/claude-code-mods/tests/support/claude-code.ts', import.meta.url)) },
+  { find: /^xlsx$/, replacement: fileURLToPath(new URL('./packages/client/ui-sidebar-documentpreview/node_modules/xlsx/xlsx.mjs', import.meta.url)) },
+]
 
 export default defineConfig({
   plugins: [pathsPlugin(), standardDecoratorPlugin()],
-  resolve: { alias: claudeCodeTestingAliases },
+  resolve: { alias: testingAliases },
   test: {
     setupFiles: ['./scripts/test-proxy-environment.ts', './scripts/test-dom-environment.ts'],
     // .tsx: client component specs (jsdom via per-file @vitest-environment pragma).
@@ -185,7 +187,7 @@ export default defineConfig({
     projects: [
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: claudeCodeTestingAliases },
+        resolve: { alias: testingAliases },
         test: {
           name: 'thread-safe',
           execArgv: vitestExecArgv,
@@ -205,7 +207,7 @@ export default defineConfig({
       },
       {
         plugins: [pathsPlugin(), standardDecoratorPlugin()],
-        resolve: { alias: claudeCodeTestingAliases },
+        resolve: { alias: testingAliases },
         test: {
           name: 'process-bound',
           execArgv: vitestExecArgv,

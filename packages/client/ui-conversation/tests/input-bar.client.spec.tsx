@@ -1324,15 +1324,17 @@ describe('running and lock semantics', () => {
     expect(empty.button.disabled).toBe(true)
   })
 
-  it('unlock refocuses the surface; mousedown on the button keeps focus', () => {
+  it('unlock does not refocus the surface; mousedown on the button keeps focus', () => {
     const first = bench({ disabled: true, draft: 'x' })
     const textarea = first.view.container.querySelector<HTMLDivElement>('[data-composer-input]')!
     const focused: (boolean | undefined)[] = []
     textarea.focus = (options?: FocusOptions) => { focused.push(options?.preventScroll) }
     act(() => { first.session.set(snapshotOf({ removed: false })) })
-    expect(focused).toEqual([true])
+    // WeChat-style: state transitions never raise the keyboard on their own —
+    // only an explicit press focuses the surface.
+    expect(focused).toEqual([])
     fireEvent.mouseDown(first.view.container.querySelector('button[aria-label="发送消息"]')!)
-    expect(focused).toEqual([true, true])
+    expect(focused).toEqual([true])
   })
 
   it('a programmatic draft write echoes back through the state and the editor DOM', () => {
@@ -1407,12 +1409,14 @@ describe('running and lock semantics', () => {
     expect(bench({ draft: 'a\nb' }).shell.snapshot.draft).toBe('a\nb')
   })
 
-  it('a session switch refocuses the editable surface with preventScroll', () => {
+  it('a session switch does not refocus the editable surface (WeChat-style: the keyboard stays dismissed)', () => {
     const { view, textarea, props } = bench({ draft: 'line one' })
     const focused: (boolean | undefined)[] = []
     textarea.focus = (options?: FocusOptions) => { focused.push(options?.preventScroll) }
     act(() => { view.rerender(<InputBar {...props} sessionId={'s2' as SessionId} />) })
-    expect(focused).toEqual([true])
+    // Switching conversations reveals the history but never steals focus:
+    // the system keyboard only rises on an explicit tap of the surface.
+    expect(focused).toEqual([])
   })
 
   it('a persisted draft adopted after mount does not steal focus from another control', () => {
@@ -1913,4 +1917,56 @@ it('places context usage below the composer and hides it until the activity clos
   fireEvent.click(view.getByRole('button', { name: '上下文已用 25%' }))
   expect(view.getByRole('dialog', { name: '上下文已用' })).toBeTruthy()
   expect(view.getByRole('button', { name: '发送消息' })).toBeTruthy()
+})
+
+describe('virtual keyboard removal (architecture guard)', () => {
+  it('renders no virtual keyboard surface and no soft-keyboard suppression attributes', () => {
+    const { view, textarea } = bench({ draft: 'hello' })
+    // The composer rides the system soft keyboard only; re-landed
+    // VirtualKeyboard wiring (component or readOnly/inputMode suppression)
+    // must fail here — removal decision 2026-11-06.
+    expect(view.container.querySelector('[data-virtual-keyboard]')).toBeNull()
+    expect(textarea.getAttribute('readonly')).toBeNull()
+    expect(textarea.getAttribute('inputmode')).toBeNull()
+  })
+})
+
+describe('double-tap deduplication (Story 5.6)', () => {
+  it('sends once when both taps of a double-tap land before a re-render', () => {
+    const { button, sink } = bench({ draft: '连击发送' })
+    // Multi-touch double-fire: two clicks inside one act, before the
+    // machine's busy re-render can disable the seat.
+    act(() => {
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      button.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+    expect(sink).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops once when the primary Stop seat is double-tapped', () => {
+    const { button, stop } = bench({ running: true })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops once when the independent Stop button is double-tapped', () => {
+    const { interruptButton, stop } = bench({ running: true, subagent: CONTINUABLE_CHILD, draft: '插话草稿' })
+    expect(interruptButton).not.toBeNull()
+    fireEvent.click(interruptButton!)
+    fireEvent.click(interruptButton!)
+    expect(stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps Stop-then-Send on the same seat immediate', () => {
+    // Distinct actions keep distinct guard windows: stopping and then
+    // sending inside the window must not swallow the send.
+    const { button, stop, sink, shell } = bench({ running: true })
+    fireEvent.click(button)
+    expect(stop).toHaveBeenCalledTimes(1)
+    writeDraft(shell, '接着发送')
+    expect(button.getAttribute('aria-label')).toBe('排队发送')
+    fireEvent.click(button)
+    expect(sink).toHaveBeenCalledTimes(1)
+  })
 })

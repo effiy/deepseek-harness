@@ -77,6 +77,7 @@ import { registerListSubagentModels } from '../packages/subagent/tool-subagent/s
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
 import WorkflowEngine from '@deepseek-ai/dsh-workflow'
 import type { WorkflowRun, WorkflowStartRequest } from '@deepseek-ai/dsh-workflow'
+import * as ToolRag from '@deepseek-ai/dsh-tool-rag'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
 import * as ToolWorkspaceDependencies from '@deepseek-ai/dsh-tool-workspace-dependencies'
@@ -458,6 +459,19 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-rag',
+    dir: 'tool-rag',
+    source: 'packages/rag/tool-rag/src/index.ts',
+    requires: ['ctx.tools', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never issues a RAG query; the placeholder endpoint is unreachable by design.
+      await ctx.plugin(ToolRag, { baseURL: 'http://catalog.invalid', token: 'catalog-placeholder' })
+    },
+    note:
+      'rag_query searches the YiKnowledge knowledge base through the YiAi RAG API. `baseURL` and `token` resolve from the plugin config, then the `YIAI_BASE_URL` / `YIAI_TOKEN` launch environment; the model-visible schema is the same in every deployment.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-ralph',

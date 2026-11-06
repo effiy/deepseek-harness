@@ -20,12 +20,12 @@ interface AssistActionProps {
   text: string
   useStore: <T>(selector: (state: StoreState) => T) => T
   actions: {
-    beginEdit: (draft: unknown, seq: number) => void
-    beginDelete: (draft: unknown, seq: number) => void
-    cancelEdit: (draft: unknown) => void
-    cancelDelete: (draft: unknown) => void
-    commitEdit: (draft: unknown) => void
-    commitDelete: (draft: unknown) => void
+    beginEdit: (seq: number) => void
+    beginDelete: (seq: number) => void
+    cancelEdit: () => void
+    cancelDelete: () => void
+    commitEdit: () => void
+    commitDelete: () => void
   }
   editMessage: (seq: number, text: string) => Promise<void>
   deleteMessage: (seq: number) => Promise<void>
@@ -55,9 +55,9 @@ function renderWithStore(
     )
 
     actions = useMemo(() => ({
-      beginEdit: (_draft: unknown, s: number) => { setState(prev => ({ ...prev, editingMessageSeq: s })) },
+      beginEdit: (s: number) => { setState(prev => ({ ...prev, editingMessageSeq: s })) },
       cancelEdit: () => { setState(prev => ({ ...prev, editingMessageSeq: null })) },
-      beginDelete: (_draft: unknown, s: number) => { setState(prev => ({ ...prev, pendingDeleteSeq: s })) },
+      beginDelete: (s: number) => { setState(prev => ({ ...prev, pendingDeleteSeq: s })) },
       cancelDelete: () => { setState(prev => ({ ...prev, pendingDeleteSeq: null })) },
       commitEdit: () => { setState(prev => ({ ...prev, editingMessageSeq: null })) },
       commitDelete: () => { setState(prev => ({ ...prev, pendingDeleteSeq: null })) },

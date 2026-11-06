@@ -81,6 +81,11 @@
     - id: health-endpoint
       name: '@deepseek-ai/dsh-host-health-endpoint'
 
+    # Unauthenticated Prometheus scrape target: process uptime, memory, CPU,
+    # event-loop delay, and the optional live-session gauge.
+    - id: metrics-endpoint
+      name: '@deepseek-ai/dsh-host-metrics-endpoint'
+
     # Session-header "Open In..." split button over the host application
     # resolution (macOS/Windows/Linux; a host with no resolved application
     # renders no button). Two halves: the host routes and the browser surface.

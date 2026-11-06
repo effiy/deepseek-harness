@@ -193,8 +193,11 @@ function TurnNavigatorRail(
     }
     const target = center - height / 2
     const max = Math.max(0, virtualizer.getTotalSize() - height)
-    const delta = Math.max(0, Math.min(max, target)) - current
-    if (delta !== 0) virtualizer.scrollBy(delta, { behavior })
+    const clamped = Math.max(0, Math.min(max, target))
+    // Write the fixed-pitch offset through the rail's own scrollToFn: the
+    // library scroll commands clamp against the live DOM scroll extent, and
+    // reading scrollHeight/clientHeight forces a layout the rail must avoid.
+    if (clamped !== current) virtualizer.options.scrollToFn(clamped, { behavior }, virtualizer)
   }, [virtualizer])
 
   useImperativeHandle(ref, (): TurnNavigatorHandle => ({

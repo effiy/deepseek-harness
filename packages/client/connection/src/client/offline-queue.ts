@@ -63,7 +63,11 @@ function storeTransaction(db: IDBDatabase, mode: IDBTransactionMode): IDBObjectS
   return tx.objectStore(STORE_NAME)
 }
 
-/** Push a message onto the offline queue. */
+/**
+ * Push a message onto the offline queue.
+ * @param message - session, text, and mode of the message to queue; `id`, `createdAt`, and `status` are assigned here.
+ * @returns the stored record with its generated id and enqueue metadata.
+ */
 export async function enqueueMessage(message: Omit<QueuedMessage, 'id' | 'createdAt' | 'status'>): Promise<QueuedMessage> {
   const db = await openDb()
   return new Promise((resolve, reject) => {
@@ -85,7 +89,10 @@ export async function enqueueMessage(message: Omit<QueuedMessage, 'id' | 'create
   })
 }
 
-/** Get all pending messages, ordered by creation time (FIFO). */
+/**
+ * Get all pending messages, ordered by creation time (FIFO).
+ * @returns every queued message whose status is `pending`, oldest first.
+ */
 export async function getPendingMessages(): Promise<QueuedMessage[]> {
   const db = await openDb()
   return new Promise((resolve, reject) => {
@@ -107,7 +114,12 @@ export async function getPendingMessages(): Promise<QueuedMessage[]> {
   })
 }
 
-/** Update a queued message's status in place. */
+/**
+ * Update a queued message's status in place.
+ * @param id - IndexedDB key of the queued message.
+ * @param status - new queue status.
+ * @param lastError - error text recorded alongside a `failed` status; omit to keep the stored value.
+ */
 export async function updateMessageStatus(
   id: number,
   status: QueueStatus,
@@ -134,7 +146,10 @@ export async function updateMessageStatus(
   })
 }
 
-/** Remove a successfully-sent message from the queue. */
+/**
+ * Remove a successfully-sent message from the queue.
+ * @param id - IndexedDB key of the queued message.
+ */
 export async function removeMessage(id: number): Promise<void> {
   const db = await openDb()
   return new Promise((resolve, reject) => {
@@ -145,7 +160,10 @@ export async function removeMessage(id: number): Promise<void> {
   })
 }
 
-/** Count pending messages. */
+/**
+ * Count pending messages.
+ * @returns number of queued messages still awaiting a drain attempt.
+ */
 export async function countPending(): Promise<number> {
   const db = await openDb()
   return new Promise((resolve, reject) => {
@@ -157,7 +175,10 @@ export async function countPending(): Promise<number> {
   })
 }
 
-/** Remove all messages for a given session (e.g., when session is archived). */
+/**
+ * Remove all messages for a given session (e.g., when session is archived).
+ * @param sessionId - session whose queued messages are deleted.
+ */
 export async function removeSessionMessages(sessionId: string): Promise<void> {
   const db = await openDb()
   return new Promise((resolve, reject) => {
@@ -215,10 +236,23 @@ export async function drainQueue(handler: DrainHandler): Promise<number> {
   return drained
 }
 
+/**
+ * Cordis service face of the offline queue: enqueue outbound messages while
+ * the browser is offline and replay them when the connection returns.
+ */
 export interface OfflineQueueService {
   enqueue: typeof enqueueMessage
   pendingCount: typeof countPending
+  /**
+   * Register the handler that sends one queued message during a drain.
+   * @param handler - sends one queued message; a throw marks it `failed`.
+   * @returns disposer that unregisters this handler.
+   */
   registerDrainHandler(handler: DrainHandler): () => void
+  /**
+   * Replay every pending message through the registered handler in FIFO order.
+   * @returns count of successfully drained messages; 0 without a handler.
+   */
   drain(): Promise<number>
 }
 
@@ -226,6 +260,7 @@ export interface OfflineQueueService {
  * Create the Cordis offline-queue service. The caller wires it into the
  * context via `ctx.provide('offlineQueue', service)` and triggers
  * `service.drain()` when the browser reports online.
+ * @returns the service instance to provide as `ctx.offlineQueue`.
  */
 export function createOfflineQueueService(): OfflineQueueService {
   let drainHandler: DrainHandler | null = null

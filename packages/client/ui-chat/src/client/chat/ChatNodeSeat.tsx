@@ -148,6 +148,10 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
     <div
       ref={wrapperRef}
       className={css.flowItem}
+      /* Each flow row is a self-contained message unit screen readers can
+       * navigate; live announcement stays with the visually-hidden status
+       * rows, never the streaming content itself. */
+      role="article"
       data-chat-anchor-key={flowKey}
       data-chat-flow-key={flowKey}
       data-chat-paging-anchor={routedNode.kind !== 'turn-process' || undefined}

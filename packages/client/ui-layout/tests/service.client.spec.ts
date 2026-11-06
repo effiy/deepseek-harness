@@ -49,14 +49,27 @@ describe('LayoutController', () => {
     const service = new LayoutController(panels, () => true, createSnapshotStore({ activePanelId: null }), createSnapshotStore(false))
     const panelId = 'panel-a' as MainPanelId
     service.selectPanel(panelId)
-    service.selectPanel(panelId)
     service.selectPanel(null)
     expect(panels.selectPanel).toHaveBeenNthCalledWith(1, panelId)
-    expect(panels.selectPanel).toHaveBeenNthCalledWith(2, panelId)
-    expect(panels.selectPanel).toHaveBeenNthCalledWith(3, null)
+    expect(panels.selectPanel).toHaveBeenNthCalledWith(2, null)
     expect(panels.toggleSidebar).not.toHaveBeenCalled()
     expect(panels.openRightbar).not.toHaveBeenCalled()
     expect(panels.closeRightbar).not.toHaveBeenCalled()
+  })
+
+  it('ignores a double-tap repeat of the same selection or toggle, keeping other targets live', () => {
+    const panels = fakePanels()
+    const service = new LayoutController(panels, () => true, createSnapshotStore({ activePanelId: null }), createSnapshotStore(false))
+    const panelId = 'panel-a' as MainPanelId
+    service.selectPanel(panelId)
+    service.selectPanel(panelId)
+    expect(panels.selectPanel).toHaveBeenCalledTimes(1)
+    service.toggleSidebar()
+    service.toggleSidebar()
+    expect(panels.toggleSidebar).toHaveBeenCalledTimes(1)
+    // A different target keeps its own window: alternating taps all land.
+    service.selectPanel(null)
+    expect(panels.selectPanel).toHaveBeenCalledTimes(2)
   })
 
   it('keeps separately constructed controllers bound to their own instances', () => {
@@ -96,7 +109,7 @@ describe('LayoutController', () => {
     service.selectPanel('panel-a' as MainPanelId)
     expect(second.aborted).toBe(true)
     const repeated = service.beginNavigation()
-    service.selectPanel('panel-a' as MainPanelId)
+    service.selectPanel('panel-b' as MainPanelId)
     expect(repeated.aborted).toBe(true)
     const pending = service.beginNavigation()
     service.dispose()

@@ -424,3 +424,36 @@
     pointer-events: auto;
   }
 }
+
+/* Reduced motion on narrow viewports: the drawer slide and backdrop fade are
+ * decorative; the sidebar and backdrop jump straight to their end state. */
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  .sidebarCol,
+  .frame::after {
+    transition: none;
+  }
+}
+
+/* Skip link: the first Tab stop, parked above the viewport until keyboard
+ * focus reveals it (WCAG 2.4.1). Fixed position keeps it out of the grid;
+ * the z-index clears the narrow sidebar overlay (50) and its backdrop (49).
+ * The fill is the primary-button pair — a surface-rung token would enlist
+ * this sheet in the elevated-scrollbar rebind it has no scrolling to bind. */
+.skipLink {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 60;
+  padding: 8px 16px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
+  font-size: 14px;
+  line-height: 20px;
+  text-decoration: none;
+  transform: translateY(calc(-100% - 16px));
+}
+
+.skipLink:focus-visible {
+  transform: translateY(0);
+}

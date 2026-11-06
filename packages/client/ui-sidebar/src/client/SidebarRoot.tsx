@@ -19,7 +19,8 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  FishLogo, IconNewChatOutlineMedium, IconNewChatOutlineRegular, IconPanelLeftOutlineRegular, isDarwinDesktop, ShortcutKeys, Tooltip,
+  FishLogo, IconNewChatOutlineMedium, IconNewChatOutlineRegular, IconPanelLeftOutlineRegular,
+  isDarwinDesktop, ShortcutKeys, Tooltip, useSwipeGesture,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
@@ -101,6 +102,12 @@ export function SidebarRoot({
   const newShortcut = useShortcuts(rows => rows.find(row => row.id === 'session.new'))
   const shortcut = useShortcuts(rows => rows.find(row => row.id === 'sidebar.left.toggle'))
   const toggleLabel = collapsed ? t('toggle.open') : t('toggle.collapse')
+  // Drawer close gesture (Story 2.6): a left swipe on the open sidebar
+  // collapses it, pairing the edge zone's right-swipe open. The hook's 2:1
+  // axis ratio keeps the panel's vertical list scrolling from firing it, and
+  // the collapsed rail never swipes itself open. On mobile the collapsed
+  // column carries pointer-events: none, so only the open drawer is swiped.
+  const drawerSwipe = useSwipeGesture({ onSwipeLeft: () => { if (!collapsed) toggleSidebar() } })
   // Wide content stays mounted while the collapse animates (fading via
   // .collapsed .wide), unmounts at settle, and remounts right away on expand.
   const [settled, setSettled] = useState(collapsed)
@@ -172,9 +179,8 @@ export function SidebarRoot({
   const buildVersion = localBuildVersion()
 
   const darwinDesktop = isDarwinDesktop()
-  // Rail resting state is the whale mark; hovering swaps in the panel icon
-  // (the expand affordance, figma sidebar-hover flow). Expanded it is a plain
-  // panel icon.
+  // The toggle renders only while expanded; collapsed reopen affordances live
+  // outside the shell (the frame's shell.leading seat, the composer control).
   const toggle = (
     <Tooltip label={toggleLabel} shortcutKeys={shortcut?.keys} delayMs={500} side={captionTooltipSide}>
       <button
@@ -184,14 +190,7 @@ export function SidebarRoot({
         aria-keyshortcuts={shortcut?.aria}
         onClick={() => { toggleSidebar() }}
       >
-        {!wide && !windowsTitlebar && (
-          <span className={css.railMark} aria-hidden="true">
-            {renderSlot('sidebar.brand.mark', { size: 24 }, { fallback: <FishLogo size={24} /> })}
-          </span>
-        )}
-        {/* Rail icons render at 18 (figma rail spec); expanded keeps the glyph-native sizes. */}
-        <IconPanelLeftOutlineRegular className={css.panelIcon} size={wide || windowsTitlebar ? 16 : 18} />
-        {!wide && renderSlot('sidebar.toggle.badge', {})}
+        <IconPanelLeftOutlineRegular size={16} />
       </button>
     </Tooltip>
   )
@@ -209,6 +208,9 @@ export function SidebarRoot({
         setPointerInside(true)
       }}
       onPointerLeave={() => { armLinger() }}
+      onTouchStart={drawerSwipe.onTouchStart}
+      onTouchMove={drawerSwipe.onTouchMove}
+      onTouchEnd={drawerSwipe.onTouchEnd}
     >
       {/* macOS hiddenInset titlebar: the strip shares the row with the traffic lights. */}
       {darwinDesktop && <div className={css.topStrip} data-window-drag>{!collapsed && toggle}</div>}

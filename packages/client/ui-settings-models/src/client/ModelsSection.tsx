@@ -316,8 +316,8 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
 
   if (state.status === 'idle') void controller.load()
   if (state.status === 'error') {
-    /* v8 ignore next -- an error status always carries text; the fallback satisfies the nullable type */
-    const errorText = state.error ?? ''
+    /* v8 ignore next -- an error status always carries text or a copy key; the fallback satisfies the nullable type */
+    const errorText = state.errorCopy !== null ? t(state.errorCopy) : state.error ?? ''
     return (
       <section className={styles['section']}>
         <p className={styles['error']}>{`${t('loadFailed')}: ${errorText}`}</p>

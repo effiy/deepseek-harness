@@ -21,13 +21,8 @@ export interface DraftEditorProps {
   readonly onWorkspaceKeyDown: KeyboardEventHandler<HTMLDivElement>
   readonly hint: string | null
   readonly showPlaceholder: boolean
-  /** When set to 'none', suppresses the soft keyboard on mobile. */
-  readonly inputMode?: 'none' | 'text'
-  /** When true, adds `readOnly` to the contentEditable to prevent the
-   *  system soft-keyboard on mobile while keeping the editor focusable. */
-  readonly readOnly?: boolean
   /** Mobile keyboard action key hint — \"send\" shows the Send icon on
-   *  the virtual keyboard, matching chat-app expectations. */
+   *  the system soft keyboard, matching chat-app expectations. */
   readonly enterKeyHint?: 'send' | 'done' | 'go' | 'next' | 'search'
 }
 
@@ -38,7 +33,7 @@ export interface DraftEditorProps {
  */
 export function DraftEditor({
   classNames: css, editor, scrollRef, editable, editorDisabled, phase, placeholderText, ariaLabel,
-  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder, inputMode, readOnly, enterKeyHint,
+  workspaceTrigger, workspacePickerOpen, onWorkspaceKeyDown, hint, showPlaceholder, enterKeyHint,
 }: DraftEditorProps): ReactNode {
   return (
     <div ref={scrollRef} className={css.scroll} data-input-scroll>
@@ -46,7 +41,6 @@ export function DraftEditor({
         <ComposerContentEditable
           editor={workspaceTrigger ? null : editor}
           editable={editable}
-          {...readOnly !== undefined && { readOnly }}
           className={clsx(css.input, editorDisabled && css.inputDisabled)}
           data-phase={phase}
           aria-disabled={editorDisabled || undefined}
@@ -59,7 +53,6 @@ export function DraftEditor({
           tabIndex={workspaceTrigger ? 0 : undefined}
           onKeyDown={workspaceTrigger ? onWorkspaceKeyDown : undefined}
           style={hint === null ? undefined : { '--dsh-composer-hint': JSON.stringify(hint) } as CSSProperties}
-          {...inputMode !== undefined ? { inputMode } : {}}
           {...enterKeyHint !== undefined ? { enterKeyHint } : {}}
         />
         {showPlaceholder && (

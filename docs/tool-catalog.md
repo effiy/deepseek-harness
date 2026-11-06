@@ -34,6 +34,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`, `get_goal`, `update_goal` | `ctx.tools`, `ctx.agents`, `ctx.goals`, `ctx.systemPrompt`, `a calling Agent in an authorized open turn` | `tool/call`, `goal/change for mutations`, `tool/result` | - | create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds. |
 | `@deepseek-ai/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`, `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
+| `@deepseek-ai/dsh-tool-rag` | `rag_query` | `ctx.tools`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | rag_query searches the YiKnowledge knowledge base through the YiAi RAG API. `baseURL` and `token` resolve from the plugin config, then the `YIAI_BASE_URL` / `YIAI_TOKEN` launch environment; the model-visible schema is the same in every deployment. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.workingDirectory`, `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
@@ -1719,6 +1720,45 @@ Query a language server for precise code navigation. operation is one of goToDef
 Source: [`packages/lsp/tool-lsp/src/index.ts`](../packages/lsp/tool-lsp/src/index.ts)
 
 The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema.
+
+<a id="deepseek-aidsh-tool-rag"></a>
+
+## `@deepseek-ai/dsh-tool-rag`
+
+### `rag_query`
+
+Search the YiKnowledge knowledge base using RAG retrieval. Returns relevant document chunks with file paths, scores, and metadata. Use this to ground your answers in documented team knowledge.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "question": {
+      "type": "string",
+      "description": "Natural-language search query for the knowledge base."
+    },
+    "top_k": {
+      "type": "integer",
+      "description": "Number of results to return (1-20, default 5)."
+    },
+    "scope": {
+      "type": "string",
+      "description": "Limit search to a file-path prefix, e.g. \"engineer/learn/\". Omit to search all documents."
+    },
+    "hybrid": {
+      "type": "boolean",
+      "description": "Use hybrid retrieval (dense vector + BM25 keyword matching). Defaults to true for best coverage."
+    }
+  },
+  "required": [
+    "question"
+  ]
+}
+```
+
+Source: [`packages/rag/tool-rag/src/index.ts`](../packages/rag/tool-rag/src/index.ts)
+
+rag_query searches the YiKnowledge knowledge base through the YiAi RAG API. `baseURL` and `token` resolve from the plugin config, then the `YIAI_BASE_URL` / `YIAI_TOKEN` launch environment; the model-visible schema is the same in every deployment.
 
 <a id="deepseek-aidsh-tool-ralph"></a>
 

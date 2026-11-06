@@ -503,8 +503,9 @@ describe('ConversationRoot resident composer', () => {
     expect(b.lineageOwners.at(-1)?.openTitle).toBeUndefined()
   })
 
-  it('active phase: fixed header outside the scrollport; sticky composer seat inside it', () => {
+  it('active phase: fixed header above the scrollport; composer seat below it as the section footer', () => {
     const b = mount(sessionSnapshotOf())
+    const section = b.view.container.querySelector('[data-conversation-content]')
     const host = b.view.container.querySelector('[data-conversation-scroll]')
     const seat = b.view.container.querySelector('[data-composer-seat]')
     const header = b.view.container.querySelector('header')
@@ -512,9 +513,12 @@ describe('ConversationRoot resident composer', () => {
     expect(host).not.toBeNull()
     expect(seat).not.toBeNull()
     expect(header).not.toBeNull()
-    // Header is column chrome above the scrollport; the seat sticks inside it.
+    // Header is column chrome above the scrollport; the seat is the section
+    // footer below it — the mobile keyboard lift uses transform, not nesting.
     expect(host?.contains(header)).toBe(false)
-    expect(host?.contains(seat)).toBe(true)
+    expect(section?.contains(host)).toBe(true)
+    expect(section?.contains(seat)).toBe(true)
+    expect(host?.contains(seat)).toBe(false)
     expect(seat?.contains(textarea)).toBe(true)
     expect(b.slotCalls).toContain('conversation.session.header.lineage')
     expect(b.slotCalls).toContain('conversation.header.leading')
@@ -556,7 +560,7 @@ describe('ConversationRoot resident composer', () => {
     // persistence mirror stays bound (ConversationSession mounts chrome-hidden
     // for blank sessions): hero typing reaches the Conversation store.
     const box = b.view.getByRole('textbox')
-    expect(host?.contains(box)).toBe(true)
+    expect(b.view.container.querySelector('[data-composer-seat]')?.contains(box)).toBe(true)
     act(() => { b.wiring.setDraft('draft in hero') })
     expect(b.store.store.getSnapshot().draft).toEqual({ text: 'draft in hero', references: [] })
     // Picker: open through the chip; a pick switches to the other
@@ -620,20 +624,20 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
-  it('same textarea DOM node survives the hero → active flip into the sticky scrollport', () => {
+  it('same textarea DOM node survives the hero → active flip in the resident composer seat', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
     const before = b.view.getByRole('textbox')
     act(() => { b.wiring.setDraft('kept across flip') })
-    // First message landed: content exists, phase leaves blank. Composer
-    // already sat in the resident scrollport during hero, so the textarea
-    // node and InputHub draft both survive.
+    // First message landed: content exists, phase leaves blank. The composer
+    // seat is the same resident section footer in both phases, so the
+    // textarea node and InputHub draft both survive.
     b.session.set(sessionSnapshotOf({ blank: false }))
     b.rerender()
     const after = b.view.getByRole('textbox')
     expect(after).toBe(before)
     expect(b.wiring.snapshot.draft).toBe('kept across flip')
     expect(b.store.store.getSnapshot().draft).toEqual({ text: 'kept across flip', references: [] })
-    expect(b.view.container.querySelector('[data-conversation-scroll]')?.contains(after)).toBe(true)
+    expect(b.view.container.querySelector('[data-composer-seat]')?.contains(after)).toBe(true)
     expect(b.view.queryByTestId('hero-headline')).toBeNull()
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
   })

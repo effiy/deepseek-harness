@@ -86,7 +86,7 @@
 /* ── Separator ────────────────────────────────────────────────────
  * Thin vertical rule between the hamburger and the tab row. */
 .separator {
-  width: 1px;
+  width: 0.5px;
   height: 24px;
   background: color-mix(in srgb, var(--dsw-alias-border-l3) 40%, transparent);
   margin: 0 4px;
@@ -230,4 +230,27 @@
 
 :global([data-ds-dark-theme]) .active::before {
   opacity: 0.18;
+}
+
+/* ------------------------------------------------------------------
+ * Reduced motion
+ *
+ * The pill spring, press scale, and colour fades are decorative; the
+ * active tab still reads clearly through colour and the filled icon,
+ * so under reduced motion every state change is instant.
+ * ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .hamburger,
+  .hamburger svg,
+  .button,
+  .button::before,
+  .button svg {
+    transition: none;
+  }
+
+  .button:active,
+  .active:active {
+    transform: none;
+  }
 }

@@ -1,6 +1,6 @@
 # DSH Web 移动端触控交互 & 键盘避让验证报告
 
-**日期**: 2026-11-04
+**日期**: 2026-11-04（2026-11-06 修订：VirtualKeyboard 退役 + 原生键盘 E2E 验收，见 §9）
 **域**: AI 专家 (aier)
 **工兵**: DSH·触控交互·钳子
 **评级标准**: S（原生级）/ A（优秀）/ B（及格）/ C（不可交付）
@@ -147,6 +147,8 @@ scrollBody.scrollTop += 300                       (JS delta 补偿)
 
 ## 5. ReadOnly / InputMode 接线方案
 
+> **⚠️ SUPERSEDED (2026-11-06)**：VirtualKeyboard 已按用户决议物理删除（3 文件 430 行 + 字典 8 条死键 + DraftEditor/ComposerContentEditable 的 `readOnly`/`inputMode` 死 props 全部移除，铁甲孤儿裁定 + 群复核）。移动端仅使用系统软键盘。本节为历史存档；现行原生键盘路径验收见 §9。
+
 ### 5.1 当前状态
 
 - `InputBar.tsx` 中 `vkVisible` 状态存在（控制虚拟键盘显示）
@@ -220,8 +222,8 @@ onClick={() => {
 | SidebarEdgeZone swipe | **A** | 阈值 30px（略低于 40px 要求），640-900px 区间由汉堡按钮补位 |
 | overscroll-behavior | **S** | iOS + Android 全平台覆盖 |
 | scroll-padding + delta 补偿 | **S** | 27 条测试全绿，快速开闭精确补偿 |
-| readOnly/inputMode 接线 | **S** | VirtualKeyboard 生命周期完整，blur-on-toggle，session 切换重置 |
-| VirtualKeyboard 生命周期 | **S** | 2026-11-04 已接线：vkVisible 状态驱动 readOnly/inputMode + VK 渲染 |
+| readOnly/inputMode 接线 | ~~S~~ → **退役** | VK 物理删除（2026-11-06），死 props 同步清理，守护 spec 防翻案 |
+| 原生键盘路径 E2E | **S** | 9 测试/28 断言 + 变异双向确认 + Story 1 逐条对照（§9，2026-11-06） |
 
 **综合评级**：**S**
 
@@ -230,6 +232,8 @@ onClick={() => {
 ---
 
 ## 7. VirtualKeyboard 生命周期实现
+
+> **⚠️ SUPERSEDED (2026-11-06)**：本节所述 VK 组件树已整体物理删除（见 §5 横幅）。守护测试断言 InputBar 渲染树不含 `[data-virtual-keyboard]`、无软键盘抑制属性，防止架构决策被翻案。
 
 ### 7.1 组件树
 
@@ -328,8 +332,67 @@ export function useTouchCapability(): TouchCapability
 | 使用方 | 文件 | 手势 | 阈值 |
 |--------|------|------|------|
 | 侧栏展开 | `SidebarEdgeZone.tsx` | `onSwipeRight → toggleSidebar` | 30px（默认） |
-| (预留) 侧栏关闭 | (未来) | `onSwipeLeft → toggleSidebar` | 30px |
+| 侧栏关闭（Story 2.6，2026-11-06 已实现） | `SidebarRoot.tsx` `<aside>` | `onSwipeLeft → toggleSidebar`（!collapsed 门控，2:1 轴比防竖滚误触） | 30px |
 | (预留) Tab 切换 | (未来) | `onSwipeLeft/Right → switchTab` | 50px |
+
+---
+
+## 9. 原生键盘 E2E 验收（2026-11-06，铁甲任务单③闭环）
+
+**交付物**：`apps/web/tests/keyboard-inset-acceptance.e2e.ts` — **9 测试 / 28 断言全绿**。
+运行：`pnpm vitest run --config vitest.web.config.ts apps/web/tests/keyboard-inset-acceptance.e2e.ts`（web lane，~4s，无需 dist/scaffold）。
+
+### 9.1 Harness 设计
+
+- **真 import 生产代码**：测试时用 vite lib-build 将 `packages/client/web/src/keyboard-inset.ts` 打成 IIFE 注入真实 Chromium——页面运行的是 shipping code，零转写、零复制。
+- **Faithful replica 页**：逐字携带 `ConversationRoot.module.css` 的消费规则（`.scrollBody` 的 scroll-padding-bottom/overscroll-behavior/momentum scroll + `.composerSeat` 的 transform 抬升/120ms cubic-bezier transition/margin-bottom safe-area）。
+- **3 条源码锚点断言防漂移**：harness 直接读生产 CSS 文件断言三条核心消费声明逐字存在——生产规则一改，锚点即红，逼迫 replica 同步。
+- **Playwright mobile emulation**（铁甲单口径，无真机）：375×812、deviceScaleFactor 2、`isMobile: true` + `hasTouch: true`。
+- **原生输入事件**：真实 mouse click 聚焦 + `page.keyboard.type` 打字——生产 focusin/focusout 监听链跑在真实事件上，非合成调用。
+
+### 9.2 visualViewport 行为差异记录
+
+| 平台模式 | innerHeight | vv.height | vv.offsetTop | offset 结果 | composer 行为 | harness 场景 |
+|---------|-------------|-----------|--------------|------------|---------------|--------------|
+| Android Chrome | 812（不变） | 476（缩小） | 0 | **336px** | transform 抬升 336px，底边贴 visual 底 | shadow vv + 真 resize 事件 |
+| iOS Safari 默认 | 812（不变） | 476（缩小） | 336（上移） | **0px** | 零抬升——visual viewport 整体上移，layout 底边天然落在键盘上方 | shadow vv + 真 resize 事件 |
+| iOS `interactive-widget=resizes-content` (16+) | 476（真缩） | 476 | 0 | **0px** | 跟随真缩小的 viewport，composer 底边=476 | **真实 setViewportSize**（零 shadow） |
+
+- 老公式 `Math.max(innerH − visualH, offsetTop)` 在 iOS 默认模式产生 **336px 双偏移**——变异 A 证明 harness 钉死此回归（§9.3）。
+- 局限：无 WebKit 真机——iOS 两场景为公式级验收（输入组合忠实、事件路径真实，渲染引擎为 Chromium）；真机抽查列发布前置项（附录 C.4）。
+
+### 9.3 变异测试双向确认（断言锚定生产行为，非锚定 replica）
+
+| 变异 | 注入点 | 预测 | 实测 | 还原后 |
+|------|--------|------|------|--------|
+| A | 公式退回老 `Math.max(innerH − visualH, vvTop)` | iOS shift 场景独红 | **1 failed / 8 passed**（精确命中） | 9/9 绿 |
+| B | `delta` 恒 0（禁用 scrollTop 补偿） | delta 补偿 + clamp 双红 | **2 failed / 7 passed**（精确命中） | 9/9 绿 |
+
+还原后生产文件 `git diff HEAD` = **0 行**——变异零残留。
+
+### 9.4 Story 1「AI 对话不被打断」Given/When/Then 逐条对照
+
+| # | Then（验收原文） | 证据 | 结论 |
+|---|------------------|------|------|
+| 1.1 | 输入框随键盘上移，始终在键盘上方可见 | harness Android-open：composerBottom=476=visual 底、transform −336、fold 消息与 composer 顶相对位置不变量、scrollTop delta +336 | ✅ |
+| 1.1 | 消息列表高度自适应缩短 | **有意架构偏差**：scrollport 不缩短——transform 抬升零 reflow（防键盘动画期抖动），消息可达性由 `scroll-padding-bottom` + delta 补偿保证（ConversationRoot.module.css 注释即此理由）；resizes-content 场景演示平台真缩短路径 | ✅（意图达成，方式不同） |
+| 1.2 | 输入框回到原位、无布局跳动 | harness focusout 延迟重置（blur 后 100/350ms 无 vv 事件也归零，composerBottom 回 812）+ clamp（关闭不负越界）+ rapid open/close（单帧双事件零抖动） | ✅ |
+| 1.3 | 发送后自动平滑滚动到底部 | ui-chat follow 体系既有 specs：`chat-scroll.client.spec.tsx`「coalesces submitted inputs into one follow」「returns to bottom immediately」、`scroll-follow.client.spec.ts` 平滑/即时动画 | ✅（ui-chat 域证据；**勘误**：验收进度表曾把「1.3」映射到本 harness 的 scrollTop delta 断言——delta 补偿属 1.1/1.2 键盘机制，发送滚动属 follow 体系） |
+| 1.4 | 流式输出不抢焦点 | 铁甲在途（验收进度表分工）；本侧相邻基建就绪：card-press 焦点恢复（§9.5）+ WeChat-style 不自动回焦 2 specs | 🟡 铁甲 |
+| 1.6 | 滚动流畅 ≥60fps、有惯性 | 前轮已验：`overscroll-behavior-y: contain` + `-webkit-overflow-scrolling: touch` + `touch-action: pan-y`（触手 2026-11-06 自查确认在位）；replica 页携带同款规则参与 delta/clamp 断言 | ✅（CSS 机制级；60fps 真机实测为发布项） |
+
+### 9.5 配套生产回归修复（焦点域，本轮发现并修复）
+
+- **回归链**：`8b04fee728 "feat: sync"`（草率聚合提交）误删 `onCardMouseDown`/`onToggleCommandMenu` 的 `focusDraftEditor` 调用；`b19012f124`（VK 移除）未恢复 → **点击输入框留白不弹系统键盘、命令菜单方向键失灵**，4 条既有 specs 持续红。
+- **修复**：恢复 `06fa431947`/`5c3081eeaa` 原审双路径焦点——`getRootElement().focus({preventScroll})`（DOM 焦点，弹键盘）+ `editor.focus()`（Lexical 选区恢复），带已聚焦守卫防旧 caret 回跳。
+- **关键事实**：Lexical 的 `editor.focus()` **从不做 DOM focus**（`view-binding.ts` `focusDraftEditor` 注释原文），单独调用在真实浏览器不弹系统键盘——必须双路径。
+- **2 条过时测试重写**：unlock/session-switch 自动回焦 → WeChat-style 不回焦（对齐 11-04 群决议「失焦自动收起、不强制弹键盘」）。
+- 数字：input-bar spec **120/120**、ui-conversation 全量 **43 文件/668 测试全绿**、`tsc -p apps/web/tsconfig.json` + ui-conversation client face 均 **EXIT=0**。
+
+### 9.6 环境事故与解锁
+
+- 安全 toolchain bump（`de52bd692c`）把 playwright 翻到 1.64.0 但未装配套浏览器 → **apps/web 全部 e2e 的 `chromium.launch` 断**（缺 `chromium_headless_shell-1248`）。已安装（99MB），web lane 整体复活——各域 e2e 复跑不再受此阻塞。
+- test:gui 全量 **15 failed / 10010 passed**（同日 12:34 时 53 → 15）：15 条全部归属预存/并发域（docpreview excel/pdf node: 基线、AMA HEAD 预坏、connection offline-retry、corner-shape PullToRefresh、menu-surfaces、ui-shortcuts），**触控域零红**。
 
 ---
 

@@ -165,6 +165,20 @@ dist/
 | 首次安装体积 | ~3MB | index + vendor chunk + CSS |
 | 更新流量 | ~50KB | 仅 index chunk 变化时 |
 
+## 实测验证（2026-11-06）
+
+验证脚本：`tests/sw-offline-verify.mjs`（Playwright headless Chrome，375×812 视口，静态服务器 serve `dist/`）。
+
+| 验证项 | 实测结果 |
+|--------|---------|
+| SW registration | `state: "activated"`，controller 非空 |
+| Shell 预缓存条目 | 6 条（`/`、`/index.html`、index/vendor 的 JS+CSS） |
+| 断网刷新（有缓存） | 缓存 shell 正常渲染（`#root` 存在），非浏览器错误页 |
+| 空缓存 + 断网 | OFFLINE_HTML："No Connection" + Try Again + 自动重连轮询 |
+| `getSWCacheStats()` | 二次访问 `staticHits: 4, staticMisses: 0, hitRate: "100.0%"` |
+| 断网导航回退 | `shellHits: 1` 正确递增 |
+| 版本更新 | rebuild → 新 cache name，旧缓存 activate 时自动清理 |
+
 ## 故障恢复
 
 1. **SW 注册失败** → 静默降级，应用正常工作（无离线缓存）
