@@ -194,7 +194,7 @@
 .stop:hover,
 .stop:focus-visible {
   border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 /* The armed press widens into a labeled danger pill so the confirm step is
@@ -207,7 +207,7 @@
   padding: 0 7px;
   border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent);
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .stopLabel {
@@ -217,7 +217,7 @@
 }
 
 .stopFailed {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .row {
@@ -358,5 +358,5 @@
 }
 
 .noticeError {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }

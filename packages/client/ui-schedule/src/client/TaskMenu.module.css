@@ -151,11 +151,11 @@
 
 /* Destructive row: error text/icon, danger hover fill. */
 .danger {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .danger .itemIcon {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .danger:hover:not(:disabled) {

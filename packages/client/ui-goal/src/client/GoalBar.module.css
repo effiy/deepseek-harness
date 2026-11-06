@@ -76,7 +76,7 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font-size: 12px;
   line-height: 20px;
   text-overflow: ellipsis;

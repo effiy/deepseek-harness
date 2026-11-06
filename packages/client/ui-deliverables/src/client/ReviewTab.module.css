@@ -10,7 +10,7 @@
 .itemCounts, .counts { display: inline-flex; flex: none; gap: 6px; align-items: center; font-family: var(--ds-font-family-code); font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-tertiary); }
 .counts { min-width: 0; margin-right: auto; }
 .added { color: var(--dsw-alias-state-success-primary); }
-.deleted { color: var(--dsw-alias-state-error-primary); }
+.deleted { color: var(--dsw-alias-state-error-label); }
 .label { color: var(--dsw-alias-label-tertiary); }
 .tools { display: inline-flex; flex: none; gap: 2px; align-items: center; margin-left: auto; }
 .tool { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 6px; border: 0; border-radius: var(--dsw-radius-sm); background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
@@ -18,4 +18,4 @@
 .tool:hover:not(:disabled) { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-interactive-bg-hover); }
 .tool[aria-pressed='true'] .compareIcon { transform: rotate(90deg); }
 .tool:disabled { cursor: progress; }
-.tool[data-error] { color: var(--dsw-alias-state-error-primary); }
+.tool[data-error] { color: var(--dsw-alias-state-error-label); }

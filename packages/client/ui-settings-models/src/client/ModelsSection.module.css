@@ -176,7 +176,7 @@
   border: none;
   border-radius: var(--dsw-radius-md);
   background: transparent;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font: inherit;
   font-size: 14px;
   line-height: 22px;
@@ -499,7 +499,7 @@
 /* The delete glyph keeps the danger tint the rest of the section uses. */
 .iconButtonDanger:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover-danger);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .modelAdvanced {
@@ -626,7 +626,7 @@ select.input {
   margin: 0;
   font-size: 12px;
   line-height: 18px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .deleteDialog {
@@ -635,7 +635,7 @@ select.input {
 
 .deleteConfirm:not(:disabled) {
   border-color: var(--dsw-alias-state-error-primary);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .deleteConfirm:hover:not(:disabled) {

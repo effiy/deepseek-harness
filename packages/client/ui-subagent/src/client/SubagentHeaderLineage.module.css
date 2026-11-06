@@ -341,7 +341,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .refresh {

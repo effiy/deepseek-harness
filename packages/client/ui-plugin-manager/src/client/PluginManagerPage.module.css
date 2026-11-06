@@ -124,7 +124,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .statusWithDot {
@@ -488,7 +488,7 @@
 /* The destructive text action in a card body: red ink inside a 30% red frame,
    and the outline hover rebinds to a red wash instead of the gray one. */
 .danger {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);
   --dsw-alias-interactive-bg-hover: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
 }
@@ -517,7 +517,7 @@
   border: 0;
   border-radius: var(--dsw-radius-sm);
   background: transparent;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   cursor: pointer;
 }
 
@@ -540,7 +540,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 18px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   overflow-wrap: anywhere;
   /* The Host's captured tail, when no output streamed, keeps its lines. */
   white-space: pre-wrap;
@@ -916,7 +916,7 @@ label.registryOption {
   margin: -4px 0 0;
   font-size: 12px;
   line-height: 18px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 /* The footer's only action spans the dialog, as the primary action of a short form does. */
@@ -1513,7 +1513,7 @@ label.registryOption {
 }
 
 .row[data-state='failed'] .rowState {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 
@@ -1522,6 +1522,6 @@ label.registryOption {
   margin: 4px 0 0 56px;
   font-size: 12px;
   line-height: 18px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   overflow-wrap: anywhere;
 }

@@ -665,7 +665,7 @@
 }
 
 .promptDiffLineremoved {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   background: color-mix(
     in srgb,
     var(--dsw-alias-state-error-primary) 12%,
@@ -827,15 +827,15 @@
 }
 
 .error {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .overview dd.error {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .details .errorPayload {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .details .errorPayload .resultBlockText {
@@ -1314,7 +1314,7 @@
 }
 
 .programAction[data-state='failed'] {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .programAction:focus-visible {
@@ -1377,7 +1377,7 @@
 }
 
 .programError::first-line {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font-weight: 600;
 }
 

@@ -32,7 +32,7 @@
 .warningIcon {
   flex: none;
   margin-top: 2px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .acknowledgement {

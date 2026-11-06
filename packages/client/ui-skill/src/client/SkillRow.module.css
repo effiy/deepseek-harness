@@ -93,7 +93,7 @@
 }
 
 .errorSummary {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .stoppedSummary {
@@ -141,7 +141,7 @@
 }
 
 .instructions[data-error] {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .instructions::-webkit-scrollbar-thumb {

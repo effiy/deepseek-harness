@@ -40,7 +40,7 @@
 }
 
 .del {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   background: var(--dsw-alias-code-diff-deleted);
   box-shadow: inset 3px 0 0 var(--dsw-alias-state-error-primary);
 }

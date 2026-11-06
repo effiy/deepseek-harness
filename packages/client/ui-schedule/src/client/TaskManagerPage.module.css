@@ -1066,7 +1066,7 @@
 /* The cron hint doubles as the row's rejection line, so its unreadable-expression
    state takes the save failure's error color in place of a second message. */
 .ruleHintError {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 /* The mock's `.automation-detail .instruction`: the editable instruction box on
@@ -1326,7 +1326,7 @@
   margin: 0;
   padding: 12px var(--detail-gutter) 0;
   background: var(--dsw-alias-bg-base);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -1412,7 +1412,7 @@
 }
 
 .deleteButton {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .page :focus-visible {

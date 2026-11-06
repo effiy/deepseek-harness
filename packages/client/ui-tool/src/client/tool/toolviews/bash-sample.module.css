@@ -74,7 +74,7 @@
 }
 
 .ioText[data-error] {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .commandInput {
@@ -185,7 +185,7 @@
 
 /* Error row's collapsed summary: the failure's first line in the error color. */
 .errorSummary {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .stoppedSummary {

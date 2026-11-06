@@ -27,7 +27,7 @@
 
 .danger:hover {
   background: var(--dsw-alias-interactive-bg-hover-danger);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 /* Context / long-press menu items inside MenuSurface */
@@ -54,7 +54,7 @@
 
 .menuItemDanger {
   composes: menuItem;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .menuItemDanger:hover,

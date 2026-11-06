@@ -45,7 +45,7 @@
 }
 
 .sandboxOff {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
 }
 
@@ -216,7 +216,7 @@
 .failure {
   flex: 0 0 auto;
   padding: 6px 12px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font: var(--dsw-font-xxxs-11);
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);
 }

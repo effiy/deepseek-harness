@@ -9,4 +9,4 @@
 }
 .field textarea { resize: vertical; }
 .field [aria-invalid='true'] { border-color: var(--dsw-alias-state-error-primary); }
-.field p { margin: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; }
+.field p { margin: 0; color: var(--dsw-alias-state-error-label); font-size: 12px; }

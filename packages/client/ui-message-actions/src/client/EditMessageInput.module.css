@@ -72,7 +72,7 @@
 
 .btnDanger {
   background: var(--dsw-alias-bg-layer-1);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   border-color: var(--dsw-alias-border-l2);
 }
 

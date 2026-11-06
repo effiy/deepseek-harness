@@ -62,6 +62,6 @@
 
 .reject:hover:not(:disabled) {
   background: var(--dsw-alias-interactive-bg-hover-danger);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   border-color: transparent;
 }

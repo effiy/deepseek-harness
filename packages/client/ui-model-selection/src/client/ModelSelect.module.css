@@ -134,7 +134,7 @@
   padding: 6px 7px;
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-interactive-bg-hover-danger);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font-size: 11px;
   line-height: 16px;
 }

@@ -53,5 +53,5 @@
 
 .tag[data-tone='danger'] {
   background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }

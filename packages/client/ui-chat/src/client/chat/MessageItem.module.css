@@ -290,7 +290,7 @@
 
 .turnErrorTitle {
   margin-right: 6px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font-weight: 600;
 }
 

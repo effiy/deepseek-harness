@@ -57,7 +57,7 @@
 
 /* Danger item: error color (typically red) */
 .danger {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .danger:active {

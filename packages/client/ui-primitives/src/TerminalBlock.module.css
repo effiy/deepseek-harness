@@ -126,7 +126,7 @@
   position: sticky;
   top: 0;
   height: var(--dsl-terminal-line-height);
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .copyButton {

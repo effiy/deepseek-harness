@@ -73,7 +73,7 @@
 }
 
 .row:is(:hover, [aria-expanded='true']) .diffRemoved {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 /* File-tool path: same type as .summary, with a persistent link affordance.
@@ -105,7 +105,7 @@
 
 /* Error row's collapsed summary: the failure's first line in the error color. */
 .errorSummary {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 /* Interrupted rows retain their business glyph and replace the summary with a visible warning. */
@@ -243,7 +243,7 @@
 
 /* A failed call's OUT text shares the collapsed summary's error color. */
 .ioText[data-error] {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 /* The block-shaped expanded bodies: the code variant's run_code program

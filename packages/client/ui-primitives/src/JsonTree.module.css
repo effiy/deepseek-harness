@@ -291,7 +291,7 @@
 }
 
 .actionButton[data-state='failed'] {
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
 }
 
 .expander {

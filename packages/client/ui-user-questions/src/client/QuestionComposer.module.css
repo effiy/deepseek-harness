@@ -434,7 +434,7 @@
 .feedback {
   flex: 1;
   min-height: 16px;
-  color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-label);
   font-size: 11px;
   line-height: 16px;
   text-align: right;
