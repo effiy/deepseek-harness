@@ -381,7 +381,7 @@
 /* Match Session search's pulse without coupling the two feature packages. */
 .skeletonFill {
   background: var(--dsw-alias-bg-skeleton);
-  animation: dsh-plugin-skeleton 2s cubic-bezier(0.36, 0, 0.64, 1) infinite;
+  animation: dsh-plugin-skeleton 2s var(--ds-ease-pulse) infinite;
 }
 
 /* Keep each real text line's height; center the shorter painted bar within it. */

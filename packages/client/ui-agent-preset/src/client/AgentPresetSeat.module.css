@@ -62,7 +62,7 @@
    character). All chars occupy their width from the start, so nothing
    reflows mid-run. */
 .introIcon {
-  animation: seat-icon-in 0.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: seat-icon-in 0.15s var(--ds-ease-emphasized) both;
 }
 
 @keyframes seat-icon-in {

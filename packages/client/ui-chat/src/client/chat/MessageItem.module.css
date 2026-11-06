@@ -405,7 +405,7 @@
 }
 
 .bubble[data-message-fresh] {
-  animation: message-bubble-enter 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: message-bubble-enter 280ms var(--ds-ease-emphasized);
 }
 
 /* User bubbles slide in from the right; assistant bubbles from the left. */

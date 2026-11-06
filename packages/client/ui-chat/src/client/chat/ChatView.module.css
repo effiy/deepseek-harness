@@ -116,7 +116,7 @@
 /* While a Turn folds, spacing changes share the closing rows' timing. */
 .column[data-chat-motion] > :not([data-chat-motion]),
 .column[data-chat-motion] > :global([data-slot="conversation.chat.flow"]) > :not([data-chat-motion]) {
-  transition: margin-top 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: margin-top 160ms var(--ds-ease-in-out);
 }
 
 @media (prefers-reduced-motion: reduce) {

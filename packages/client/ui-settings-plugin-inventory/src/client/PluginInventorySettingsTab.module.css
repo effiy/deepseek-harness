@@ -489,7 +489,7 @@
   }
 
   .skeletonBar {
-    animation: plugin-inventory-skeleton 2s cubic-bezier(0.36, 0, 0.64, 1) infinite;
+    animation: plugin-inventory-skeleton 2s var(--ds-ease-pulse) infinite;
   }
 }
 
