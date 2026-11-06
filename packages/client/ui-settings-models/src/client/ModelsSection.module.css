@@ -599,7 +599,8 @@ select.input {
 }
 
 .input::placeholder {
-  color: var(--dsw-alias-label-dimmed);
+  /* WCAG AA: dimmed measured 1.26:1 light / 1.90:1 dark; caption clears 4.5:1. */
+  color: var(--dsw-alias-label-caption);
 }
 
 .input:disabled {

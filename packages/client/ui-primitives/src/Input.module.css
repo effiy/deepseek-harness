@@ -34,5 +34,7 @@
 }
 
 .input::placeholder {
-  color: var(--dsw-alias-label-dimmed);
+  /* WCAG AA: dimmed measured 1.26:1 light / 1.90:1 dark; placeholders carry
+     real usage hints, so they take the caption token (>=4.5:1 both themes). */
+  color: var(--dsw-alias-label-caption);
 }

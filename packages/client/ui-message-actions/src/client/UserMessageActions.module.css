@@ -13,7 +13,7 @@
   height: 32px;
   border: none;
   background: none;
-  color: var(--dsw-icon-secondary);
+  color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
   border-radius: var(--dsw-radius-sm);
   padding: 0;
@@ -21,13 +21,13 @@
 }
 
 .action:hover {
-  background: var(--dsw-surface-hover);
-  color: var(--dsw-icon-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 .danger:hover {
-  background: var(--dsw-surface-danger-hover, rgb(255 0 0 / 0.08));
-  color: var(--dsw-icon-danger, #e5484d);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  color: var(--dsw-alias-state-error-primary);
 }
 
 /* Context / long-press menu items inside MenuSurface */
@@ -38,7 +38,7 @@
   padding: 8px 16px;
   border: none;
   background: none;
-  color: var(--dsw-text-primary);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
   font-size: 0.875rem;
   cursor: pointer;
@@ -48,18 +48,18 @@
 
 .menuItem:hover,
 .menuItem:focus-visible {
-  background: var(--dsw-surface-hover);
+  background: var(--dsw-alias-interactive-bg-hover);
   outline: none;
 }
 
 .menuItemDanger {
   composes: menuItem;
-  color: var(--dsw-icon-danger, #e5484d);
+  color: var(--dsw-alias-state-error-primary);
 }
 
 .menuItemDanger:hover,
 .menuItemDanger:focus-visible {
-  background: var(--dsw-surface-danger-hover, rgb(255 0 0 / 0.08));
+  background: var(--dsw-alias-interactive-bg-hover-danger);
 }
 
 .backdrop {

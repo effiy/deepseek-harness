@@ -22,17 +22,17 @@
 .confirmText {
   flex: 1 1 100%;
   font-size: 0.875rem;
-  color: var(--dsw-text-secondary);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .editArea {
   width: 100%;
   min-height: 80px;
   padding: 12px;
-  border: 1px solid var(--dsw-border-default);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-surface-default);
-  color: var(--dsw-text-primary);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
   font: inherit;
   font-size: 0.9375rem;
   line-height: 1.5;
@@ -42,7 +42,7 @@
 
 .editArea:focus {
   outline: none;
-  border-color: var(--dsw-border-accent);
+  border-color: var(--dsw-alias-state-business-primary);
 }
 
 .btn {
@@ -51,33 +51,33 @@
   font: inherit;
   font-size: 0.875rem;
   cursor: pointer;
-  border: 1px solid var(--dsw-border-default);
-  background: var(--dsw-surface-default);
-  color: var(--dsw-text-primary);
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
 }
 
 .btn:hover {
-  background: var(--dsw-surface-hover);
+  background: var(--dsw-alias-interactive-bg-hover-solid);
 }
 
 .btnPrimary {
-  background: var(--dsw-surface-accent, #155eef);
-  color: #fff;
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
   border-color: transparent;
 }
 
 .btnPrimary:hover {
-  opacity: 0.9;
+  background: var(--dsw-alias-button-primary-hover);
 }
 
 .btnDanger {
-  background: var(--dsw-surface-danger, #e5484d);
-  color: #fff;
-  border-color: transparent;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-state-error-primary);
+  border-color: var(--dsw-alias-border-l2);
 }
 
 .btnDanger:hover {
-  opacity: 0.9;
+  background: var(--dsw-alias-interactive-bg-hover-danger);
 }
 
 .btn:disabled {

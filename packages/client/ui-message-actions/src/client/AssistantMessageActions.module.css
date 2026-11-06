@@ -6,17 +6,17 @@
   height: 24px;
   border: none;
   background: none;
-  color: var(--dsw-icon-secondary);
+  color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
   border-radius: 4px;
   padding: 0;
 }
 
 .action:hover {
-  color: var(--dsw-icon-primary);
-  background: var(--dsw-surface-secondary);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .danger:hover {
-  color: var(--dsw-icon-danger);
+  color: var(--dsw-alias-state-error-primary);
 }

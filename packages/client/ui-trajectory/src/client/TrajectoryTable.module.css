@@ -644,7 +644,9 @@
 }
 
 .promptDiffLinemeta {
-  color: var(--dsw-alias-label-caption);
+  /* WCAG AA: caption on the bluish-60 module fill measured 4.42:1; the
+     tinted-fill convention takes secondary (5.36:1), matching Linecontext. */
+  color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-bg-module-platform);
   user-select: none;
 }
