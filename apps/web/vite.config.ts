@@ -144,10 +144,10 @@ function injectPreloadHints(): Plugin {
   return {
     name: 'dsh-inject-preload-hints',
     transformIndexHtml: {
-      // Run before Vite's built-in modulepreload injector so only our font
-      // tags appear in the early head (order: 'pre'); Vite's modulepreload
-      // injection runs at 'post' and handles the entry chunks.
-      order: 'pre',
+      // The resolved bundle reaches ctx only at the 'post' stage of the build
+      // transform; at 'pre' ctx.bundle is undefined and no font tag is emitted.
+      // Vite's own modulepreload injector handles the entry chunks separately.
+      order: 'post',
       handler(html, ctx) {
         if (!ctx.bundle) return html
         const tags: string[] = []
