@@ -291,12 +291,16 @@ describe('connection client apply', () => {
       expect(handle.state.getSnapshot()).toBe('connected')
       expect(calls).toBe(1)
 
+      // watchBrowserNetwork debounces online/offline transitions by 500ms,
+      // so each flip lands only after the hold-off window elapses.
       browser.setOnline(false)
+      await vi.advanceTimersByTimeAsync(500)
       expect(handle.state.getSnapshot()).toBe('disconnected')
       await vi.advanceTimersByTimeAsync(10_000)
       expect(calls).toBe(1)
 
       browser.setOnline(true)
+      await vi.advanceTimersByTimeAsync(500)
       expect(handle.state.getSnapshot()).toBe('connecting')
       await vi.advanceTimersByTimeAsync(49)
       expect(calls).toBe(1)
@@ -544,10 +548,20 @@ describe('connection client apply', () => {
     const handle = await mount()
     const original = globalThis.fetch
     const abort = new AbortController()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     globalThis.fetch = vi.fn().mockResolvedValue(new Response('unavailable', { status: 503 }))
     try {
-      await expect(handle.rpc.call('/api', 'goals/create', {}, abort.signal))
-        .rejects.toThrow('HTTP 503')
+      // The default retry policy backs off ~1s/2s/4s (±25% jitter) on the
+      // retryable 503 before the final response returns to the caller, whose
+      // error contract reports the HTTP status.
+      vi.useFakeTimers()
+      const exhausted = handle.rpc.call('/api', 'goals/create', {}, abort.signal)
+      // Attach the rejection assertion before advancing so the exhausted call
+      // never sits unhandled while the backoff timers run.
+      const rejection = expect(exhausted).rejects.toThrow('HTTP 503')
+      await vi.advanceTimersByTimeAsync(10_000)
+      await rejection
+      vi.useRealTimers()
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'api/goals/create',
         expect.objectContaining({ signal: abort.signal }),
@@ -610,6 +624,7 @@ describe('connection client apply', () => {
       })
     } finally {
       globalThis.fetch = original
+      warnSpy.mockRestore()
     }
 
     for (const [channel, endpoint] of [

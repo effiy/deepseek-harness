@@ -7,7 +7,7 @@
  * observed targets and exposes a `flush(isIntersecting)` helper so the test
  * can simulate rows entering or leaving the viewport.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // IntersectionObserver shim (must run before ChatRecycler import)
@@ -291,6 +291,68 @@ describe('ChatRecycler', () => {
       expect(rows[5]!.hasAttribute('data-chat-recycled')).toBe(false)
       // All other rows (assistant kind) are recycled.
       expect(recycledCount(rows)).toBe(19)
+    })
+  })
+
+  describe('restore height absorption', () => {
+    beforeEach(() => {
+      const fixture = setupFixture(10)
+      scroller = fixture.scroller
+      column = fixture.column
+      rows = fixture.rows
+    })
+
+    /**
+     * Model per-state row heights: the recycled placeholder height vs the
+     * restored children height. React updates stashed children while they are
+     * detached, so the two can diverge — the drift the absorption compensates.
+     */
+    function statefulHeight(row: HTMLElement, recycled: number, restored: number): void {
+      Object.defineProperty(row, 'offsetHeight', {
+        configurable: true,
+        get: () => (row.hasAttribute('data-chat-recycled') ? recycled : restored),
+      })
+    }
+
+    it('reports the summed height restored rows gained above the reader', () => {
+      const absorbAbove = vi.fn()
+      recycler = new ChatRecycler({ tailKeep: 5, absorbAbove })
+      recycler.observe(scroller, column)
+      recycler.updateTurns(rows.map((_, i) => ({ turn: i + 1 })))
+      // Evict rows 1-5 at their rendered height; the tail stays interactive.
+      flushIntersection(false)
+      expect(recycledCount(rows)).toBe(5)
+      // Detached React updates grow the stashed children of the evicted rows.
+      for (const row of rows.slice(0, 5)) statefulHeight(row, ROW_HEIGHT, ROW_HEIGHT + 100)
+      // jsdom places every rect at zero: rows restore "above" the scrollport top.
+      flushIntersection(true)
+      expect(absorbAbove).toHaveBeenCalledTimes(1)
+      expect(absorbAbove).toHaveBeenCalledWith(500)
+    })
+
+    it('excludes rows restored below the reader and skips unchanged heights', () => {
+      const absorbAbove = vi.fn()
+      recycler = new ChatRecycler({ tailKeep: 5, absorbAbove })
+      recycler.observe(scroller, column)
+      recycler.updateTurns(rows.map((_, i) => ({ turn: i + 1 })))
+      flushIntersection(false)
+      statefulHeight(rows[0]!, ROW_HEIGHT, ROW_HEIGHT + 300)
+      statefulHeight(rows[1]!, ROW_HEIGHT, ROW_HEIGHT + 120)
+      // Row 2 restores below the scrollport top: its growth moves nothing visible.
+      vi.spyOn(rows[1]!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 900, 343, ROW_HEIGHT))
+      flushIntersection(true)
+      expect(absorbAbove).toHaveBeenCalledTimes(1)
+      expect(absorbAbove).toHaveBeenCalledWith(300)
+    })
+
+    it('does not call absorbAbove when restores match their placeholders', () => {
+      const absorbAbove = vi.fn()
+      recycler = new ChatRecycler({ tailKeep: 5, absorbAbove })
+      recycler.observe(scroller, column)
+      recycler.updateTurns(rows.map((_, i) => ({ turn: i + 1 })))
+      flushIntersection(false)
+      flushIntersection(true)
+      expect(absorbAbove).not.toHaveBeenCalled()
     })
   })
 })

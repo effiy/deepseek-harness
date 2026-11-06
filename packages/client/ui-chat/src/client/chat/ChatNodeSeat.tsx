@@ -150,8 +150,10 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       className={css.flowItem}
       /* Each flow row is a self-contained message unit screen readers can
        * navigate; live announcement stays with the visually-hidden status
-       * rows, never the streaming content itself. */
+       * rows, never the streaming content itself. tabIndex -1 keeps the row
+       * out of the Tab order while the feed's arrow navigation can focus it. */
       role="article"
+      tabIndex={-1}
       data-chat-anchor-key={flowKey}
       data-chat-flow-key={flowKey}
       data-chat-paging-anchor={routedNode.kind !== 'turn-process' || undefined}

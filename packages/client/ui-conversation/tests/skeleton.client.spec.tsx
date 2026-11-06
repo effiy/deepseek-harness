@@ -140,6 +140,10 @@ function mount(
     composerBlock?: { reason: string }
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Force the content factory's variant (the main panel always renders 'main'). */
+    contentVariant?: 'main' | 'embedded'
+    /** Give the session view stub a `[data-conversation-focus]` landing element. */
+    sessionFocusTarget?: boolean
   } = {},
 ) {
   const sessionId = 'sessionId' in options ? options.sessionId : SID
@@ -236,6 +240,9 @@ function mount(
       )
     }
     if (key === 'conversation.session') {
+      if (options.sessionFocusTarget === true) {
+        return <div data-testid="session-focus-target" data-conversation-focus="" tabIndex={-1} />
+      }
       return (
         <ConversationSession
           sessionId={SID}
@@ -353,7 +360,11 @@ function mount(
     )) as ConversationContentProps['useFactorySlot']
     return (
       <FactoryViewsTestContext.Provider value={common}>
-        <ConversationContent {...({ ...common, ...runtimeProps, ...input, useFactorySlot })} />
+        <ConversationContent {...({
+          ...common, ...runtimeProps, ...input,
+          ...(options.contentVariant === undefined ? {} : { variant: options.contentVariant }),
+          useFactorySlot,
+        })} />
       </FactoryViewsTestContext.Provider>
     )
   }) as ConversationSlotProps['renderFactorySlot']
@@ -378,6 +389,12 @@ function mount(
     view, store, wiring, sink, retargetWorkspace, session, conversation, slotCalls, lineageOwners, seatOwners, open,
     pickerOwner: () => pickerOwner,
     rerender: () => { view.rerender(<ConversationMainPanel {...props} />) },
+    /** Simulate a user-initiated Session switch: same mounted tree, new selection. */
+    switchSession: (next: SessionId) => {
+      ;(runtimeProps as { sessionId: SessionId | undefined }).sessionId = next
+      ;(props as { sessionId: SessionId | undefined }).sessionId = next
+      view.rerender(<ConversationMainPanel {...props} />)
+    },
   }
 }
 
@@ -846,5 +863,35 @@ describe('ConversationRoot resident composer', () => {
   it('hero phase renders no width handles (no transcript to size)', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
     expect(b.view.container.querySelector('[data-width-handle]')).toBeNull()
+  })
+})
+
+describe('Session-switch focus', () => {
+  it('never steals focus at startup and moves it to the conversation on a user switch', () => {
+    const b = mount(sessionSnapshotOf())
+    // The first Session seen is startup restoration: focus stays with the document.
+    expect(document.activeElement).toBe(document.body)
+    b.switchSession(sid('s2'))
+    expect(document.activeElement).toBe(b.view.container.querySelector('[data-conversation-content]'))
+  })
+
+  it('prefers the session view’s own focus target when one is offered', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { sessionFocusTarget: true })
+    b.switchSession(sid('s2'))
+    expect(document.activeElement).toBe(b.view.getByTestId('session-focus-target'))
+  })
+
+  it('leaves an active position inside the conversation alone', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { sessionFocusTarget: true })
+    const target = b.view.getByTestId('session-focus-target')
+    target.focus()
+    b.switchSession(sid('s2'))
+    expect(document.activeElement).toBe(target)
+  })
+
+  it('never takes focus from the main view in an embedded copy', () => {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { contentVariant: 'embedded' })
+    b.switchSession(sid('s2'))
+    expect(document.activeElement).toBe(document.body)
   })
 })

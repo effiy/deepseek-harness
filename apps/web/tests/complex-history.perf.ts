@@ -336,13 +336,15 @@ function smallSidebarFixture(): string {
   session.append('turn/start', {
     turn: 1,
   })
+  // Canonical recorded order: the step opens first, and system/message must be
+  // the first surface append (V4 protected-head rule).
+  session.append('step/start', { turn: 1, step: 1 })
+  appendSystemPrompt(session, 1, 1)
   const user = session.append('user/message', createUserMessage({
     content: text('Inspect this compact synthetic session.'),
     source: { kind: 'user' },
   }), { surfaceOp: 'append' })
   appendTitle(session, 'Synthetic sidebar session', user.seq)
-  session.append('step/start', { turn: 1, step: 1 })
-  appendSystemPrompt(session, 1, 1)
   appendRequestHeader(session, 1, 1)
   appendToolStep(session, 1, 1, 2)
   session.append('step/end', { turn: 1, step: 1 })
@@ -360,6 +362,10 @@ function longHistoryFixture(): string {
     session.append('turn/start', {
       turn,
     })
+    // Canonical recorded order: the step opens first, and turn 1's system/message
+    // must be the first surface append (V4 protected-head rule).
+    session.append('step/start', { turn, step: 1 })
+    if (turn === 1) appendSystemPrompt(session, turn, 1)
     const user = session.append('user/message', createUserMessage({
       content: text(
         `LONG_PERF_SENTINEL turn ${String(turn)}: analyze payload ${'u'.repeat(200)}`,
@@ -367,9 +373,6 @@ function longHistoryFixture(): string {
       source: { kind: 'user' },
     }), { surfaceOp: 'append' })
     if (turn === 1) appendTitle(session, LONG_SESSION_TITLE, user.seq)
-
-    session.append('step/start', { turn, step: 1 })
-    if (turn === 1) appendSystemPrompt(session, turn, 1)
     appendRequestHeader(session, turn, 1)
     if (turn % TOOL_TURN_INTERVAL === 0) {
       appendToolStep(session, turn, 1, TOOLS_PER_TOOL_TURN)
@@ -918,20 +921,20 @@ async function closePerformanceWorld(world: PerformanceWorld): Promise<void> {
   if (failures.length > 1) throw new AggregateError(failures, 'web performance teardown failed')
 }
 
-async function openPerformancePage(
-  world: PerformanceWorld,
-  expectedSessions: number,
-): Promise<Locator> {
+async function openPerformancePage(world: PerformanceWorld): Promise<Locator> {
   await world.page.goto(world.scaffold.authenticatedUrl, { waitUntil: 'load' })
   await world.page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-  const group = world.page.getByRole('treeitem').first()
-  await expect.poll(() => group.textContent(), { timeout: 30_000 })
-    .toContain(`${String(expectedSessions)} ${expectedSessions === 1 ? 'session' : 'sessions'}`)
-  return group
+  // Group rows render their label only; the seeded Ungrouped row is the
+  // user-visible barrier for sidebar session-data arrival.
+  await world.page.getByText('Ungrouped', { exact: true }).waitFor({ timeout: 30_000 })
+  return world.page.getByRole('treeitem').first()
 }
 
 async function openLongHistory(page: Page): Promise<number> {
-  await page.getByRole('textbox', { name: 'Search name, keywords...', exact: true })
+  // Search is a collapsed header action; expand it so the input is actionable.
+  const searchButton = page.getByRole('button', { name: 'Search sessions' })
+  if (await searchButton.getAttribute('aria-expanded') !== 'true') await searchButton.click()
+  await page.getByPlaceholder('Search session names', { exact: false })
     .fill('LONG_PERF_SENTINEL')
   const results = page.getByRole('tree', { name: 'Search results' }).getByRole('treeitem')
   await expect.poll(() => results.count(), { timeout: 60_000 }).toBe(1)
@@ -1010,11 +1013,12 @@ async function continueConversation(
         throw new Error(`continued turn ${String(index)} did not log its tool result`)
       }
       const message = toolResult.data.message
-      expect(message.isError).toBe(false)
-      expect(message.content
+      const resultText = message.content
         .filter(block => block.type === 'text')
         .map(block => block.text)
-        .join('')).toContain(spec.toolResultMarker)
+        .join('')
+      expect(message.isError, `continued tool result text: ${resultText}`).toBe(false)
+      expect(resultText).toContain(spec.toolResultMarker)
     }
     const user = turnEvents.find(
       event => event.type === 'user/message' && event.data.source.kind === 'user',
@@ -1212,9 +1216,10 @@ describe('manual web performance: complex workspace and history', () => {
       sidebarSessions: SIDEBAR_SESSION_COUNT,
       seedLongHistory: true,
     })
+    let testFailure: unknown
     try {
       const bootStarted = performance.now()
-      const group = await openPerformancePage(world, SIDEBAR_SESSION_COUNT + 1)
+      const group = await openPerformancePage(world)
       const bootReadyMs = performance.now() - bootStarted
       const page = world.page
       const cdp = await page.context().newCDPSession(page)
@@ -1321,8 +1326,19 @@ describe('manual web performance: complex workspace and history', () => {
       }, null, 2)}`)
       expect(world.tripwire.warnings).toEqual([])
       expect(world.tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      testFailure = error
+      throw error
     } finally {
-      await closePerformanceWorld(world)
+      try {
+        await closePerformanceWorld(world)
+      } catch (cleanupError) {
+        if (testFailure === undefined) throw cleanupError
+        throw new AggregateError(
+          [testFailure, cleanupError],
+          'cardinality performance test and teardown failed',
+        )
+      }
     }
   })
 
@@ -1332,8 +1348,9 @@ describe('manual web performance: complex workspace and history', () => {
       replay: performanceReplayOverride(COMPARISON_TURNS, comparisonTurn),
       seedLongHistory: true,
     })
+    let testFailure: unknown
     try {
-      await openPerformancePage(world, 1)
+      await openPerformancePage(world)
       const cdp = await world.page.context().newCDPSession(world.page)
       await cdp.send('Performance.enable')
       const opened = await measure(cdp, () => openLongHistory(world.page))
@@ -1354,8 +1371,19 @@ describe('manual web performance: complex workspace and history', () => {
       }, null, 2)}`)
       expect(world.tripwire.warnings).toEqual([])
       expect(world.tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      testFailure = error
+      throw error
     } finally {
-      await closePerformanceWorld(world)
+      try {
+        await closePerformanceWorld(world)
+      } catch (cleanupError) {
+        if (testFailure === undefined) throw cleanupError
+        throw new AggregateError(
+          [testFailure, cleanupError],
+          'default 24-turn performance test and teardown failed',
+        )
+      }
     }
   })
 
@@ -1365,8 +1393,9 @@ describe('manual web performance: complex workspace and history', () => {
       replay: performanceReplayOverride(COMPARISON_TURNS, comparisonTurn),
       seedLongHistory: true,
     })
+    let testFailure: unknown
     try {
-      await openPerformancePage(world, 1)
+      await openPerformancePage(world)
       const cdp = await world.page.context().newCDPSession(world.page)
       await cdp.send('Performance.enable')
       expect(await openLongHistory(world.page)).toBe(DEFAULT_HISTORY_TURNS)
@@ -1400,8 +1429,19 @@ describe('manual web performance: complex workspace and history', () => {
       }, null, 2)}`)
       expect(world.tripwire.warnings).toEqual([])
       expect(world.tripwire.pageErrors).toEqual([])
+    } catch (error) {
+      testFailure = error
+      throw error
     } finally {
-      await closePerformanceWorld(world)
+      try {
+        await closePerformanceWorld(world)
+      } catch (cleanupError) {
+        if (testFailure === undefined) throw cleanupError
+        throw new AggregateError(
+          [testFailure, cleanupError],
+          'expanded 500-turn performance test and teardown failed',
+        )
+      }
     }
   })
 

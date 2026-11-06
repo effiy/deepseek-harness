@@ -45,6 +45,7 @@ function openDb(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = () => {
       const db = request.result
+      /* v8 ignore next -- DB_VERSION is fixed at 1: the upgrade runs only at first creation, where the store cannot exist yet */
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
         store.createIndex('sessionId', 'sessionId', { unique: false })
@@ -142,7 +143,7 @@ export async function updateMessageStatus(
       putRequest.onsuccess = () => { resolve(); db.close() }
       putRequest.onerror = () => { reject(putRequest.error ?? new Error('Failed to update offline message')); db.close() }
     }
-    getRequest.onerror = () => { reject(getRequest.error ?? new Error('Failed to read offline message')) }
+    getRequest.onerror = () => { reject(getRequest.error ?? new Error('Failed to read offline message')); db.close() }
   })
 }
 
@@ -221,6 +222,7 @@ export async function drainQueue(handler: DrainHandler): Promise<number> {
 
   let drained = 0
   for (const message of pending) {
+    /* v8 ignore next -- autoIncrement injects keyPath 'id' into every stored record; the arm only guards the optional-id type */
     if (message.id === undefined) continue
     try {
       await updateMessageStatus(message.id, 'sending')

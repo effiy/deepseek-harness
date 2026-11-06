@@ -6,7 +6,7 @@
  *
  * Pattern follows @deepseek-ai/dsh-host-health-endpoint.
  *
- * @module @deepseek-ai/dsh-bot-status-public
+ * @module @deepseek-ai/dsh-host-bot-status-endpoint
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
@@ -16,7 +16,7 @@ import type { AgentStatus, Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 
 /** Stable Cordis plugin name. */
-export const name = 'bot-status-public'
+export const name = 'bot-status-endpoint'
 
 /** Services required for route registration and agent tracking. */
 export const inject = ['webServer', 'agents']
@@ -152,5 +152,5 @@ export function apply(ctx: Context): void {
     disposeCreated()
     disposeDisposed()
     disposeRoute()
-  }, 'bot-status-public: lifecycle')
+  }, 'bot-status-endpoint: lifecycle')
 }

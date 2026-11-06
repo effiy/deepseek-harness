@@ -199,7 +199,8 @@
     "tests/workflow-run.e2e.ts",
     "tests/mobile-viewport.e2e.ts",
     "tests/mobile-content-contract.e2e.ts",
-    "tests/keyboard-inset-acceptance.e2e.ts"
+    "tests/keyboard-inset-acceptance.e2e.ts",
+    "tests/chat-load-anchor-acceptance.e2e.ts"
   ],
   "references": [
     { "path": "../../packages/experimental/auto-review" },

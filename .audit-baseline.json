@@ -47,7 +47,20 @@
       "module": "extract-zip",
       "severity": "high",
       "title": "extract-zip unvalidated symlink path traversal",
-      "cves": []
+      "cves": [],
+      "accepted_risk": {
+        "status": "accepted",
+        "decided_at": "2026-11-06",
+        "approver": "技术管家·哲思（群主管拍板，抽查核实）",
+        "auditor": "DSH·配置审计·严审（三条证据独立复核，签核留痕）",
+        "proposer": "DSH·安全修复工兵·补天（yauzl 替换方案已否决）",
+        "evidence": [
+          "无修复版：npm latest 即 2.0.1（带毒版本），advisory 1139346/1193685 patched_versions=null 且 patched_versions_unpublished=true，上游 2021 后停更",
+          "输入受信、解压前强制哈希校验：scripts/primary-runtime/prepare.ts 的 downloadPrimaryRuntimeAsset（L39-42）对下载字节计算 sha256/sha512，digest 不匹配即 rmSync+throw，校验通过才返回路径供 extractZip 消费；URL 与 digest 由 lock.json 锁定。apps/desktop/scripts/prepare-runtime.ts 走 @electron/get downloadArtifact（默认对照官方 SHASUMS256.txt 校验，源为 Electron GitHub releases），非 lock.json 机制",
+          "仅 dev/构建面：根 package.json 与 apps/desktop/package.json 中 extract-zip 均为 devDependencies；消费点仅 2 个构建脚本 + 1 个测试 mock（apps/desktop/tests/runtime-preparation.spec.ts），不进产品运行时 bundle"
+        ],
+        "review_trigger": "extract-zip 发布修复版、新增消费点、或解压输入源变更时立即重评"
+      }
     },
     "1164782": {
       "module": "fflate",
@@ -59,7 +72,20 @@
       "module": "extract-zip",
       "severity": "high",
       "title": "extract-zip allows arbitrary file writes through symlink archive entries",
-      "cves": []
+      "cves": [],
+      "accepted_risk": {
+        "status": "accepted",
+        "decided_at": "2026-11-06",
+        "approver": "技术管家·哲思（群主管拍板，抽查核实）",
+        "auditor": "DSH·配置审计·严审（三条证据独立复核，签核留痕）",
+        "proposer": "DSH·安全修复工兵·补天（yauzl 替换方案已否决）",
+        "evidence": [
+          "无修复版：npm latest 即 2.0.1（带毒版本），advisory 1139346/1193685 patched_versions=null 且 patched_versions_unpublished=true，上游 2021 后停更",
+          "输入受信、解压前强制哈希校验：scripts/primary-runtime/prepare.ts 的 downloadPrimaryRuntimeAsset（L39-42）对下载字节计算 sha256/sha512，digest 不匹配即 rmSync+throw，校验通过才返回路径供 extractZip 消费；URL 与 digest 由 lock.json 锁定。apps/desktop/scripts/prepare-runtime.ts 走 @electron/get downloadArtifact（默认对照官方 SHASUMS256.txt 校验，源为 Electron GitHub releases），非 lock.json 机制",
+          "仅 dev/构建面：根 package.json 与 apps/desktop/package.json 中 extract-zip 均为 devDependencies；消费点仅 2 个构建脚本 + 1 个测试 mock（apps/desktop/tests/runtime-preparation.spec.ts），不进产品运行时 bundle"
+        ],
+        "review_trigger": "extract-zip 发布修复版、新增消费点、或解压输入源变更时立即重评"
+      }
     },
     "1241206": {
       "module": "katex",

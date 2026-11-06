@@ -188,8 +188,8 @@
     # web-runtime row owns; Connection reads trust authorities from webStartup.
     # Public bot-status endpoint consumed by YiVad: exposes agent/status
     # through an unauthenticated GET /bot/status with CORS headers.
-    - id: bot-status-public
-      name: '@deepseek-ai/dsh-bot-status-public'
+    - id: bot-status-endpoint
+      name: '@deepseek-ai/dsh-host-bot-status-endpoint'
 
     # This row rejects wildcard binds.
     - id: webserver

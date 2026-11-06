@@ -404,17 +404,31 @@ export function useTouchCapability(): TouchCapability
 | `packages/client/web/src/boot.ts` | `installKeyboardInset()` 调用（L56） |
 | `packages/client/ui-conversation/src/client/skeleton/ConversationRoot.module.css` | `.scrollBody`: `overscroll-behavior-y: contain`、`-webkit-overflow-scrolling: touch`、`scroll-padding-bottom`、`touch-action: pan-y`；`.composerSeat`: `margin-bottom` → `transform: translateY()` |
 | `packages/client/ui-chat/src/client/chat/ChatView.module.css` | `.scroll`: `overscroll-behavior-y: contain`、`-webkit-overflow-scrolling: touch`、`touch-action: pan-y pinch-zoom` |
-| `packages/client/ui-conversation/src/client/skeleton/InputBar.tsx` | VirtualKeyboard 生命周期：vkVisible 状态 + DraftEditor readOnly/inputMode 接线 + VK toggle（含 blur） + VirtualKeyboard 渲染 |
-| `packages/client/ui-conversation/src/client/locales.ts` | +4 keys × 2 locales：`input.keyboard` / `.hide` / `.done` / `.space` |
+| `packages/client/ui-conversation/src/client/skeleton/InputBar.tsx` | ~~VK 生命周期接线~~（2026-11-06 已删）→ 现状：createTapGuard 防连击（send/stop 双路径，Story 5.6）+ focusDraftEditor 焦点恢复（修复 8b04fee728 回归，§9.5） |
+| `packages/client/ui-conversation/src/client/locales.ts` | −8 条死键（`input.keyboard`/`.hide`/`.done`/`.space` × zh/en，VK 退役清理，grep 复核 = 0 残留） |
+| `packages/client/ui-conversation/src/client/virtual-keyboard/` | **已删除** 3 文件 430 行（layouts.ts 76 / VirtualKeyboard.module.css 189 / VirtualKeyboard.tsx 165，铁甲孤儿裁定） |
+| `packages/client/ui-conversation/src/client/input/editor/DraftEditor.tsx` + `ComposerContentEditable.tsx` | `readOnly`/`inputMode` 死 props 移除（全仓消费方 = 0，grep 验证） |
+| `packages/client/ui-primitives/src/tap-guard.ts`（+ index 导出） | **新增** createTapGuard 共享 util（300ms 窗、按键独立，Story 5.6） |
+| `packages/client/ui-sidebar/src/client/SidebarRoot.tsx` | `<aside>` 接 useSwipeGesture onSwipeLeft（Story 2.6 左滑关闭，+3 specs） |
+| `packages/client/ui-primitives/src/markdown/MarkdownText.module.css` | 链接热区 `::after` 居中伪元素 min 44×44（Story 3.3，z-index:−1 文本永远赢 hit-test，相邻链接零误触） |
+| `packages/client/ui-layout/src/client/service.ts` | LayoutController.toggleSidebar/selectPanel 接 tapGuard（Story 5.6，+2 specs） |
+| `apps/web/tests/keyboard-inset-acceptance.e2e.ts` | **新增** Playwright 原生键盘 E2E 验收 harness（§9，9 测试/28 断言） |
+| `packages/client/ui-conversation/tests/input-bar.client.spec.tsx` | +VK 架构守护 describe、+4 防连击 specs、2 条 WeChat-style 焦点测试重写（§9.5） |
 
 ## 附录 B：测试覆盖
 
 | 文件 | 语言 | 用例 | 状态 |
 |------|------|------|------|
 | `packages/client/web/tests/keyboard-inset-scenarios.spec.ts` | vitest | 27 | ✅ 全绿 |
+| `apps/web/tests/keyboard-inset-acceptance.e2e.ts` | vitest + playwright | 9（28 断言） | ✅ 全绿 + 变异双向确认（§9.3） |
+| `packages/client/ui-conversation/tests/input-bar.client.spec.tsx` | vitest | 120 | ✅ 全绿（VK 架构守护 + 防连击 + WeChat-style 焦点） |
+| `packages/client/ui-primitives/tests/tap-guard.client.spec.ts` | vitest | 4 | ✅ 全绿 |
 
 ## 附录 C：已知局限
 
 1. `document.querySelector('[data-conversation-scroll]')` 只补偿第一个滚动容器——多会话分屏场景第二个不受影响（产品当前无此场景）
 2. `--dsh-keyboard-height-prev` 在 CSS 中未消费（仅 JS 使用）——transition 动画如需 delta-aware 可未来扩展
 3. SidebarEdgeZone 断点硬编码 640px，与新的实际移动布局触发宽度 900px 不同步——由汉堡按钮补位
+4. E2E harness 的 iOS 场景为 Chromium 公式级验收（无 WebKit 真机）：vv 输入组合与事件路径忠实，渲染引擎非 Safari——真机抽查为发布前置项
+5. harness replica 防漂移锚点仅覆盖三条核心消费声明（transform/transition/scroll-padding）——composerSeat/scrollBody 的其余规则变更需人工同步 replica
+6. Playwright 浏览器二进制与 playwright 版本强耦合：toolchain bump 后须跑 `pnpm exec playwright install chromium-headless-shell`，否则全 e2e lane 断（2026-11-06 事故，已解锁）

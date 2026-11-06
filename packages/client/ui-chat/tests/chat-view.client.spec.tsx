@@ -3708,6 +3708,21 @@ describe('ChatView', () => {
     expect(view.queryByLabelText('回到底部')).toBeNull()
   })
 
+  it('claims tail-follow anchoring only after the first landing arms manual follow', () => {
+    // The attribute switches the scrollport from native anchoring to the manual
+    // follow system (ChatView.module.css overflow-anchor rules). During history
+    // loading the manual system is gated on open, so an early claim would leave
+    // loading-phase row growth without any compensator (mobile CLS regression).
+    const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] }, { openState: 'loading' })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[data-chat-flow]')!.parentElement as HTMLDivElement
+    installScrollMetrics(scroller, 1_000, 300)
+    expect(view.container.querySelector('[data-chat-following-tail]')).toBeNull()
+    act(() => { h.setSession({ openState: 'open' }) })
+    expect(scroller.scrollTop).toBe(700)
+    expect(view.container.querySelector('[data-chat-following-tail]')).not.toBeNull()
+  })
+
   it('keeps following when a stream-finalization shrink clamp delivers its scroll', () => {
     const h = makeHarness({ nodes: [user(1, 'q'), assistant(2, 'a')] })
     const view = render(<h.ChatView {...h.props} />)
@@ -4318,5 +4333,45 @@ describe('ChatView', () => {
     expect(status?.querySelector('animate')).toBeNull()
     act(() => { h.setSession({ running: false }) })
     expect(column.querySelector('[data-chat-running]')).toBeNull()
+  })
+})
+
+describe('Chat feed keyboard navigation', () => {
+  it('exposes the transcript as an arrow-navigable feed of message rows', () => {
+    const h = makeHarness({ nodes: [user(1, 'first message'), assistant(2, 'a reply')] })
+    const view = render(<h.ChatView {...h.props} />)
+    const column = view.container.querySelector<HTMLElement>('[data-chat-flow]')!
+    expect(column.getAttribute('role')).toBe('feed')
+    expect(column.getAttribute('aria-label')).toBe('消息列表')
+    expect(column.tabIndex).toBe(0)
+    const region = view.container.querySelector<HTMLElement>('[data-conversation-focus]')!
+    expect(region.tabIndex).toBe(-1)
+    const articles = [...view.container.querySelectorAll<HTMLElement>('[role="article"]')]
+    expect(articles.length).toBeGreaterThanOrEqual(2)
+    expect(articles.every(article => article.tabIndex === -1)).toBe(true)
+    const first = articles[0]!
+    const last = articles[articles.length - 1]!
+    expect(first.textContent).toContain('first message')
+    expect(last.textContent).toContain('a reply')
+    // One Tab stop enters the feed; the arrows walk the rows. The middle
+    // turn-process row folds under compact policy, so only the ends are pinned.
+    column.focus()
+    fireEvent.keyDown(column, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(first, { key: 'End' })
+    expect(document.activeElement).toBe(last)
+    fireEvent.keyDown(last, { key: 'ArrowUp' })
+    expect(document.activeElement).not.toBe(last)
+    fireEvent.keyDown(last, { key: 'Home' })
+    expect(document.activeElement).toBe(first)
+  })
+
+  it('withholds feed semantics while the transcript has no rows', () => {
+    const h = makeHarness({}, { openState: 'loading' })
+    const view = render(<h.ChatView {...h.props} />)
+    const column = view.container.querySelector<HTMLElement>('[data-chat-flow]')!
+    expect(column.hasAttribute('role')).toBe(false)
+    expect(column.hasAttribute('tabindex')).toBe(false)
+    expect(column.hasAttribute('aria-label')).toBe(false)
   })
 })

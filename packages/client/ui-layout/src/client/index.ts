@@ -15,11 +15,13 @@ import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
+import { registerBottomNav } from './MobileBottomNav.tsx'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import { SIDEBAR_AUTO_COLLAPSE } from './columns.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { en, zh } from './shortcut-locales.ts'
+import { NAV_NS, navEn, navZh } from './locale.ts'
 import { ThemePresenter } from './theme-presenter.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
@@ -158,6 +160,7 @@ export const inject = ['slots', 'theme', 'locale', 'shortcuts']
  */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh, en }), 'layout: command labels')
+  ctx.effect(() => ctx.locale.register(NAV_NS, { zh: navZh, en: navEn }), 'layout: bottom-nav labels')
   const t = ctx.locale.bind('shortcuts.layout')
 
   ctx.effect(() => {
@@ -208,12 +211,19 @@ export function apply(ctx: ClientContext): void {
         'web:windows': { code: 'KeyB', modifiers: ['primary', 'alt'] },
       },
       regions: ['page', 'editable'], modals: [],
-      resolve: () => ({ status: 'handled', run: () => { layout.toggleSidebar() } }),
+      // Discrete key presses are deliberate — the shortcut layer already drops
+      // key-repeat — so this command bypasses the touch double-tap
+      // deduplication LayoutController.toggleSidebar applies to pointer faces.
+      resolve: () => ({ status: 'handled', run: () => { instance.actions.toggleSidebar() } }),
     })
+    // Default shell.bottom occupant: the mobile bar (CSS hides it above the
+    // tablet breakpoint); a later dynamic registrant shadows it while mounted.
+    const disposeBottomNav = registerBottomNav(ctx, instance)
     const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
     retainMainPanels()
     return () => {
       disposeShortcut()
+      disposeBottomNav()
       layout.dispose()
       disposePanels()
       disposeRegistration()

@@ -1,16 +1,24 @@
 /**
- * Bottom navigation bar rendered on narrow viewports.  Registered into the
- * `shell.bottom` slot through a per-registration `inject` that provides the
- * layout store instance as a bare observable (the framework binds it to
- * `useLayoutStore`) and the bound `actions`.
+ * Bottom navigation bar rendered on narrow viewports.  {@link registerBottomNav}
+ * seats it as the default composition's `shell.bottom` occupant: the
+ * registration declares the `layout.bottom-nav` locale (the framework injects
+ * the `t` seat) and a per-registration `inject` carrying the bound `actions`
+ * and the layout store instance as a bare observable (the renderer binds it to
+ * `useLayoutStore`).  A later dynamic registrant (the experimental inspector
+ * panel) shadows the bar at a lower priority; removing it restores the bar.
  *
  * The component always renders; CSS `@media (max-width: 899px)` on `.root`
  * hides the bar above the `--ds-bp-tablet` threshold (900 px) so the footer
  * row stays at zero height on wide viewports.
  */
+import type { JSX } from 'react'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import { NAV_NS, type BottomNavKey } from './locale.ts'
 import type { MainPanelId, PanelActions } from './service.ts'
+import type { createLayoutStore } from './stores.ts'
 import css from './MobileBottomNav.module.css'
 
 // ---------------------------------------------------------------------------
@@ -66,15 +74,15 @@ function SettingsIcon() {
 
 interface NavButton {
   id: MainPanelId | null
-  label: string
+  labelKey: BottomNavKey
   Icon: () => JSX.Element
 }
 
 const NAV_BUTTONS: readonly NavButton[] = [
-  { id: null,                                        label: 'Chat',       Icon: ChatIcon },
-  { id: brandString<MainPanelId>('workspace'),       label: 'Workspace',  Icon: WorkspaceIcon },
-  { id: brandString<MainPanelId>('schedule'),        label: 'Schedule',   Icon: ScheduleIcon },
-  { id: brandString<MainPanelId>('settings'),        label: 'Settings',   Icon: SettingsIcon },
+  { id: null,                                        labelKey: 'nav.chat',      Icon: ChatIcon },
+  { id: brandString<MainPanelId>('workspace'),       labelKey: 'nav.workspace', Icon: WorkspaceIcon },
+  { id: brandString<MainPanelId>('schedule'),        labelKey: 'nav.schedule',  Icon: ScheduleIcon },
+  { id: brandString<MainPanelId>('settings'),        labelKey: 'nav.settings',  Icon: SettingsIcon },
 ]
 
 // ---------------------------------------------------------------------------
@@ -84,17 +92,25 @@ const NAV_BUTTONS: readonly NavButton[] = [
 // ---------------------------------------------------------------------------
 
 /** The subset of LayoutState the bottom nav reads. */
-interface LayoutSnapshot {
+export interface LayoutSnapshot {
+  /** Main-panel selection; `null` is the conversation. */
   panelInfo: { activePanelId: MainPanelId | null }
+  /** Narrow-viewport sidebar override state. */
   layoutInfo: { narrowExpanded: boolean }
 }
 
-export interface MobileBottomNavProps {
-  /** Bound layout store actions (selectPanel, …). */
+/** The inject face {@link registerBottomNav} supplies at the registration. */
+export interface BottomNavInjected {
+  /** Bound layout store actions (selectPanel, toggleSidebar, …). */
   actions: PanelActions
-  /** Framework-bound selector hook over the injected store observable. */
-  useLayoutStore: SnapshotSelectorHook<LayoutSnapshot>
+  /** The layout store instance; the renderer binds it to `useLayoutStore`. */
+  hooks: { layoutStore: HostObservable<LayoutSnapshot> }
 }
+
+/** Composed props: the frame's runtime share, the declared locale's `t`, and the inject face. */
+export type MobileBottomNavProps = PropsRuntime<'shell.bottom'>
+  & PropsLocale<'layout.bottom-nav'>
+  & InjectFace<BottomNavInjected>
 
 function HamburgerIcon() {
   return (
@@ -109,16 +125,16 @@ function HamburgerIcon() {
   )
 }
 
-export function MobileBottomNav({ actions, useLayoutStore }: MobileBottomNavProps) {
+export function MobileBottomNav({ actions, useLayoutStore, t }: MobileBottomNavProps) {
   const activePanelId = useLayoutStore(s => s.panelInfo.activePanelId)
   const narrowExpanded = useLayoutStore(s => s.layoutInfo.narrowExpanded)
 
   return (
-    <nav className={css.root} role="navigation" aria-label="Main navigation">
+    <nav className={css.root} role="navigation" aria-label={t('nav.mainNavigation')}>
       <button
         className={css.hamburger}
         onClick={() => { actions.toggleSidebar() }}
-        aria-label="Toggle sidebar"
+        aria-label={t('nav.toggleSidebar')}
         aria-expanded={narrowExpanded}
       >
         <HamburgerIcon />
@@ -127,10 +143,10 @@ export function MobileBottomNav({ actions, useLayoutStore }: MobileBottomNavProp
       <div className={css.tabGroup}>
         {NAV_BUTTONS.map(btn => (
           <button
-            key={btn.label}
+            key={btn.labelKey}
             className={`${css.button} ${activePanelId === btn.id ? css.active : ''}`}
             onClick={() => { actions.selectPanel(btn.id) }}
-            aria-label={btn.label}
+            aria-label={t(btn.labelKey)}
             aria-current={activePanelId === btn.id ? 'page' : undefined}
           >
             <btn.Icon />
@@ -139,4 +155,31 @@ export function MobileBottomNav({ actions, useLayoutStore }: MobileBottomNavProp
       </div>
     </nav>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Registration.
+// ---------------------------------------------------------------------------
+
+/** The shared layout store instance (the store handle's created product). */
+export type LayoutStoreInstance = ReturnType<ReturnType<typeof createLayoutStore>['create']>
+
+/**
+ * Seat the bottom nav as the default composition's `shell.bottom` occupant.
+ * The registration declares the `layout.bottom-nav` locale and injects the
+ * bound store actions plus the store instance as a bare observable; the
+ * renderer binds the observable to the component's `useLayoutStore` seat.
+ * @param ctx - client context owning the registration.
+ * @param instance - the shared layout store instance the frame renders from.
+ * @returns disposer removing the registration.
+ */
+export function registerBottomNav(ctx: ClientContext, instance: LayoutStoreInstance): () => void {
+  return ctx.slots.register({
+    name: 'shell.bottom',
+    locale: NAV_NS,
+    inject: (): BottomNavInjected => ({
+      actions: instance.actions,
+      hooks: { layoutStore: instance },
+    }),
+  }, MobileBottomNav)
 }

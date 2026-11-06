@@ -13,6 +13,8 @@ import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layo
 import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-layout'
 import type { MainPanelId } from '../src/client/service.ts'
 import type { createLayoutStore } from '../src/client/stores.ts'
+import { MobileBottomNav } from '../src/client/MobileBottomNav.tsx'
+import { NAV_NS } from '../src/client/locale.ts'
 
 const owners = new Set<Fiber>()
 let originalRootStyle: string | null
@@ -96,6 +98,22 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('shell.leading')).toEqual({ kind: 'single', scope: 'root' })
   })
 
+  it('seats MobileBottomNav as the default shell.bottom occupant', async () => {
+    const { ctx, slots } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const instance = (slots.entries('root')[0]!.store as ReturnType<typeof createLayoutStore>).create()
+    const entries = slots.entries('shell.bottom')
+    expect(entries).toHaveLength(1)
+    expect(entries[0]!.component).toBe(MobileBottomNav)
+    expect(entries[0]!.locale).toBe(NAV_NS)
+    // The inject face hands the component the same shared instance the frame
+    // renders from: bound actions plus the store as a bare observable.
+    const face = entries[0]!.inject!()
+    expect(face.actions).toBe(instance.actions)
+    expect((face.hooks as { layoutStore: unknown }).layoutStore).toBe(instance)
+  })
+
   it('shares a pre-created instance between service actions, root rendering, and panelInfo', async () => {
     const { ctx, slots, rendererHost } = await bench()
     const fiber = ctx.plugin({ inject: [...inject], apply })
@@ -158,6 +176,7 @@ describe('ui-layout client apply', () => {
     await fiber.await()
     const host = rendererHost()
     expect(host.root.getSnapshot().hooks.panelInfo).toBeDefined()
+    expect(slots.entries('shell.bottom')).toHaveLength(1)
     await fiber.dispose()
     expect(ctx.get('layout')).toBeUndefined()
     expect(slots.entries('root')).toHaveLength(0)

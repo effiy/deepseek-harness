@@ -84,6 +84,24 @@ export function ConversationContent(props: ConversationContentProps) {
     }
   }, [pendingWorkspaceId, sessionWorkspace?.workspaceId, workspaces.phase, pendingWorkspace])
 
+  // A Session switch moves the reading position to the new Conversation so
+  // keyboard and screen-reader users land on the content they navigated to.
+  // The first Session seen is startup restoration and never steals focus; an
+  // embedded copy leaves focus with the main view; a position already inside
+  // the body (the composer survives the switch) stays put.
+  const lastSession = useRef<ConversationContentProps['sessionId']>(undefined)
+  useEffect(() => {
+    if (sessionId === undefined) return
+    const previous = lastSession.current
+    lastSession.current = sessionId
+    if (previous === undefined || previous === sessionId || props.variant === 'embedded') return
+    /* v8 ignore next -- the callback ref binds the body during commit, before any Session-switch effect runs. */
+    if (body === null) return
+    if (body.contains(document.activeElement)) return
+    const target = body.querySelector<HTMLElement>('[data-conversation-focus]') ?? body
+    target.focus({ preventScroll: true })
+  }, [sessionId, body, props.variant])
+
   const zone: InputZone | undefined =
     session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 
@@ -190,6 +208,7 @@ export function ConversationContent(props: ConversationContentProps) {
     <section
       ref={bodyRef}
       className={clsx(css.body, props.variant === 'embedded' && css.embeddedBody)}
+      tabIndex={-1}
       data-conversation-content=""
       data-conversation-session={sessionId}
       data-conversation-region="chat"

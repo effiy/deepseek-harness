@@ -34,6 +34,8 @@ interface BaselineAdvisory {
   severity: string
   title: string
   cves: string[]
+  /** Auditor-written sign-off record; never produced by this gate, preserved across baseline updates. */
+  accepted_risk?: Record<string, unknown>
 }
 
 /** The committed baseline shape. */
@@ -155,9 +157,26 @@ function main(): void {
 
   // 2. Baseline update mode
   if (updateBaseline) {
+    const previous = readBaseline()
     const baseline = buildBaseline(live)
+    // Audit sign-off records are auditor-written annotations, not gate output:
+    // carry them onto the matching advisory so an update never silently drops
+    // an accepted-risk decision. An annotation whose advisory disappeared from
+    // the live audit is dropped with it — the risk it accepted no longer exists.
+    let carried = 0
+    for (const [id, adv] of Object.entries(baseline.advisories)) {
+      const prior = previous?.advisories[id]
+      if (prior?.accepted_risk !== undefined) {
+        adv.accepted_risk = prior.accepted_risk
+        carried++
+      }
+    }
     writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n')
-    console.log(`check-ci-audit: baseline written — ${Object.keys(baseline.advisories).length} advisories (${baseline.summary.high} high, ${baseline.summary.critical} critical)`)
+    console.log(
+      `check-ci-audit: baseline written — ${Object.keys(baseline.advisories).length} advisories`
+      + ` (${baseline.summary.high} high, ${baseline.summary.critical} critical)`
+      + (carried > 0 ? `, ${carried} accepted-risk annotation(s) carried over` : ''),
+    )
     return
   }
 

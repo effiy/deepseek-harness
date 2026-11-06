@@ -560,3 +560,27 @@ it('releases a removed paging row without navigating to unrelated content', () =
   expect(h.viewport.preserving).toBe(false)
   expect(h.scroller.scrollTop).toBe(80)
 })
+
+it('absorbAbove shifts the reader by restored height without reader attribution', () => {
+  const h = fixture()
+  h.column.scrollTop = 400
+  h.viewport.acknowledge(scrollMetrics(h.column))
+  // A recycler restore above the reader grows the range, then the ledger write.
+  Object.defineProperty(h.column, 'scrollHeight', { configurable: true, value: 2_500 })
+  h.viewport.absorbAbove(500)
+  expect(h.column.scrollTop).toBe(900)
+  expect(h.viewport.readScroll()?.movedByReader).toBe(false)
+})
+
+it('absorbAbove clamps to the scroll range and no-ops while detached', () => {
+  const h = fixture()
+  h.column.scrollTop = 1_500
+  h.viewport.absorbAbove(500) // floor = 2000 − 300
+  expect(h.column.scrollTop).toBe(1_700)
+  h.viewport.absorbAbove(-200)
+  expect(h.column.scrollTop).toBe(1_500)
+  h.viewport.absorbAbove(0)
+  expect(h.column.scrollTop).toBe(1_500)
+  h.viewport.detach()
+  h.viewport.absorbAbove(100)
+})

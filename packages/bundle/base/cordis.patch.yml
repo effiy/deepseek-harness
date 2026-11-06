@@ -229,6 +229,14 @@
           maxExportBatchSize: 2048
           exportTimeoutMillis: 1500
 
+    # Structured JSON-lines process logging for aggregation systems. Inert
+    # unless DSH_LOG_FILE names a path; size rotation bounds disk usage at
+    # maxFileSizeBytes x (maxFiles + 1).
+    - id: structured-logging
+      name: '@deepseek-ai/dsh-structured-logging'
+      config:
+        file: !!js process.env.DSH_LOG_FILE || undefined
+
     - id: subprocess
       name: '@deepseek-ai/dsh-subprocess-local'
 

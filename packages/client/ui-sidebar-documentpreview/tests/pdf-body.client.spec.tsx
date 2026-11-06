@@ -242,11 +242,16 @@ describe('PDF body', () => {
     scrollport.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true,
       deltaMode: WheelEvent.DOM_DELTA_PAGE, deltaY: -1 }))
     act(() => { h.controller.abort() })
+    // Environment intersection delivery records the visible page while the
+    // tab is open, so the entry at close may carry page state; it must never
+    // carry the aborted gesture's zoom, and no write may touch it afterwards.
+    const closed = h.instance.getSnapshot().byTab[h.tabId]
+    expect(closed?.zoom).toBeUndefined()
     scrollport.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, deltaY: -1 }))
     await act(async () => { await vi.advanceTimersByTimeAsync(120) })
-    expect(h.instance.getSnapshot().byTab[h.tabId]).toBeUndefined()
+    expect(h.instance.getSnapshot().byTab[h.tabId]).toBe(closed)
     view.unmount()
-    expect(h.instance.getSnapshot().byTab[h.tabId]).toBeUndefined()
+    expect(h.instance.getSnapshot().byTab[h.tabId]).toBe(closed)
   })
 
   it('redraws only nearby pages and refreshes a retained page when it returns at the new zoom', async () => {

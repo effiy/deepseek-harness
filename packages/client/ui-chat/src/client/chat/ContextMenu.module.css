@@ -1,13 +1,12 @@
-/* ── WeChat-style long-press context menu ─────────────────────────── */
+/* ── Long-press context menu — functional shell over the shared MenuSurface
+   material (the component owns the fill, blur, and outer radius) ────────── */
 
 .menu {
   position: fixed;
   z-index: 100;
   min-width: 160px;
   max-width: 220px;
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
-  /* WeChat menu shadow: subtle depth without a heavy backdrop */
+  /* WeChat menu shadow: subtle depth under the shared translucent material */
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
   overflow: hidden;
   /* Enter animation: scale up + fade in from finger origin */

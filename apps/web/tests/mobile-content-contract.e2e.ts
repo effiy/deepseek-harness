@@ -6,8 +6,11 @@
  * 3.4 (wide tables ride a scroll wrapper), 3.5 (wide images stay contained),
  * 3.6 (image lightbox preview opens), 4.6 (a failed image degrades to its alt
  * fallback), 2.9 (the composer draft survives a bottom-nav panel switch),
- * 1.5 (portrait↔landscape rotation keeps the layout intact), and 4.2 (records
- * the confirmed absence of a non-modal offline indicator).
+ * 1.5 (portrait↔landscape rotation keeps the layout intact), 4.2 (records the
+ * confirmed absence of a non-modal offline indicator), and the shell.bottom
+ * default-occupant contract landed with the 2026-11-06 bottom-nav wiring:
+ * the bar renders at phone width with every `layout.bottom-nav` label
+ * resolved, and its CSS gate hides it at desktop width.
  *
  * The seeded session carries one assistant message with an over-wide fenced
  * code line, a five-column table, one route-fulfilled wide SVG image, and one
@@ -187,11 +190,12 @@ describe('web e2e: mobile content contracts (gap-analysis ⚠️ items)', () => 
     const codeMetrics = await code.evaluate(element => ({
       scrollWidth: element.scrollWidth,
       clientWidth: element.clientWidth,
-      overflowX: getComputedStyle(element).overflowX,
+      whiteSpace: getComputedStyle(element).whiteSpace,
     }))
-    // The over-wide line scrolls inside the block instead of breaking the page.
-    expect(codeMetrics.scrollWidth).toBeGreaterThan(codeMetrics.clientWidth)
-    expect(['auto', 'scroll']).toContain(codeMetrics.overflowX)
+    // The over-wide line wraps inside the block (the shipped CodeBlock pre is
+    // pre-wrap + break-all) instead of breaking the page.
+    expect(codeMetrics.scrollWidth).toBe(codeMetrics.clientWidth)
+    expect(codeMetrics.whiteSpace).toBe('pre-wrap')
 
     const tableWrapper = page.locator('[class*="tableScroll"]').first()
     await tableWrapper.scrollIntoViewIfNeeded()
@@ -262,6 +266,34 @@ describe('web e2e: mobile content contracts (gap-analysis ⚠️ items)', () => 
     await nav.getByRole('button', { name: 'Chat', exact: true }).click()
     await composer.waitFor({ state: 'visible', timeout: 15_000 })
     expect(await composer.textContent()).toContain(DRAFT_TEXT)
+  }, 90_000)
+
+  it('wiring — the shell.bottom bar renders at phone width with all six locale labels', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-mobile-bottom-nav'))
+    // Set the phone viewport explicitly so this case also stands alone under
+    // a `-t` filter; a fresh load keeps Chat (panel id null) active, and 2.9
+    // ends on Chat as well, so the aria-current assertion holds in both runs.
+    await page.setViewportSize({ width: 375, height: 812 })
+    const nav = page.getByRole('navigation', { name: 'Main navigation' })
+    await nav.waitFor({ state: 'visible', timeout: 15_000 })
+    // The five buttons plus the nav's own accessible name carry all six
+    // `layout.bottom-nav` keys; an unresolved key would surface verbatim
+    // (e.g. "nav.chat") instead of the English dictionary value.
+    for (const label of ['Chat', 'Workspace', 'Reminders', 'Settings', 'Toggle left sidebar']) {
+      await nav.getByRole('button', { name: label, exact: true })
+        .waitFor({ state: 'visible', timeout: 10_000 })
+    }
+    // The active tab reads the real layout store through the registration's
+    // inject/hooks binding — the composition-level counterpart of the
+    // hand-built SlotTestRuntime spec in ui-layout.
+    const chat = nav.getByRole('button', { name: 'Chat', exact: true })
+    expect(await chat.getAttribute('aria-current')).toBe('page')
+    // The occupant registers unconditionally; the CSS gate (display: flex
+    // only at ≤900px) keeps the bar out of the desktop accessibility tree.
+    await page.setViewportSize({ width: 1680, height: 1000 })
+    await nav.waitFor({ state: 'hidden', timeout: 15_000 })
+    await page.setViewportSize({ width: 375, height: 812 })
+    await nav.waitFor({ state: 'visible', timeout: 15_000 })
   }, 90_000)
 
   it('1.5 — rotation to landscape and back keeps the layout intact', async () => {

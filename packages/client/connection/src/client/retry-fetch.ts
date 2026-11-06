@@ -110,7 +110,9 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
  *
  * @param fetchImpl - The underlying fetch (or RpcFetch) to decorate.
  * @param partialPolicy - Retry timing overrides; absent uses defaults.
- * @returns A decorated fetch with the same signature.
+ * @returns A decorated fetch with the same signature. When every attempt met
+ * a retryable status, the final response returns for the caller's own HTTP
+ * status reporting; a retryable network error rethrows.
  */
 export function createRetryFetch(
   fetchImpl: RpcFetch,
@@ -150,7 +152,10 @@ export function createRetryFetch(
       await sleep(delay, signal ?? undefined)
     }
 
-    // All retries exhausted.
+    // All retries exhausted. A final retryable-status response returns to the
+    // caller, which owns HTTP status reporting; a retryable network error
+    // rethrows; anything else surfaces the attempt count.
+    if (lastError instanceof Response) return lastError
     throw lastError instanceof Error
       ? lastError
       : new Error(`fetch failed after ${policy.maxRetries + 1} attempts`)

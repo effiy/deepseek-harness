@@ -183,6 +183,23 @@ export class ChatViewport {
   }
 
   /**
+   * Absorb an out-of-band content height change above the reading position,
+   * like a recycler restoring rows taller than their placeholders. The write
+   * updates the attribution ledger so the delivered scroll is not reader input.
+   * @param px - signed height added above the scrollport's top edge.
+   */
+  absorbAbove(px: number): void {
+    const elements = this.elements
+    if (elements === null || px === 0) return
+    const metrics = this.metrics()
+    if (metrics === null) return
+    const top = Math.max(0, Math.min(metrics.floor, metrics.top + px))
+    if (top === metrics.top) return
+    elements.scroller.scrollTop = top
+    this.observation = { top: elements.scroller.scrollTop, landing: null }
+  }
+
+  /**
    * Stop an outstanding native follow animation at its current position before a reading gesture.
    * @param follow - follow controller bound to this scrollport.
    */

@@ -68,12 +68,16 @@ function recycleRow(
 
 /**
  * Restore original children from the stash and remove the placeholder.
+ * @returns the border-box height the row gained (negative when it shrank);
+ * React updates reach stashed children while they are detached, so the live
+ * height can differ from the placeholder the eviction measured.
  */
 function restoreRow(
   row: HTMLElement,
   stash: WeakMap<Element, ChildNode[]>,
-): void {
-  if (!row.hasAttribute(RECYCLED_ATTR)) return
+): number {
+  if (!row.hasAttribute(RECYCLED_ATTR)) return 0
+  const before = row.offsetHeight
   const children = stash.get(row)
   // Clear the placeholder(s) — there may be multiple if the row was recycled
   // while React was in the middle of a render.
@@ -84,6 +88,7 @@ function restoreRow(
     for (const child of children) row.appendChild(child)
     stash.delete(row)
   }
+  return row.offsetHeight - before
 }
 
 /**
@@ -107,9 +112,19 @@ export class ChatRecycler {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
   /** Turn numbers of the last N turns — rows with these turns are never recycled. */
   private protectedTurns = new Set<number>()
+  private readonly absorbAbove: ((px: number) => void) | undefined
 
-  constructor(options: { tailKeep?: number } = {}) {
+  /**
+   * @param options.tailKeep - how many tail turns stay fully interactive.
+   * @param options.absorbAbove - receives the summed height that restored rows
+   * added above the scrollport's top edge, once per observer delivery. The
+   * IntersectionObserver callback runs after the frame's paint, so a restore
+   * whose live height differs from its placeholder paints one uncompensated
+   * frame unless the scroll owner shifts by the same delta in this same task.
+   */
+  constructor(options: { tailKeep?: number; absorbAbove?: (px: number) => void } = {}) {
     this.tailKeep = options.tailKeep ?? DEFAULT_TAIL_KEEP
+    this.absorbAbove = options.absorbAbove
   }
 
   /**
@@ -123,11 +138,22 @@ export class ChatRecycler {
 
     this.observer = new IntersectionObserver(
       (entries) => {
+        let absorbed = 0
+        let scrollerTop: number | null = null
         for (const entry of entries) {
           const row = entry.target as HTMLElement
-          if (entry.isIntersecting) restoreRow(row, this.stash)
-          else if (this.canRecycle(row)) recycleRow(row, this.stash)
+          if (entry.isIntersecting) {
+            // A row restored above the reader pushes the reading position down
+            // by its height delta; rows below the reader move nothing visible.
+            scrollerTop ??= scroller.getBoundingClientRect().top
+            const above = row.getBoundingClientRect().bottom <= scrollerTop
+            const delta = restoreRow(row, this.stash)
+            if (above) absorbed += delta
+          } else if (this.canRecycle(row)) {
+            recycleRow(row, this.stash)
+          }
         }
+        if (absorbed !== 0) this.absorbAbove?.(absorbed)
       },
       {
         root: scroller,

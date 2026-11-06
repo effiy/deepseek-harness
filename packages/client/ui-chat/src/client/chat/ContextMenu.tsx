@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
+import { MenuSurface } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './ContextMenu.module.css'
 
 /** One item in a context menu. */
@@ -15,9 +16,9 @@ export interface ContextMenuItem {
 }
 
 /**
- * Fixed-position context menu with WeChat-style appearance:
- * white rounded card, soft shadow, scale+fade enter animation,
- * dismiss on outside tap or scroll.
+ * Fixed-position long-press context menu on the shared MenuSurface material
+ * (compact radius, translucent fill + blur), with a scale+fade enter animation
+ * from the finger origin; dismisses on outside tap or scroll.
  *
  * @param props - Menu items, position, and dismiss callback.
  */
@@ -30,6 +31,7 @@ export function ContextMenu({ items, position, onDismiss }: {
 
   useEffect(() => {
     const dismiss = (e: Event): void => {
+      /* v8 ignore next -- the ref detaches before this passive listener's cleanup; no dispatched event can observe the gap. */
       if (menuRef.current === null) return
       if (menuRef.current.contains(e.target as Node)) return
       onDismiss()
@@ -44,8 +46,9 @@ export function ContextMenu({ items, position, onDismiss }: {
   }, [onDismiss])
 
   return (
-    <div
+    <MenuSurface
       ref={menuRef}
+      compact
       className={css.menu}
       style={{
         '--menu-origin-x': `${position.originX}%`,
@@ -72,6 +75,6 @@ export function ContextMenu({ items, position, onDismiss }: {
           </button>
         </Fragment>
       ))}
-    </div>
+    </MenuSurface>
   )
 }

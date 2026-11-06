@@ -2,6 +2,7 @@
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { FocusEvent as ReactFocusEvent, KeyboardEvent as ReactKeyboardEvent } from 'react'
 import type {
   NodeKey, RenderEntry,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -13,6 +14,7 @@ import {
 import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
+import { navigateFeed, rememberFeedFocus } from './feed-navigation.ts'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
@@ -193,6 +195,16 @@ export function ChatView({
     transcriptView,
   })
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
+  // The feed owns one Tab stop; Up/Down/Home/End move focus between its
+  // visible article rows, and inner widgets (menus, trees, inputs) keep their
+  // own arrow keys through the delegation guards in feed-navigation.
+  const onFeedKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    navigateFeed(event.nativeEvent, event.currentTarget)
+  }, [])
+  const onFeedFocus = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
+    rememberFeedFocus(event.currentTarget, event.target)
+  }, [])
+  const hasRows = entries.length > 0
 
   return (
     <div className={css.frame}>
@@ -205,9 +217,24 @@ export function ChatView({
           t={t}
         />
       )}
-      <section className={css.root} aria-label={t('chat.regionLabel')} data-chat-following-tail={scroll.followingTail ? '' : undefined}>
+      <section
+        className={css.root}
+        aria-label={t('chat.regionLabel')}
+        tabIndex={-1}
+        data-conversation-focus=""
+        // CSS disables native scroll anchoring under this attribute because the
+        // manual follow system owns bottom positioning while tail-following.
+        // That system arms at the first landing, so claiming tail-follow earlier
+        // would leave history-loading row growth without any compensator.
+        data-chat-following-tail={scroll.initialized && scroll.followingTail ? '' : undefined}
+      >
         <div ref={scroll.listRef} className={css.scroll}>
           <div ref={scroll.columnRef} className={css.column} data-chat-flow=""
+            role={hasRows ? 'feed' : undefined}
+            aria-label={hasRows ? t('chat.feedLabel') : undefined}
+            tabIndex={hasRows ? 0 : undefined}
+            onKeyDown={onFeedKeyDown}
+            onFocus={onFeedFocus}
             data-chat-motion={deferCompletedTurns && scroll.initialized
               && (running || motionTail || pendingInputs.length > 0) ? '' : undefined}>
             {openState === 'loading' && entries.length === 0 && (

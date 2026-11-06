@@ -183,7 +183,7 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   const classes = [css.body, !capped ? css.expandedBody : '',
     capped && edges.canScrollUp ? css.fadeTop : '', capped && edges.canScrollDown ? css.fadeBottom : '']
   return (
-    <div ref={rootRef} className={css.root} role="article" data-chat-group-key={groupKey}
+    <div ref={rootRef} className={css.root} role="article" tabIndex={-1} data-chat-group-key={groupKey}
       data-chat-flow-key={groupKey} data-chat-anchor-key={`group:${groupKey}`} data-chat-turn={turn}
       data-chat-paging-anchor={grouped && !open || undefined}
       data-step-process data-group-expanded-mode={!grouped || undefined}>

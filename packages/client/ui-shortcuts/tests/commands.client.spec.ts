@@ -3,7 +3,7 @@ import { describe, expect, onTestFinished, vi } from 'vitest'
 import { createElement, Fragment, useSyncExternalStore } from 'react'
 import { act, cleanup, render } from '@testing-library/react'
 import { createClientTest, webApp } from '@deepseek-ai/dsh-client-test-runtime/src/assembly/index.ts'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Modal, TAP_GUARD_WINDOW_MS } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { DesktopKeyboardApi, DesktopShortcutInput, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/protocol'
 import type { createSettingsShellStore } from '../../ui-settings-general/src/client/shell-store.ts'
@@ -133,6 +133,10 @@ describe('assembled shortcut command owners', () => {
     expect(layout.getSnapshot().layoutInfo.sidebar).not.toBe(sidebar)
     press('Slash')
     expect(reference.getSnapshot().open).toBe(false)
+    // LayoutController dedupes sidebar toggles inside the tap-guard window
+    // (touch double-fire protection); let the window lapse before the
+    // restoring toggle so it is not swallowed as a double-tap.
+    await new Promise<void>(resolve => setTimeout(resolve, TAP_GUARD_WINDOW_MS + 50))
     press('KeyB')
     expect(layout.getSnapshot().layoutInfo.sidebar).toBe(sidebar)
     press('KeyB', true)

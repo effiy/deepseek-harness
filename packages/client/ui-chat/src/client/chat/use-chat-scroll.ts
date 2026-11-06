@@ -209,7 +209,14 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
     const column = columnRef.current
     if (list === null || column === null) return
     const scroller = list.closest<HTMLElement>('[data-conversation-scroll]') ?? list
-    if (recyclerRef.current === null) recyclerRef.current = new ChatRecycler({ tailKeep: 5 })
+    if (recyclerRef.current === null) {
+      recyclerRef.current = new ChatRecycler({
+        tailKeep: 5,
+        // Restores land after paint; absorb their above-reader height delta in
+        // the same task so the reading position never jumps a frame.
+        absorbAbove: (px) => { viewport.absorbAbove(px) },
+      })
+    }
     recyclerRef.current.observe(scroller, column)
     return () => { recyclerRef.current?.disconnect() }
   }, [listRef, columnRef])

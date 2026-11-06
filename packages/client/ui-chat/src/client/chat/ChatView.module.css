@@ -46,6 +46,11 @@
   touch-action: pan-y pinch-zoom;
 }
 
+/* Tail-following hands bottom positioning to the manual follow system, so
+   native anchoring must stay out of its way. ChatView renders the attribute
+   only after the first landing; history-loading and mid-list views keep
+   native anchoring, which absorbs content growth above the reader in the
+   same frame the manual system is not yet (or no longer) compensating. */
 .root[data-chat-following-tail] .scroll,
 :global([data-conversation-scroll]):has(.root[data-chat-following-tail]) {
   overflow-anchor: none;
