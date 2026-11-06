@@ -2,9 +2,9 @@
   "generated_at": "2026-11-06",
   "summary": {
     "critical": 0,
-    "high": 21,
-    "moderate": 30,
-    "low": 5
+    "high": 12,
+    "moderate": 17,
+    "low": 4
   },
   "advisories": {
     "1102341": {
@@ -73,12 +73,6 @@
       "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
       "cves": []
     },
-    "1242625": {
-      "module": "vite",
-      "severity": "moderate",
-      "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
-      "cves": []
-    },
     "1242647": {
       "module": "@modelcontextprotocol/server",
       "severity": "high",
@@ -97,19 +91,7 @@
       "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
       "cves": []
     },
-    "1242654": {
-      "module": "vite",
-      "severity": "moderate",
-      "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
-      "cves": []
-    },
     "1242658": {
-      "module": "vite",
-      "severity": "high",
-      "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
-      "cves": []
-    },
-    "1242661": {
       "module": "vite",
       "severity": "high",
       "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
@@ -127,40 +109,10 @@
       "title": "Vite: Cross origin script execution through Vite custom middleware",
       "cves": []
     },
-    "1242727": {
-      "module": "vite",
-      "severity": "low",
-      "title": "Vite: Cross origin script execution through Vite custom middleware",
-      "cves": []
-    },
     "1242730": {
       "module": "vite",
       "severity": "moderate",
       "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
-      "cves": []
-    },
-    "1242733": {
-      "module": "vite",
-      "severity": "moderate",
-      "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
-      "cves": []
-    },
-    "1242736": {
-      "module": "vite",
-      "severity": "moderate",
-      "title": "Vite: First 4 bytes of files outside of `server.fs` setting is exposed by `?vite-wasm-instance`",
-      "cves": []
-    },
-    "1242767": {
-      "module": "@vitest/mocker",
-      "severity": "moderate",
-      "title": "Vitest: Code injection via unauthenticated manual mock registration",
-      "cves": []
-    },
-    "1242769": {
-      "module": "@vitest/mocker",
-      "severity": "moderate",
-      "title": "Vitest: Windows backslash traversal bypasses the @vitest/mocker redirect allowlist fix",
       "cves": []
     },
     "1243071": {
@@ -173,24 +125,6 @@
       "module": "body-parser",
       "severity": "high",
       "title": "body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body",
-      "cves": []
-    },
-    "1243078": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
-      "cves": []
-    },
-    "1243079": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
-      "cves": []
-    },
-    "1243081": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
       "cves": []
     },
     "1243084": {
@@ -223,70 +157,10 @@
       "title": "fast-uri vulnerable to scheme injection via an unescaped first-segment colon in suffix references",
       "cves": []
     },
-    "1243113": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
-      "cves": []
-    },
-    "1243114": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
-      "cves": []
-    },
     "1243432": {
       "module": "vite",
       "severity": "moderate",
       "title": "vite: `server.fs.deny` bypass on Windows alternate paths",
-      "cves": []
-    },
-    "1243473": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
-      "cves": []
-    },
-    "1243475": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
-      "cves": []
-    },
-    "1243476": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
-      "cves": []
-    },
-    "1243478": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
-      "cves": []
-    },
-    "1243479": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
-      "cves": []
-    },
-    "1243481": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
-      "cves": []
-    },
-    "1243482": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
-      "cves": []
-    },
-    "1243484": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici vulnerable to Denial of Service via unhandled exception in the decompress interceptor",
       "cves": []
     },
     "1243486": {
@@ -311,18 +185,6 @@
       "module": "qs",
       "severity": "moderate",
       "title": "qs : qs.stringify with arrayFormat 'comma' throws an uncaught TypeError on array elements carrying a non-callable own toString (DoS)",
-      "cves": []
-    },
-    "1243858": {
-      "module": "vite",
-      "severity": "moderate",
-      "title": "Vite: `server.fs.deny` bypassed with queries",
-      "cves": []
-    },
-    "1244003": {
-      "module": "follow-redirects",
-      "severity": "high",
-      "title": "follow-redirects: Cross-realm sensitiveHeaders arrays are discarded and custom credentials can follow redirects",
       "cves": []
     },
     "1244013": {

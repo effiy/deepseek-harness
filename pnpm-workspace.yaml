@@ -24,6 +24,16 @@ overrides:
   # README) and still depends on vulnerable node-forge <=1.4.0 (12 advisories,
   # 6 high). 1.4.1+ satisfies selfsigned's "^1" range and clears them all.
   'node-forge': '>=1.4.1'
+  # Transitive undici pins below the patched releases (13 advisories, 7 high):
+  # jsdom/@electron/get/@yao-pkg/pkg-fetch resolve 7.30.0 and the
+  # electron-builder node-gyp chain resolves 6.29.0. Range-qualified overrides
+  # keep every consumer within its declared major.
+  'undici@7': '>=7.30.1 <8'
+  'undici@6': '>=6.29.1 <7'
+  # http-server>http-proxy (apps/web dev server) pins follow-redirects 1.16.1,
+  # which discards cross-realm sensitiveHeaders (1 high). http-proxy's "^1.0.0"
+  # range accepts the patched release.
+  'follow-redirects': '>=1.16.2'
 
 peerDependencyRules:
   allowedVersions:
