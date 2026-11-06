@@ -65,7 +65,7 @@
 }
 
 .card[data-cordis-status='running'] .status {
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-state-success-label);
 }
 
 .card[data-cordis-status='failed'] .status {

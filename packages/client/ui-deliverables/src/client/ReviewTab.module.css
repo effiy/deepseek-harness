@@ -9,7 +9,7 @@
 .itemPath { min-width: 0; overflow: hidden; line-height: 20px; text-overflow: ellipsis; white-space: nowrap; }
 .itemCounts, .counts { display: inline-flex; flex: none; gap: 6px; align-items: center; font-family: var(--ds-font-family-code); font-size: 12px; line-height: 20px; color: var(--dsw-alias-label-tertiary); }
 .counts { min-width: 0; margin-right: auto; }
-.added { color: var(--dsw-alias-state-success-primary); }
+.added { color: var(--dsw-alias-state-success-label); }
 .deleted { color: var(--dsw-alias-state-error-label); }
 .label { color: var(--dsw-alias-label-tertiary); }
 .tools { display: inline-flex; flex: none; gap: 2px; align-items: center; margin-left: auto; }

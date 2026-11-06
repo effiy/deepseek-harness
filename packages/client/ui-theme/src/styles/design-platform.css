@@ -37,6 +37,7 @@ body {
   --dsw-static-green-500: rgb(34, 197, 94);
   --dsw-static-green-500-a08: rgb(34 197 94 / 8%);
   --dsw-static-green-500-a12: rgb(34 197 94 / 12%);
+  --dsw-static-green-800: rgb(22, 101, 52);
   --dsw-static-green-900: rgb(35, 60, 44);
   --dsw-static-neutral-00: rgb(255, 255, 255);
   --dsw-static-neutral-1000: rgb(0, 0, 0);
@@ -123,6 +124,7 @@ body[data-ds-dark-theme] {
   --dsw-static-green-500: rgb(34, 197, 94);
   --dsw-static-green-500-a08: rgb(34 197 94 / 8%);
   --dsw-static-green-500-a12: rgb(34 197 94 / 12%);
+  --dsw-static-green-800: rgb(22, 101, 52);
   --dsw-static-green-900: rgb(35, 60, 44);
   --dsw-static-neutral-00: rgb(255, 255, 255);
   --dsw-static-neutral-1000: rgb(0, 0, 0);
@@ -266,7 +268,9 @@ body {
   --dsw-alias-state-error-primary: var(--dsw-static-red-600);
   --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
   --dsw-alias-state-idle-primary: var(--dsw-static-neutral-300);
-  --dsw-alias-state-success-primary: var(--dsw-static-green-500);
+  /* Success text tier (design review 2026-11-06): light reads green-800, >=6.27:1 on white, green-100, and the diff-added fill; fills, dots, and borders keep state-success-primary. */
+  --dsw-alias-state-success-label: var(--dsw-static-green-800);
+  --dsw-alias-state-success-primary: var(--dsw-static-green-800);
   --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
   --dsw-alias-state-success-tertiary: var(--dsw-static-green-100);
   /* Warn text tier (design review 2026-11-06): light reads amber-700, >=4.86:1 on every warn text surface; fills, dots, and borders keep state-warn-primary. */
@@ -390,6 +394,8 @@ body[data-ds-dark-theme] {
   --dsw-alias-state-error-primary: var(--dsw-static-red-400);
   --dsw-alias-state-error-secondary: var(--dsw-static-red-400);
   --dsw-alias-state-idle-primary: var(--dsw-static-neutral-600);
+  /* WCAG AA: dark keeps green-500 on both tracks; the label alias gives success text one token across themes (6.05:1 on the dark diff-added fill, 5.26:1 on green-900). */
+  --dsw-alias-state-success-label: var(--dsw-static-green-500);
   --dsw-alias-state-success-primary: var(--dsw-static-green-500);
   --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
   --dsw-alias-state-success-tertiary: var(--dsw-static-green-900);

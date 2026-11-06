@@ -51,7 +51,10 @@
 }
 
 .icon.success {
-  color: var(--dsw-alias-state-success-primary);
+  /* The same split for success: the fixed green-400 of the secondary track
+     reads 6.19:1 light / 4.91:1 dark here, while the light-theme primary
+     green-800 would fall to 1.70:1 on this surface. */
+  color: var(--dsw-alias-state-success-secondary);
 }
 
 .text {

@@ -62,7 +62,7 @@
 
 .success {
   background: var(--dsw-alias-state-success-tertiary);
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-state-success-label);
   border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary) 20%, transparent);
 }
 

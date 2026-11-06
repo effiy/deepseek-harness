@@ -50,7 +50,7 @@
 }
 
 .add {
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-state-success-label);
   background: var(--dsw-alias-code-diff-added);
   box-shadow: inset 3px 0 0 var(--dsw-alias-state-success-primary);
 }

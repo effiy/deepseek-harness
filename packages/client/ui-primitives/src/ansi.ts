@@ -37,9 +37,9 @@ export type AnsiLine = readonly AnsiSpan[]
  * semantic. Black and white both resolve to the primary label color so text
  * stays legible under either theme instead of matching the surface it sits
  * on; bright black takes the tertiary label color (the muted-gray role).
- * Bright red and bright yellow take the error- and warn-label text tokens:
- * the secondary red and yellow are fill tones and miss AA text contrast on
- * the light code surface.
+ * Bright red, bright green, and bright yellow take the error-, success-, and
+ * warn-label text tokens: the secondary red, green, and yellow are fill
+ * tones and miss AA text contrast on the light code surface.
  * Cyan and bright cyan take two static blues: the design system has no cyan,
  * and anser's literal bright cyan is unreadable on the light theme's code
  * surface. Magenta has no token equivalent and falls through to anser's
@@ -52,7 +52,7 @@ const TOKEN_BY_BASIC_RGB: Record<string, string> = {
   '187,0,0': 'var(--dsw-alias-state-error-primary)',
   '255,85,85': 'var(--dsw-alias-state-error-label)',
   '0,187,0': 'var(--dsw-alias-state-success-primary)',
-  '0,255,0': 'var(--dsw-alias-state-success-secondary)',
+  '0,255,0': 'var(--dsw-alias-state-success-label)',
   '187,187,0': 'var(--dsw-alias-state-warn-primary)',
   '255,255,85': 'var(--dsw-alias-state-warn-label)',
   '0,0,187': 'var(--dsw-alias-state-business-primary)',

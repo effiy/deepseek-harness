@@ -69,7 +69,7 @@
 }
 
 .row:is(:hover, [aria-expanded='true']) .diffAdded {
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-state-success-label);
 }
 
 .row:is(:hover, [aria-expanded='true']) .diffRemoved {

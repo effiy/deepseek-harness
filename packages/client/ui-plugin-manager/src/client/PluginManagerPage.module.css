@@ -1008,7 +1008,7 @@ label.registryOption {
 }
 
 .wizardIcon[data-state='done'] {
-  color: var(--dsw-alias-state-success-secondary);
+  color: var(--dsw-alias-state-success-label);
 }
 
 .wizardIcon[data-state='error'] {

@@ -32,13 +32,15 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
-/* Status tones tint their own color for the fill, so a palette change moves
- * fill and text together and neither needs a second token. The tint is 10%,
- * except `warning`, which keeps the 12% the plugin inventory's conditional
- * tag shipped with — matching it is what makes this a pure consolidation. */
+/* Status tones tint a state color for the fill and read that family's label
+ * token for the text where one exists (error/success/warning — design review
+ * 2026-11-06 text/fill split; `info` keeps business-primary for both). The
+ * tint is 10%, except `warning`, which keeps the 12% the plugin inventory's
+ * conditional tag shipped with — matching it is what makes this a pure
+ * consolidation. */
 .tag[data-tone='success'] {
   background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 10%, transparent);
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-state-success-label);
 }
 
 .tag[data-tone='info'] {

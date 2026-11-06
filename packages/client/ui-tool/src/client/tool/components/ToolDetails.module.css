@@ -89,7 +89,7 @@
 }
 
 .item[data-change='added'] .status {
-  color: var(--dsw-alias-state-success-primary);
+  color: var(--dsw-alias-state-success-label);
 }
 
 .item[data-change='removed'] .status {
@@ -169,7 +169,7 @@
 }
 
 .badge[data-tone='info'] { color: var(--dsw-alias-state-business-primary); }
-.badge[data-tone='success'] { color: var(--dsw-alias-state-success-primary); }
+.badge[data-tone='success'] { color: var(--dsw-alias-state-success-label); }
 .badge[data-tone='warning'] { color: var(--dsw-alias-state-warn-label); }
 .badge[data-tone='error'] { color: var(--dsw-alias-state-error-label); }
 

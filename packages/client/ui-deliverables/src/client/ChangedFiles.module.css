@@ -17,7 +17,7 @@ button.header:disabled { cursor: progress; }
 .header:hover .statCounts, .header:focus-visible .statCounts { display: none; }
 .header:hover .previewHint, .header:focus-visible .previewHint { display: inline; }
 .stat[data-error='true'], .counts[data-error='true'] { color: var(--dsw-alias-state-error-label); }
-.added { color: var(--dsw-alias-state-success-primary); }
+.added { color: var(--dsw-alias-state-success-label); }
 .deleted { color: var(--dsw-alias-state-error-label); }
 .list { margin: 0; padding: 0; list-style: none; border-top: 0.5px solid var(--dsw-alias-border-l2); }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; box-sizing: border-box; width: 100%; min-width: 0; min-height: 24px; margin: 0; padding: 7px 18px 7px 14px; border: 0; background: transparent; color: var(--dsw-alias-label-tertiary); cursor: pointer; font-family: var(--ds-font-family-code); font-size: 11px; line-height: 18px; text-align: left; }
