@@ -20,6 +20,10 @@ overrides:
   '@deepseek-ai/schemastery': 'link:vendor/schemastery'
   'xlsx': 'npm:xlsx@0.18.5'
   'zod': '4.6.7'
+  # selfsigned 4.x is pinned (5.x breaks under pnpm; see packages/host/webserver
+  # README) and still depends on vulnerable node-forge <=1.4.0 (12 advisories,
+  # 6 high). 1.4.1+ satisfies selfsigned's "^1" range and clears them all.
+  'node-forge': '>=1.4.1'
 
 peerDependencyRules:
   allowedVersions:

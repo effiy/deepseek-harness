@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-11-04",
+  "generated_at": "2026-11-06",
   "summary": {
     "critical": 0,
-    "high": 31,
-    "moderate": 37,
-    "low": 8
+    "high": 21,
+    "moderate": 30,
+    "low": 5
   },
   "advisories": {
     "1102341": {
@@ -59,12 +59,6 @@
       "module": "extract-zip",
       "severity": "high",
       "title": "extract-zip allows arbitrary file writes through symlink archive entries",
-      "cves": []
-    },
-    "1240912": {
-      "module": "node-forge",
-      "severity": "high",
-      "title": "node-forge RSA PKCS#1 v1.5 signature verification accepts extra nested DigestAlgorithm elements",
       "cves": []
     },
     "1241206": {
@@ -181,12 +175,6 @@
       "title": "body-parser vulnerable to Denial of Service via trailing bytes after a compressed request body",
       "cves": []
     },
-    "1243077": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
-      "cves": []
-    },
     "1243078": {
       "module": "undici",
       "severity": "moderate",
@@ -197,12 +185,6 @@
       "module": "undici",
       "severity": "moderate",
       "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
-      "cves": []
-    },
-    "1243080": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
       "cves": []
     },
     "1243081": {
@@ -241,12 +223,6 @@
       "title": "fast-uri vulnerable to scheme injection via an unescaped first-segment colon in suffix references",
       "cves": []
     },
-    "1243112": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
-      "cves": []
-    },
     "1243113": {
       "module": "undici",
       "severity": "high",
@@ -265,22 +241,10 @@
       "title": "vite: `server.fs.deny` bypass on Windows alternate paths",
       "cves": []
     },
-    "1243472": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
-      "cves": []
-    },
     "1243473": {
       "module": "undici",
       "severity": "high",
       "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
-      "cves": []
-    },
-    "1243474": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
       "cves": []
     },
     "1243475": {
@@ -295,12 +259,6 @@
       "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
       "cves": []
     },
-    "1243477": {
-      "module": "undici",
-      "severity": "high",
-      "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
-      "cves": []
-    },
     "1243478": {
       "module": "undici",
       "severity": "high",
@@ -313,12 +271,6 @@
       "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
       "cves": []
     },
-    "1243480": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
-      "cves": []
-    },
     "1243481": {
       "module": "undici",
       "severity": "moderate",
@@ -329,12 +281,6 @@
       "module": "undici",
       "severity": "moderate",
       "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
-      "cves": []
-    },
-    "1243483": {
-      "module": "undici",
-      "severity": "moderate",
-      "title": "undici vulnerable to Denial of Service via unhandled exception in the decompress interceptor",
       "cves": []
     },
     "1243484": {
@@ -379,88 +325,22 @@
       "title": "follow-redirects: Cross-realm sensitiveHeaders arrays are discarded and custom credentials can follow redirects",
       "cves": []
     },
-    "1244012": {
-      "module": "minimatch",
-      "severity": "moderate",
-      "title": "minimatch has potential denial of service via globparts amplification",
-      "cves": []
-    },
     "1244013": {
       "module": "glob",
       "severity": "moderate",
       "title": "Glob: AbortSignal cancellation bypass allows post-timeout filesystem traversal",
       "cves": []
     },
-    "1244014": {
-      "module": "node-forge",
-      "severity": "low",
-      "title": "Forge: ASN.1 OID first arc truncation in asn1.oidToDer",
-      "cves": []
-    },
-    "1244015": {
-      "module": "node-forge",
-      "severity": "moderate",
-      "title": "Forge: Prototype Pollution in forge.http cookie handling via a malicious Set-Cookie",
-      "cves": []
-    },
-    "1244016": {
-      "module": "node-forge",
-      "severity": "moderate",
-      "title": "Forge: TLS client crash when the server sends no certificate",
-      "cves": []
-    },
-    "1244017": {
-      "module": "node-forge",
-      "severity": "high",
-      "title": "Forge: Regular expression denial of service in PEM decoding (pem.decode)",
-      "cves": []
-    },
-    "1244018": {
-      "module": "node-forge",
-      "severity": "low",
-      "title": "Forge: Denial of Service via infinite loop in BigInteger.modInverse() with negative input (incomplete fix of CVE-2026-33891)",
-      "cves": []
-    },
-    "1244019": {
-      "module": "node-forge",
-      "severity": "low",
-      "title": "Forge: verifyCertificateChain() removes trusted CA certificates with the same subject from the CA store",
-      "cves": []
-    },
-    "1244020": {
-      "module": "node-forge",
-      "severity": "moderate",
-      "title": "Forge: AES-GCM authentication bypass via unvalidated tagLength option",
-      "cves": []
-    },
-    "1244021": {
-      "module": "node-forge",
-      "severity": "high",
-      "title": "Forge: PKCS#12 MAC forgery and constant-key PBE via zero iteration count",
-      "cves": []
-    },
-    "1244022": {
-      "module": "node-forge",
-      "severity": "high",
-      "title": "Forge: Denial of service in TLS record processing via a record interleaved with a fragmented handshake message",
-      "cves": []
-    },
-    "1244023": {
-      "module": "node-forge",
-      "severity": "high",
-      "title": "Forge: Denial of service in TLS record processing via call stack exhaustion",
-      "cves": []
-    },
-    "1244024": {
-      "module": "node-forge",
-      "severity": "high",
-      "title": "Forge: X.509 basicConstraints bypass in verifyCertificateChain() via deprecated extension OIDs 2.5.29.10 and 2.5.29.13",
-      "cves": []
-    },
     "1244497": {
       "module": "@modelcontextprotocol/client",
       "severity": "moderate",
       "title": "MCP TypeScript client SDK: HTTP client transports and OAuth requests followed cross-origin redirects and re-sent custom headers and request bodies",
+      "cves": []
+    },
+    "1244623": {
+      "module": "minimatch",
+      "severity": "moderate",
+      "title": "minimatch has potential denial of service via globparts amplification",
       "cves": []
     }
   }
