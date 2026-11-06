@@ -1,43 +1,28 @@
 /** Welcome page with a required explicit start. */
-import { useEffect, useState, type RefObject } from 'react'
+import { type RefObject } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DesktopOnboardingProps } from './onboarding-contract.ts'
 import { OnboardingIllustration } from './OnboardingIllustration.tsx'
 import css from './DesktopOnboarding.module.css'
 
+/** Base path for onboarding illustration static assets served from the web public root. */
+const ILLUSTRATION_BASE = '/assets/onboarding'
+
 /**
- * Lazy-load the welcome illustration for the user's locale.
+ * Resolve welcome illustration URLs for the user's locale.
  *
- * The PNGs are large (~500 KB each, 8 total across two steps).  Static
- * imports would base64-inline them into the main JS bundle, adding ~4.9 MB.
- * Dynamic `import()` creates a separate chunk per image, so the browser
- * fetches only the two variants (light + dark) for the current locale, and
- * only when the onboarding step actually renders.
+ * Images are static PNG files under {@link ILLUSTRATION_BASE}, served with
+ * standard HTTP caching and brotli compression by the frontend-static server.
+ * No base64 encoding — the browser loads only the two variants (light + dark)
+ * for the current locale, and only when the `<img>` elements render.
  */
 function useWelcomeImages(locale: string) {
-  const [light, setLight] = useState<string>()
-  const [dark, setDark] = useState<string>()
-
-  useEffect(() => {
-    let cancelled = false
-    const isZh = locale === 'zh'
-    Promise.all([
-      isZh
-        ? import('./assets/onboarding-welcome-zh.png')
-        : import('./assets/onboarding-welcome.png'),
-      isZh
-        ? import('./assets/onboarding-welcome-zh-dark.png')
-        : import('./assets/onboarding-welcome-dark.png'),
-    ]).then(([lightMod, darkMod]) => {
-      if (!cancelled) {
-        setLight((lightMod as { default: string }).default)
-        setDark((darkMod as { default: string }).default)
-      }
-    })
-    return () => { cancelled = true }
-  }, [locale])
-
-  return { art: light, artDark: dark }
+  const isZh = locale === 'zh'
+  const suffix = isZh ? '-zh' : ''
+  return {
+    art: `${ILLUSTRATION_BASE}/onboarding-welcome${suffix}.png`,
+    artDark: `${ILLUSTRATION_BASE}/onboarding-welcome${suffix}-dark.png`,
+  }
 }
 
 /** @param props - localized content, focus target and navigation. @returns the welcome step. */

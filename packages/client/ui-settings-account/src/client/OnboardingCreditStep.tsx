@@ -1,41 +1,27 @@
 /** Credit introduction retains the action ordering selected on first entry. */
-import { useEffect, useState, type RefObject } from 'react'
+import { type RefObject } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DesktopOnboardingProps } from './onboarding-contract.ts'
 import { OnboardingIllustration } from './OnboardingIllustration.tsx'
 import css from './DesktopOnboarding.module.css'
 
+/** Base path for onboarding illustration static assets served from the web public root. */
+const ILLUSTRATION_BASE = '/assets/onboarding'
+
 /**
- * Lazy-load the credit illustration for the user's locale.
+ * Resolve credit illustration URLs for the user's locale.
  *
- * Same strategy as {@link OnboardingWelcomeStep}: dynamic `import()` creates
- * a separate chunk per image, so only the two variants for the current locale
- * are fetched and only when the credit step renders.
+ * Same static-file strategy as {@link OnboardingWelcomeStep}: PNGs are served
+ * as standard assets under {@link ILLUSTRATION_BASE}, avoiding base64 encoding
+ * and its 33 % size tax.
  */
 function useCreditImages(locale: string) {
-  const [light, setLight] = useState<string>()
-  const [dark, setDark] = useState<string>()
-
-  useEffect(() => {
-    let cancelled = false
-    const isZh = locale === 'zh'
-    Promise.all([
-      isZh
-        ? import('./assets/onboarding-recharge-zh.png')
-        : import('./assets/onboarding-recharge.png'),
-      isZh
-        ? import('./assets/onboarding-recharge-zh-dark.png')
-        : import('./assets/onboarding-recharge-dark.png'),
-    ]).then(([lightMod, darkMod]) => {
-      if (!cancelled) {
-        setLight((lightMod as { default: string }).default)
-        setDark((darkMod as { default: string }).default)
-      }
-    })
-    return () => { cancelled = true }
-  }, [locale])
-
-  return { art: light, artDark: dark }
+  const isZh = locale === 'zh'
+  const suffix = isZh ? '-zh' : ''
+  return {
+    art: `${ILLUSTRATION_BASE}/onboarding-recharge${suffix}.png`,
+    artDark: `${ILLUSTRATION_BASE}/onboarding-recharge${suffix}-dark.png`,
+  }
 }
 
 /** @param props - credit facts, localized content and recharge/navigation actions. @returns the credit step. */
