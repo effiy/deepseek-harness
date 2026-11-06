@@ -367,3 +367,49 @@ HoverCard×2、Rows hover 预览×4、SessionScheduleMark×5：figma 注明"两�
 暗色 `state-error-primary`（red-400）在 bg-layer-2（rgb(44,44,46)）/ bg-layer-3（rgb(53,54,56)）上原生即 **4.24 / 3.71 ❌**——与 tint 无关，是暗色错误文字梯度问题。修需评估更亮的红或调整层表面色，涉及暗色品牌色，交设计/产品排期。
 
 *执行：暗骑；commit d1d669339d（代码 9 文件 125 行）+ 本报告 §8.6（docs）*
+
+---
+
+## 8.7 设计复议执行 — state-error-label 文字/填充分轨（2026-11-06 晚间，commit 0242783893）
+
+> 规格来源：`YiKnowledge/roles/designer/reports/2026-11-06-暗黑对比度复议结论.md`（针艺三项复议全部办结）
+> 复议对午间 PR（d1d669339d）的结论：#1 link deepseek-600、#2 placeholder=caption **均维持，不回滚不再调**。§8.6.4 的 red-400 梯度观察经复议确认（暗 L2/L3 = 4.24/3.68 ❌）并由本节闭环。
+
+### 8.7.1 #3 执行：错误文字/填充分轨
+
+| 项 | 内容 |
+|----|------|
+| 新增 static | `red-300: rgb(255, 122, 122)`（两主题静态块；全层过 AA 的最小提亮档） |
+| 新增 alias | `state-error-label`：亮 = red-600（4.92 白底，**亮色零视觉变化**）/ 暗 = red-300 |
+| 保留 | `state-error-primary/secondary` 原值不动，继续服务填充/圆点/描边（直接重映射会把 StateDot 填充一起提亮、白字压填充只剩 2.52 ❌，针艺方案已规避） |
+| 迁移 | **82 处 `color:` 文字消费 / 48 文件**（执行单预估 12 处，全仓 grep 实测 src 层 83 处，6.9 倍出入；按「state-error-label = 错误文字唯一令牌」设计意图全量迁移） |
+| 排除① | StateDot `.dot[data-state='error']`——currentColor 画圆点属图形非文字（暗 red-400 = 3.68 过图形 3:1；亮 4.92） |
+| 排除② | `ui-primitives/src/ansi.ts` ANSI 红映射（TS 层）——终端底 `markdown-code-block` 双主题跟随（亮 bluish-50 / 暗 bluish-900），暗底 red-400 实测 **5.23 ✓ 达标无需迁**，且避 TS 快照风险 |
+| 排除③ | 全部 border-color / background / color-mix 填充消费（sed 模式以前置字符类排除，diff 逐行核过） |
+
+**独立复测（脚本，与针艺表一致）**：red-300 暗色 base/L1/L2/L3 = **7.22 / 6.22 / 5.52 / 4.79** ✅；L3+4% danger tint = 4.59（针艺 4.61，舍入差）✅；L2+12% tint = 4.78 ✅；终端 bluish-900 = 6.82 ✅。lib/ 构建产物内 9 处旧副本未跟踪、重建自动跟随；运行中 3080 实例生效需重建 bundle（未动）。
+
+### 8.7.2 warn 观察项核实（针艺观察 #2 —— 嫌疑证实，移交候选值）
+
+`state-warn-label` = amber-600 rgb(221,134,41)，**亮暗两主题同值未分轨**。消费点逐一核底：
+
+| 消费点 | 实际底 | 亮实测 | 暗实测 | 判定 |
+|--------|--------|--------|--------|------|
+| ExcelBody `.notice` | 同规则 warn-tertiary 底 | on amber-100 = **2.58** ❌ | on amber-900 = 5.53 ✅ | 亮 ❌ |
+| FontNotice `.warning` | 面板底 / hover amber-100 | 白 2.79 / amber-100 2.58 ❌ | L1 5.62 ✅ | 亮 ❌ |
+| ModelSelect `.warning` | bg-module-platform（b60/暗 b800） | b60 上 **2.58** ❌ | b800 上 **4.33** ❌ | **两端 ❌** |
+| ConnectionIndicator | warn-tertiary 底 | 2.58 ❌ | 5.53 ✅ | 亮 ❌ |
+| ExcelBody `.formulaWarning` | 图标（图形类 3:1） | **2.79 < 3** ❌ | ✅ | 亮 ❌ |
+| Toast `.icon` | toast-bg = bluish-800（双主题深底） | 4.32 ≥3 ✅ | ✅ | **排除** |
+
+**附加发现（同类，执行单外）**：`state-warn-primary`（amber-500）作文字——MessageItem:308、Tag:51（12% amber tint 上）：亮白底 **2.15** ❌❌（比 warn-label 更差）、b60 1.98 ❌；暗 L3 5.63 ✅。warn 分轨时此两处文字消费应一并迁入 label 轨。
+针艺观察 #3 证实：暗 layer-3（bluish-800）= 最劣文字底，warn-label 暗端唯一失败点（4.33）。**待针艺出亮 amber-700 级 / 暗 amber-300 级实测候选值后，warn 照本节模式执行。**
+
+### 8.7.3 测试与提交
+
+- test:gui 全量（19:41，HEAD 7bdc91311c + 本改动 + 像素 2 个未跟踪新 spec）：**623 文件，10243 passed / 2 failed / 1 skipped**
+- 唯一红 = `chat-recycler-stress` 两条墙钟性能断言（53ms/50ms、295ms/100ms）——**并发负载抖动**：本次运行恰逢像素补写 spec 抢 CPU；CSS 值不进 jsdom（css:false），不可能影响 DOM 回收计时。**单独重跑 17/17 绿**（1.2s）✅
+- 顺带验证：像素新增 `useSwipeGesture` / `sidebar-edge-zone` 两 spec 在本 run 全过
+- commit：`0242783893`（49 文件 88+/82- = 170 行：令牌 6 行 + 迁移 82 行 + 注释）
+
+*执行：暗骑；规格：针艺复议结论；复测签收待针艺*
