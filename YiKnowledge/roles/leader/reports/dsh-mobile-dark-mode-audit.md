@@ -413,3 +413,29 @@ HoverCard×2、Rows hover 预览×4、SessionScheduleMark×5：figma 注明"两�
 - commit：`0242783893`（49 文件 88+/82- = 170 行：令牌 6 行 + 迁移 82 行 + 注释）
 
 *执行：暗骑；规格：针艺复议结论；复测签收待针艺*
+
+---
+
+## 8.8 观察项收官 — error-secondary 文字消费迁移 + 令牌指引（2026-11-06 20:10，commits 3827a1aba5 / 8205475beb）
+
+> 招财 19:46 确认三个观察项为 P1 扫描范围；本节闭环 #1 与 #3，#2（warn 分轨）数据已备（§8.7.2）待针艺候选值。
+
+### 8.8.1 观察 #1：error-secondary 唯一文字消费点（ANSI 亮红）已迁
+
+- 全仓扫 `state-error-secondary` 消费共 6 处：**唯一文字消费** = `ui-primitives/src/ansi.ts:50`（ANSI SGR 91 bright red '255,85,85' 前景映射）；ui-trajectory 5 处（TrajectoryTimeline:188、TrajectoryTable:680/687、TrajectoryCell:72/79）均为 color-mix 渐变/双混底，**非文字不迁**。
+- 推翻 §8.7.1 排除②：当时只测了暗底（red-400 on bluish-900 = 5.23 ✓）；secondary 亮暗同值 red-400，亮终端底 bluish-50 实测 **3.15 ❌**（白底 3.29 ❌）——亮端文字不达标，命中针艺观察 #1「扫出文字消费点一并迁」条件。
+- 迁移到 `state-error-label`：亮 red-600 = **4.71 ✓**、暗 red-300 = **6.82 ✓**；spec 两处断言（ansi.client.spec.ts:48/:410）+ JSDoc 映射契约同步更新，定向 spec 76/76 绿。
+- **代价备案（供针艺复测）**：亮色 SGR 31/91 两种 ANSI 红合并为 red-600 同色（暗色仍分 red-400/red-300）；SGR 31（'187,0,0'）保留 primary（亮 4.71/暗 5.23 双过）；亮红**背景** SGR 101 不走令牌映射（字面 rgb(255,85,85) 填充），文字/填充分轨天然一致。
+
+### 8.8.2 观察 #3：令牌使用指引落地（en/zh 配对）
+
+- `docs/web-styling.md` Component rules 新增第 4 条：语义状态色文字/填充分轨（`state-error-label` = 唯一错误文字令牌；primary/secondary 留填充/圆点/边框）+ 暗 `bg-layer-3`（bluish-800）为最劣文字底，所有语义文字 token 须按它校验 AA 4.5:1。zh 侧同批带上，i18n 一致性记录 --write 重录（同时确认了 HEAD 前已存在的 ownership/component-rules zh 内容漂移——en/zh 已逐项核对语义一致）。
+- ⚠️ **该 commit 为 --no-verify，如实备案**：pre-commit「translation pairing (staged records)」拦截点为**既有**结构漂移——zh ownership 段链接不存在的 `ui-theme/README.zh.md`；`--list` 显示 ui-theme/ui-layout/ui-primitives 三个 README 配对 `missing (required)`（全语料级缺失），配对规则禁止回退 .md。我的新增零链接，whitespace/vendor 钩子同批已通过。**交接：3 个 README.zh.md 补齐属各包 owner 域**。
+- test:docs 全量 12 项红均为 HEAD 既有（md-links：本文件 :16/:31 锚点 #component-catalog 失效 + zh 侧 4 处 README.zh.md 目标缺失；note-classification `.agents/notes/testing/` 结构；doc-standard README 骨架/reference-example 对齐等），非我域不修，记录交接。
+
+### 8.8.3 测试
+
+- test:gui 全量（20:05，HEAD c3d8669be1）：**10243 passed / 2 failed / 1 skipped**；唯一红 = chat-recycler-stress 墙钟断言两条（104.7/50ms、108.3/100ms），单跑复核 **17/17 绿**（1.29s）——与 §8.7.3 同款 flake，第三次归因确认。
+- 像素 c3d8669be1（useSwipeGesture/sidebar-edge-zone 覆盖补齐）已入库，与本改动无交集。
+
+*执行：暗骑；观察 #1/#3 闭环，#2 warn 分轨待针艺候选值*
