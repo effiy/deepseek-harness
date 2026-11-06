@@ -16,6 +16,7 @@ Global style sheets belong in `ui-theme/src/styles/`. Component styles live besi
 - Reuse the control before restyling one: the [ui-primitives component catalog](../packages/client/ui-primitives/README.md#component-catalog) is the only channel that crosses feature packages, and a deliberate visual difference belongs in a prop there rather than in a second copy ([reference](../packages/client/ui-primitives/README.md)).
 - Use CSS Modules and `clsx`; do not add a component library or Tailwind.
 - Use `--dsw-alias-*` semantic tokens in feature components. Do not copy static palette values or write literal colors there.
+- Split semantic state colors between text and fill: `--dsw-alias-state-error-label` is the only error-text token (light red-600, dark red-300); `state-error-primary/secondary` stay on fills, dots, and borders. Dark `--dsw-alias-bg-layer-3` (bluish-800) is the worst-case text surface: verify every semantic text token against it for AA 4.5:1.
 - Keep theme selectors out of feature component CSS. Light/dark overrides belong to the theme owner.
 - Pair font sizes with line heights and use the theme typography variables when an existing role matches.
 - Keep source text, terminal output, and diff lines unwrapped when their component contract requires column preservation; use the shared scrollbar styles rather than component-specific scrollbar selectors.
