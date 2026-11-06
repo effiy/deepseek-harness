@@ -439,3 +439,43 @@ HoverCard×2、Rows hover 预览×4、SessionScheduleMark×5：figma 注明"两�
 - 像素 c3d8669be1（useSwipeGesture/sidebar-edge-zone 覆盖补齐）已入库，与本改动无交集。
 
 *执行：暗骑；观察 #1/#3 闭环，#2 warn 分轨待针艺候选值*
+
+---
+
+## 8.9 warn 分轨执行 — amber-700/amber-400 换轨 + Toast 图标规格缺口修复（2026-11-06 20:40，commit f5fae739df）
+
+> 规格来源：针艺复议结论 §warn 候选值（L118-135）；招财 19:46 确认 P1 范围。执行前将其全部实测值独立脚本复算，14 项 ✓（校准项 amber-600/bluish-800 = 4.33）。
+
+### 8.9.1 令牌换轨（针艺规格照单）
+
+| 项 | 变更 |
+|----|------|
+| static amber-700 | 双主题块新增 rgb(147,95,7)（=amber-500×0.6，严格同色相 37.7°） |
+| state-warn-label | 亮 amber-600→**amber-700**：white/b60/b75/amber-100 = 5.41/5.00/4.86/5.01 全 ✓；暗 amber-600→**amber-400**（现有，零新增）：b950/875/850/800 = 9.53/8.21/7.28/6.32，amber-900 徽章底 8.08 全 ✓ |
+| state-warn-primary | 亮 amber-500→**amber-700**（亮端圆点/描边 2.15 ❌→5.41 ✓；白字压 amber-700 填充 5.41 ✓ 无副作用）；暗 amber-500 不变 |
+| 契约注释 | 按 error 分轨先例（L262/L385）在亮暗两块各加一行 |
+
+label 轨 14 处文字消费随换值自动全修：ModelSelect 两端 ❌、ExcelBody `.notice`、FontNotice、ConnectionIndicator（亮 2.58/2.79 系全清）、`.formulaWarning` 图标亮端 2.79<3 ❌→5.01 ✓。
+
+### 8.9.2 warn-primary 文字消费迁移（针艺 6 处 + ANSI 1 处）
+
+- 6 处照单迁 label：MessageItem:308、Tag:51、ApprovalPanel:26、PluginManagerPage:720、PlanReviewPanel:36、ToolDetails:173（针艺记 172，实测偏 1 行）。
+- **第 7 处（针艺清单外，TS 层，按观察 #1 同类原则迁）**：`ansi.ts` SGR 93 bright yellow → warn-secondary 为文字消费，亮端 amber-400 on bluish-50 = **1.83 ❌❌**（今日全程最劣单点）；迁 label：亮 5.18 ✓ / 暗 9.00 ✓（暗端 secondary=label=amber-400 **零视觉变化**）；spec :52 断言同步。代价同 SGR 91 先例：亮端 SGR 33/93 合并为 amber-700 同色（暗端 500/400 仍分档）——备案针艺复测。
+- SGR 33（→primary）不迁：primary 亮端换轨后自动 2.15 ❌→5.41 ✓、暗端 b900 8.01 ✓——与 SGR 31 保留 primary 先例同构。
+- primary 轨保留（填充/描边）：StateDot:22（圆点，亮 amber-700 5.41 ✓）、StateDot:100、Tag:50、ConnectionIndicator:46/54、PluginManagerPage:1154、Band:66。
+- Band.module.css（experimental，Claude Code 终端调色板）：`git show 0242783893` 证实 82 处 error 迁移未触及该文件；:56 黄 / :57 红均 primary 轨且双端过（亮 b60 5.00 / 暗 b875 底 7.31、4.78 ✓）→ **不动**，调色板语义与 ANSI SGR 31/33 处理对齐。
+
+### 8.9.3 Toast 图标规格缺口（针艺规格未覆盖；数学必然解 + 备案复测）
+
+- `.icon`（warning 变体，Toast.module.css:46）消费 **warn-label**；toast-bg 恒深：亮 bluish-800 / 暗 **bluish-750**（针艺「双主题 b800」为笔误，文件注释 L28-30 自证）。label 亮端换轨后图标 = amber-700 on b800 = **2.24 ❌**（图形类 3:1）；其 L135「4.32 维持排除」按旧值 amber-600 计算，换轨后失效。
+- warn 家族唯一可行解 = **warn-secondary**（amber-400 双主题同值）：亮 6.32 ✓ / 暗 5.01 ✓——primary 亮端同批切 700（2.24 ❌ 同病）、tertiary 近白填充，无第三选项，**数学必然非偏好**；且补对称缺口：success 图标本就在填充轨（success-primary），warn 图标挂文字轨才是异常。已迁 + 英文契约注释，**备案针艺复测否决**。
+- Toast 无 error 变体（源码全读证实）；success 图标 green-500 双 toast 底 5.31/4.21 ✓ 不受任何换轨影响。
+- 顺带备案 2 处 label 轨填充反用（**不动**，复测时判是否迁 primary 轨）：TrajectoryTimeline:212 `background:`（数值过：亮 5.41/暗 6.32+，仅分轨语义反）、TrajectoryCell:95 / TrajectoryTable:701 color-mix 62%（色相微移）。
+
+### 8.9.4 测试与提交
+
+- ansi 定向 76/76 绿；**test:gui 全量 10245 passed / 0 failed / 1 skipped（46.96s）**——recycler-stress 未复现，今日归因后首次全绿 run。
+- 无新增 alias（amber-700 为 static），BUILTIN_INSPECT_TOKENS 无需注册；file-type-icon spec 的 static amber-400/500 断言不受影响；lifecycle-chrome e2e 探针引令牌名非值，不受影响。
+- commit：`f5fae739df`（fix 10 文件 23+/14−）。
+
+*执行：暗骑；规格：针艺 warn 候选值；复测签收待针艺（含备案三项：Toast 缺口解、SGR 93 第 7 处、亮端 SGR 33/93 合并）*
