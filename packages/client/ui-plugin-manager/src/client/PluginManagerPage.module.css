@@ -717,7 +717,7 @@
 .installSafety > svg {
   flex: none;
   margin-top: 2px;
-  color: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-state-warn-label);
 }
 
 .guideList {

@@ -49,7 +49,7 @@ describe('parseAnsiLines: basic colors mapped onto theme tokens', () => {
     ['32', 'green', 'var(--dsw-alias-state-success-primary)'],
     ['92', 'bright green', 'var(--dsw-alias-state-success-secondary)'],
     ['33', 'yellow', 'var(--dsw-alias-state-warn-primary)'],
-    ['93', 'bright yellow', 'var(--dsw-alias-state-warn-secondary)'],
+    ['93', 'bright yellow', 'var(--dsw-alias-state-warn-label)'],
     ['34', 'blue', 'var(--dsw-alias-state-business-primary)'],
     ['94', 'bright blue', 'var(--dsw-static-blue-400)'],
     ['36', 'cyan', 'var(--dsw-static-blue-600)'],

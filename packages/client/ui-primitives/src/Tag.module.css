@@ -48,7 +48,7 @@
 
 .tag[data-tone='warning'] {
   background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 12%, transparent);
-  color: var(--dsw-alias-state-warn-primary);
+  color: var(--dsw-alias-state-warn-label);
 }
 
 .tag[data-tone='danger'] {

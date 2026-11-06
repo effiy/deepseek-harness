@@ -6,6 +6,7 @@ body {
   --dsw-static-amber-400: rgb(247, 173, 49);
   --dsw-static-amber-500: rgb(245, 158, 11);
   --dsw-static-amber-600: rgb(221, 134, 41);
+  --dsw-static-amber-700: rgb(147, 95, 7);
   --dsw-static-amber-900: rgb(39, 36, 31);
   --dsw-static-blue-100: rgb(219, 234, 254);
   --dsw-static-blue-300: rgb(147, 197, 253);
@@ -91,6 +92,7 @@ body[data-ds-dark-theme] {
   --dsw-static-amber-400: rgb(247, 173, 49);
   --dsw-static-amber-500: rgb(245, 158, 11);
   --dsw-static-amber-600: rgb(221, 134, 41);
+  --dsw-static-amber-700: rgb(147, 95, 7);
   --dsw-static-amber-900: rgb(39, 36, 31);
   --dsw-static-blue-100: rgb(219, 234, 254);
   --dsw-static-blue-300: rgb(147, 197, 253);
@@ -267,8 +269,9 @@ body {
   --dsw-alias-state-success-primary: var(--dsw-static-green-500);
   --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
   --dsw-alias-state-success-tertiary: var(--dsw-static-green-100);
-  --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
-  --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
+  /* Warn text tier (design review 2026-11-06): light reads amber-700, >=4.86:1 on every warn text surface; fills, dots, and borders keep state-warn-primary. */
+  --dsw-alias-state-warn-label: var(--dsw-static-amber-700);
+  --dsw-alias-state-warn-primary: var(--dsw-static-amber-700);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-100);
   --dsw-alias-switch-thumb: var(--dsw-static-neutral-bluish-00);
@@ -390,7 +393,8 @@ body[data-ds-dark-theme] {
   --dsw-alias-state-success-primary: var(--dsw-static-green-500);
   --dsw-alias-state-success-secondary: var(--dsw-static-green-400);
   --dsw-alias-state-success-tertiary: var(--dsw-static-green-900);
-  --dsw-alias-state-warn-label: var(--dsw-static-amber-600);
+  /* WCAG AA: amber-600 text falls to 4.33:1 on layer-3; amber-400 holds >=6.32:1 on every dark layer and 8.08:1 on the amber-900 badge fill. */
+  --dsw-alias-state-warn-label: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-primary: var(--dsw-static-amber-500);
   --dsw-alias-state-warn-secondary: var(--dsw-static-amber-400);
   --dsw-alias-state-warn-tertiary: var(--dsw-static-amber-900);

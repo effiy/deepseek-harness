@@ -43,7 +43,11 @@
   display: grid;
   place-items: center;
   flex: none;
-  color: var(--dsw-alias-state-warn-label);
+  /* The icon is a graphic on the always-dark toast surface, so it rides the
+     fill track: warn-secondary is a fixed amber-400 in both themes (6.32:1
+     light / 5.01:1 dark), while the light-theme label amber-700 would fall
+     to 2.24:1 here. */
+  color: var(--dsw-alias-state-warn-secondary);
 }
 
 .icon.success {
