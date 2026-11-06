@@ -1,6 +1,6 @@
 /** Shared language, wrapping, and clipboard controls for code cards. */
 import {
-  IconCheckOutlineRegular, IconCopyOutlineRegular, IconNowrapFillRegular, IconWrapFillRegular,
+  IconCheckOutlineRegular, IconCopyOutlineRegular, IconNowrapFillRegular, IconRightUpOutlineRegular, IconWrapFillRegular,
 } from './icons/index.tsx'
 import { Tooltip } from './Tooltip.tsx'
 import { supportsHighlighting } from './markdown/highlight.ts'
@@ -28,6 +28,10 @@ interface CodeToolbarProps {
   wrapped: boolean
   onCopy?: (() => void) | undefined
   onWrap?: (() => void) | undefined
+  /** Expand-to-fullscreen action; omitted when fullscreen is unavailable. */
+  onFullscreen?: (() => void) | undefined
+  /** Accessible label for the fullscreen expand button. */
+  fullscreenLabel?: string | undefined
 }
 
 /**
@@ -35,7 +39,10 @@ interface CodeToolbarProps {
  * @param props - Localized labels, current state, and card-owned actions.
  * @returns The shared code-card header.
  */
-export function CodeToolbar({ lang, title, status, labels, copyLabel, copiedLabel, copied, wrapped, onCopy, onWrap }: CodeToolbarProps) {
+export function CodeToolbar({
+  lang, title, status, labels, copyLabel, copiedLabel, copied, wrapped,
+  onCopy, onWrap, onFullscreen, fullscreenLabel,
+}: CodeToolbarProps) {
   const wrapLabel = wrapped ? labels.unwrapLabel : labels.wrapLabel
   const clipboardLabel = copied ? copiedLabel : copyLabel
   return (
@@ -54,6 +61,11 @@ export function CodeToolbar({ lang, title, status, labels, copyLabel, copiedLabe
         {onCopy !== undefined && <Tooltip label={clipboardLabel} side="top" portal>
           <button type="button" className={css.action} aria-label={clipboardLabel} onClick={onCopy}>
             {copied ? <IconCheckOutlineRegular size={14} /> : <IconCopyOutlineRegular size={14} />}
+          </button>
+        </Tooltip>}
+        {onFullscreen !== undefined && fullscreenLabel !== undefined && <Tooltip label={fullscreenLabel} side="top" portal>
+          <button type="button" className={css.action} aria-label={fullscreenLabel} onClick={onFullscreen}>
+            <IconRightUpOutlineRegular size={14} />
           </button>
         </Tooltip>}
       </div>

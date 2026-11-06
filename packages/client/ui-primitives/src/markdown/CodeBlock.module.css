@@ -188,3 +188,115 @@
     display: none;
   }
 }
+
+/* ── Fullscreen overlay ────────────────────────────────────────────────── */
+
+.fullscreenBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  /* Shared neutral scrim (the only exception from --dsw-* semantic color rule,
+     following the ImageLightbox precedent). */
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+}
+
+/* Tapping the darkened area behind the panel dismisses the overlay. */
+.fullscreenMask {
+  position: absolute;
+  inset: 0;
+}
+
+.fullscreenStage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 40px;
+  /* Safe-area inset for notched mobile screens. */
+  padding-top: calc(40px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(40px + env(safe-area-inset-left, 0px));
+  padding-right: calc(40px + env(safe-area-inset-right, 0px));
+}
+
+.fullscreenHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--dsw-alias-bg-base);
+  border-radius: var(--dsl-code-block-border-radius) var(--dsl-code-block-border-radius) 0 0;
+  flex-shrink: 0;
+}
+
+.fullscreenClose {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.fullscreenClose:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 3px;
+}
+
+.fullscreenBody {
+  flex: 1;
+  overflow: auto;
+  background: var(--dsl-code-block-background);
+  border-radius: 0 0 var(--dsl-code-block-border-radius) var(--dsl-code-block-border-radius);
+}
+
+/* Shiki's inline theme background needs routing inside the fullscreen overlay
+   too (same as the inline .block :where(pre.shiki) override). */
+.fullscreenBody :where(pre.shiki) {
+  background: var(--dsl-code-block-background) !important;
+}
+
+.fullscreenBody :where(pre) {
+  font: var(--dsl-code-block-content-font);
+  padding: 16px 24px;
+  margin: 0 !important;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--dsl-code-block-background);
+}
+
+/* Plain-text fallback: same as the inline .plain arm. */
+.fullscreenPre {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── Mobile: edge-to-edge overlay ─────────────────────────────────────── */
+@media (max-width: 640px) {
+  .fullscreenStage {
+    padding: 0;
+  }
+
+  .fullscreenHeader {
+    border-radius: 0;
+    padding: 12px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+  }
+
+  .fullscreenBody {
+    border-radius: 0;
+  }
+
+  .fullscreenBody :where(pre) {
+    padding: 12px;
+  }
+}

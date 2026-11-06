@@ -1,0 +1,50 @@
+/* Mobile message fold — clips long content at a configurable height with a
+   gradient fade and an expand / collapse toggle. */
+
+.wrapper {
+  position: relative;
+}
+
+/* Overflow-hidden + max-height clipping are driven by the inline style
+   so the collapsed cap — 300 px by default — stays configurable through
+   the React prop without extra class slots. */
+.content {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Fade from transparent to the chat background at the bottom 40 px —
+   the standard iOS / WeChat overflow hint.  The gradient sits on top
+   of the last visible lines while they are still readable underneath. */
+.fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--dsw-alias-bg-base)
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Caption-sized toggle button (针艺 §1: caption 12 / 16).  Centered,
+   full-width, and a 44-px touch target on mobile per HIG and 针艺 §3. */
+.toggle {
+  --dsl-message-fold-toggle-font: 12px/16px var(--dsw-font-family);
+  /* 针艺 §1 caption (12/16). Replace with --dsw-text-caption when PR-A lands. */
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 8px;
+  background: none;
+  border: none;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsl-message-fold-toggle-font);
+  cursor: pointer;
+  text-align: center;
+  min-height: 44px;
+}

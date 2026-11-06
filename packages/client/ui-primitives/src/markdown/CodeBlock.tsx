@@ -1,5 +1,6 @@
-import { Fragment, useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties, ReactNode, Ref } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { writeClipboard } from '../clipboard.ts'
 import { CodeToolbar, type CodeToolbarLabels } from '../CodeToolbar.tsx'
@@ -8,6 +9,7 @@ import {
 } from './highlight.ts'
 import type { HighlightSpan, StreamingHighlightFrame } from './highlight.ts'
 import { useViewportHighlighting } from './useViewportHighlighting.ts'
+import { IconCloseOutlineRegular, IconRightUpOutlineRegular } from '../icons/index.tsx'
 import css from './CodeBlock.module.css'
 
 export interface CodeBlockProps {
@@ -40,6 +42,11 @@ export interface CodeBlockProps {
   toolbarLabels?: CodeToolbarLabels | undefined
   /** With toolbarLabels, use the owner's wrapping preference and omit the toolbar's local wrap action. */
   wrap?: boolean | undefined
+  /** Label for the fullscreen expand button. When set, an expand button appears
+   *  for non-streaming code blocks and opens a full-viewport overlay. */
+  fullscreenLabel?: string | undefined
+  /** Accessible label for the fullscreen overlay close control. */
+  fullscreenCloseLabel?: string | undefined
 }
 
 /**
@@ -69,7 +76,8 @@ function renderLine(line: readonly HighlightSpan[], index: number): ReactNode {
 }
 
 export function CodeBlock({
-  code, lang, streaming, className, contentRef, lineNumbers = false, showHeader = true, copyLabel, copiedLabel, toolbarLabels, wrap,
+  code, lang, streaming, className, contentRef, lineNumbers = false, showHeader = true,
+  copyLabel, copiedLabel, toolbarLabels, wrap, fullscreenLabel, fullscreenCloseLabel,
 }: CodeBlockProps) {
   const trimmed = code.endsWith('\n') ? code.slice(0, -1) : code
   const sourceLines = lineNumbers ? trimmed.split('\n') : undefined
@@ -156,6 +164,33 @@ export function CodeBlock({
   const [copied, setCopied] = useState(false)
   const [localWrapped, setWrapped] = useState(true)
   const wrapped = wrap ?? localWrapped
+  const [fullscreen, setFullscreen] = useState(false)
+  // Fullscreen is available for settled (non-streaming) blocks only.
+  const canFullscreen = fullscreenLabel !== undefined && streaming !== true
+  // Re-compute highlighted HTML for the fullscreen overlay; the inline `html`
+  // may be undefined for blocks that were streamed and still hold a cached body.
+  const fullscreenHtml = useMemo(
+    () => (highlighting && streaming !== true ? highlightToHtml(trimmed, lang) : undefined),
+    [highlighting, streaming, trimmed, lang, loaded],
+  )
+
+  // Body scroll lock and Escape dismiss for the fullscreen overlay.
+  useEffect(() => {
+    if (!fullscreen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        setFullscreen(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKeyDown, true)
+    }
+  }, [fullscreen])
 
   const onCopy = useCallback(() => {
     if (copied) return
@@ -197,16 +232,59 @@ export function CodeBlock({
           lang={lang} labels={toolbarLabels} copyLabel={copyLabel} copiedLabel={copiedLabel}
           copied={copied} wrapped={wrapped} onCopy={onCopy}
           onWrap={wrap === undefined ? () => { setWrapped(value => !value) } : undefined}
+          onFullscreen={canFullscreen ? () => { setFullscreen(true) } : undefined}
+          fullscreenLabel={canFullscreen ? fullscreenLabel : undefined}
         /> : <div className={css.banner} data-code-block-banner>
           <div className={css.infostring}>{lang ?? ''}</div>
           <div className={css.action}>
             <button type="button" className={css.copyButton} onClick={onCopy}>
               {copied ? copiedLabel : copyLabel}
             </button>
+            {canFullscreen && (
+              <button type="button" className={css.copyButton} aria-label={fullscreenLabel} onClick={() => { setFullscreen(true) }}>
+                <IconRightUpOutlineRegular size={14} />
+              </button>
+            )}
           </div>
         </div>}
       </div>}
       <div ref={contentRef} className={css.content} data-code-block-content>{body}</div>
+      {fullscreen && createPortal(
+        <div className={css.fullscreenBackdrop} role="dialog" aria-modal="true" aria-label={fullscreenLabel}>
+          {/* Clicking the mask area behind the code panel dismisses the overlay,
+              matching the ImageLightbox backdrop-tap pattern. */}
+          <div className={css.fullscreenMask} aria-hidden="true" onMouseDown={() => { setFullscreen(false) }} />
+          <div className={css.fullscreenStage}>
+            <div className={css.fullscreenHeader}>
+              <span className={css.infostring}>{lang ?? ''}</span>
+              <div className={css.action}>
+                <button type="button" className={css.copyButton} onClick={onCopy}>
+                  {copied ? copiedLabel : copyLabel}
+                </button>
+                <button type="button" className={css.fullscreenClose} aria-label={fullscreenCloseLabel ?? fullscreenLabel ?? ''} onClick={() => { setFullscreen(false) }}>
+                  <IconCloseOutlineRegular size={16} />
+                </button>
+              </div>
+            </div>
+            <div className={css.fullscreenBody}>
+              {fullscreenHtml !== undefined
+                ? (
+                  /* shiki's HTML output is a static span tree — the sanctioned
+                     innerHTML consumption path per shiki's own docs. */
+                  <div dangerouslySetInnerHTML={{ __html: fullscreenHtml }} />
+                )
+                : (
+                  <pre className={css.fullscreenPre}><code>
+                    {sourceLines === undefined ? trimmed : sourceLines.map((line, index) => (
+                      <Fragment key={index}>{index > 0 && '\n'}<span className="line">{line}</span></Fragment>
+                    ))}
+                  </code></pre>
+                )}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }
