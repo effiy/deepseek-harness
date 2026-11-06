@@ -83,7 +83,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  animation: panel-enter 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: panel-enter 180ms var(--ds-ease-emphasized);
 }
 
 @keyframes panel-enter {
@@ -372,7 +372,11 @@
     transform: translate3d(-100%, 0, 0);
     opacity: 0;
     pointer-events: none;
-    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+    /* This closed-state transition is the dismissal timing: the drawer
+       exits faster than it enters (native iOS sheet behavior) and fades
+       out ahead of the slide. Presentation timing lives on the expanded
+       rule below. */
+    transition: transform 0.3s var(--ds-ease-accelerate), opacity 0.2s linear;
 
     /* Prevent subpixel flicker during animation on iOS */
     backface-visibility: hidden;
@@ -388,20 +392,24 @@
     transform: translate3d(0, 0, 0);
     opacity: 1;
     pointer-events: auto;
+    /* Presentation timing: the decelerating spring settles the drawer
+       into place (native iOS sheet curve); the fade finishes before the
+       slide so no translucent panel crosses the content. */
+    transition: transform 0.42s var(--ds-ease-spring), opacity 0.3s ease-out;
   }
 
   /* Collapsed: the default .sidebarCol already has opacity:0 +
      translate3d(-100%) + pointer-events:none.  When the expanded
-     rule is removed, the sidebar naturally slides out and fades
-     out in 300ms — no visibility:hidden snap to interrupt it. */
+     rule is removed, the sidebar slides out over 300ms, fading
+     ahead of the slide — no visibility:hidden snap to interrupt it. */
   .frame[data-sidebar-collapsed] .sidebarCol {
     border-right: none;
     background: transparent;
   }
 
   /* Visual backdrop: always present but faded out when collapsed.
-     Uses opacity transition for a smooth fade-in/fade-out that
-     matches the sidebar slide animation.  translateZ(0) forces
+     Fades on the drawer's presentation/dismissal timings so the dim
+     tracks the slide in both directions.  translateZ(0) forces
      GPU layer promotion to avoid compositing issues on iOS. */
   .frame::after {
     content: '';
@@ -412,11 +420,12 @@
     opacity: 0;
     pointer-events: none;
     transform: translateZ(0);
-    transition: opacity 0.35s ease;
+    transition: opacity 0.3s ease;
   }
 
   .frame:not([data-sidebar-collapsed])::after {
     opacity: 1;
+    transition: opacity 0.42s var(--ds-ease-spring);
     /* Capture all pointer events while the backdrop is visible so iOS Safari
        cannot pass touches through to conversation-area elements below.  Without
        this, the backdrop is purely visual and ghost clicks on buttons / inputs
