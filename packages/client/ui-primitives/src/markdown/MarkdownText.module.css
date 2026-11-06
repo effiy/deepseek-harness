@@ -512,9 +512,11 @@
   line-height: 18px;
 }
 
-/* ── Mobile: compact markdown spacing ───────────────────────────────────
+/* ── Mobile: compact markdown spacing + table overflow fade ──────────────
  * Tighten heading and paragraph margins on narrow screens so the reader
- * sees more content per screen without sacrificing hierarchy. */
+ * sees more content per screen without sacrificing hierarchy.
+ * The trailing-edge mask on scrollable tables mirrors the code-block
+ * overflow hint: a gradient fade that signals "swipe sideways." */
 @media (max-width: 640px) {
   .markdown :where(h1, h2, h3) {
     margin: 20px 0 10px;
@@ -524,5 +526,18 @@
   }
   .markdown p {
     margin: 12px 0;
+  }
+
+  .tableScroll {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black calc(100% - 40px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      black calc(100% - 40px),
+      transparent
+    );
   }
 }

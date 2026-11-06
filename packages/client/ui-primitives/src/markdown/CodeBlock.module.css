@@ -144,12 +144,47 @@
   user-select: none;
 }
 
-/* ── Mobile: tighter code-block margins ────────────────────────────────── */
+/* ── Mobile: tighter code-block margins + overflow fade ────────────────── */
 @media (max-width: 640px) {
   .block {
     margin: 10px 0;
   }
   .block:not(:last-child) {
     margin-bottom: 8px;
+  }
+
+  /* Gradient fade on the trailing edge means "scroll sideways for more."
+     The 40px transparent tail fades the last glyphs so the user sees the
+     content is truncated without a scrollbar — the standard iOS/WeChat
+     overflow hint.  On short snippets that fit the viewport the fade
+     costs only the rightmost 40px of an already narrow column, so it
+     reads as a design choice rather than a defect. */
+  .block :where(pre) {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      black calc(100% - 40px),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      black calc(100% - 40px),
+      transparent
+    );
+    /* Tighter horizontal padding for mobile gives the text more room
+       before the fade kicks in. */
+    padding: 12px;
+  }
+}
+
+/* ── Narrow screens (≤480px): hide line-number gutters ──────────────────
+ * The gutter eats ~30px of already-scarce horizontal space.  Drop it
+ * and let the code fill the full width; the copy button in the sticky
+ * banner still gives orientation. */
+@media (max-width: 480px) {
+  .numbered :where(pre) code > :global(.line) {
+    padding-inline-start: 0;
+  }
+  .numbered :where(pre) code > :global(.line)::before {
+    display: none;
   }
 }
