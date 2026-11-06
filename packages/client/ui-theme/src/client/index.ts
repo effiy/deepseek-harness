@@ -132,19 +132,21 @@ const BUILTIN_THEMES: readonly ThemeDefinition[] = Object.freeze([
   Object.freeze({ id: 'dark', colorScheme: 'dark' as const, tokens: Object.freeze({}) }),
 ])
 
-/** OLED pure-black theme: dark palette with #000 surface family. Floating
- *  layers (overlay, toast, menu) keep the dark b900 family; body text drops
- *  to bluish-100 for halation control on pure-black backgrounds per design
- *  review (2026-11-07).  Battery saving is quantifiable: OLED pixels at #000
- *  draw near-zero power. */
+/** OLED pure-black theme: dark palette with #000 surface family.  Base stays
+ *  pure black; layers 1-3 receive subtle elevation lift (12/18/23 per-channel
+ *  — designer ruling, 2026-11-07) so nested surfaces stay perceptible without
+ *  breaking the OLED power envelope.  Floating layers (overlay, toast, menu)
+ *  keep the dark b900 family; body text drops to bluish-100 for halation
+ *  control on pure-black backgrounds.  Battery saving is quantifiable: OLED
+ *  pixels at #000 draw near-zero power. */
 const OLED_THEME: ThemeDefinition = Object.freeze({
   id: 'oled' as const,
   colorScheme: 'dark' as const,
   tokens: Object.freeze({
     '--dsw-alias-bg-base': '#000000',
-    '--dsw-alias-bg-layer-1': '#000000',
-    '--dsw-alias-bg-layer-2': '#000000',
-    '--dsw-alias-bg-layer-3': '#000000',
+    '--dsw-alias-bg-layer-1': '#0c0c0c',
+    '--dsw-alias-bg-layer-2': '#121212',
+    '--dsw-alias-bg-layer-3': '#171717',
     '--dsw-alias-label-primary': 'var(--dsw-static-neutral-bluish-100)',
     '--dsw-specific-sidebar-fill': '#000000',
     '--dsw-specific-keyboard-fill': '#000000',
