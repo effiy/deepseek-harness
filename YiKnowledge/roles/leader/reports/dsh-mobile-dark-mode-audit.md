@@ -262,3 +262,108 @@
 ---
 
 *审计工具：手动代码审查 + WCAG 2.1 相对亮度对比度公式 + ripgrep 全量扫描*
+
+---
+
+## 八、复查与修复附录（2026-11-06，守望 3️⃣ 号任务）
+
+**任务**：按 WCAG AA 复查 31 处高危硬编码，先修 `label-caption` 2.13:1 和 `label-tertiary` 3.71:1。
+
+**结果**：复查 35 处（原 31 + 复查新发现 4）｜ 修复 24 处 ｜ 重分类达标 11 处 ｜ 范围内剩余违规 **0**
+
+### 8.1 令牌层修复（design-platform.css）
+
+新增 3 个静态令牌（亮/暗两个色板块同步写入，保持 parity）：
+
+| 令牌 | 值 | 用途 |
+|---|---|---|
+| `--dsw-static-neutral-bluish-450` | `rgb(155, 161, 170)` | 暗色 caption |
+| `--dsw-static-neutral-bluish-650` | `rgb(110, 115, 121)` | 亮色 caption |
+| `--dsw-static-neutral-bluish-675` | `rgb(105, 110, 116)` | 亮色 tertiary |
+
+别名重映射及实测对比度（脚本验证）：
+
+| 别名 | 原值 | 新值 | 修复前 | 修复后 |
+|---|---|---|---|---|
+| 亮 `label-caption` | bluish-400 | bluish-650 | **2.13:1 ❌** | 4.78:1 白底 ✅ / 4.58:1 侧栏 bluish-50 ✅ |
+| 亮 `label-tertiary` | bluish-600 | bluish-675 | **3.71:1 ❌** | 5.14:1 白底 ✅ / 4.92:1 bluish-50 ✅ / 4.62:1 bluish-75 ✅ |
+| 暗 `label-caption` | bluish-600 | bluish-450 | layer-1 **4.24 ❌** / layer-2 **3.76 ❌** | base 7.01 / L1 6.04 / L2 5.36 / L3 4.65 全 ✅ |
+
+亮色层级保留：secondary 5.80 > tertiary 5.14 > caption 4.78（AA 压缩了层级间距，属合规必然代价）。暗色 tertiary（bluish-400）不动，全层达标。
+
+### 8.2 组件层修复（5 文件，24 处）
+
+| 文件 | 处数 | 修复内容 |
+|---|---|---|
+| `ui-message-actions/EditMessageInput.module.css` | 4+9 | 全文件假命名空间（`--dsw-surface-*`/`--dsw-text-*`/`--dsw-border-*` 均不存在）→ 真实别名令牌；btnPrimary → `button-primary-fill`+`label-primary-foreground`（亮 18.90 / 暗 18.08）；btnDanger 白字红底 3.91 ❌ → 应用标准 danger 模式（亮 4.50 / 暗 4.77）；另按 0.5px hairline 门禁修正 2 处 `1px` 边框 |
+| `ui-message-actions/UserMessageActions.module.css` | 4+4 | 假令牌 → 别名；图标走 `label-tertiary`→hover `label-primary`（Rows `.iconButton` 先例） |
+| `ui-message-actions/AssistantMessageActions.module.css` | 4 | **复查新发现**（无回退值所以躲过了原审计的硬编码 grep）：`--dsw-icon-*`/`--dsw-surface-secondary` → 别名令牌 |
+| `ui-attachment/FileCard.module.css` | 10 | 6 处死回退删除；假令牌 `fill-tertiary` → `bg-skeleton`；`.removeFailed` `#fff` → `label-primary-foreground`（暗色红底白字 3.29 ❌ → 深字 5.75 ✅） |
+| `ui-chat/MessageItem.module.css` | 2 | 2 处死回退删除 |
+
+验证 grep：假令牌命名空间全仓 **0 匹配**；ui-message-actions 字面色回退 **0 匹配**。
+
+### 8.3 重分类达标（11 处，不修）
+
+HoverCard×2、Rows hover 预览×4、SessionScheduleMark×5：figma 注明"两种主题固定暗色表面 `#2C2C2E`"（tooltip 类设计意图），其上文字实测 13.94 / 9.25 / 6.53:1 全部 ≥4.5 ✅。非违规，仅建议后续把表面色提升为 `--dsw-specific-hovercard-fill` 令牌（P2）。
+
+### 8.4 剩余 flag（令牌级设计决策，未单方面改）
+
+| # | 项 | 实测 | 建议 |
+|---|---|---|---|
+| 1 | 亮 `--dsw-alias-link`（deepseek-500） | 4.23:1 白底 ❌ | 品牌色决策，评估 deepseek-600（5.39:1） |
+| 2 | `label-dimmed` 作 Input placeholder | 亮 1.26 / 暗 1.90 ❌ | placeholder 是否豁免交设计判定；建议提至 caption 级 |
+| 3 | 应用级 danger hover：红字叠红色 tint | 亮 4.15 / 暗 3.95 ❌（瞬态） | 系统性（40+ 处），降 tint 透明度或加深错误文字色 |
+| 4 | red-600 白底 | 4.497:1 临界 | 全应用错误文字色，评估 rgb(224,18,18)（4.92:1） |
+| 5 | caption/tertiary 在着色填充上 | bluish-60/75/100 上 4.11~4.42 ❌ | 在着色填充上渲染 caption 的组件应改用 secondary |
+
+### 8.5 测试归因（test:gui 全量 290 失败 / 9724 通过）
+
+- **由我引入并已修复**：2 处（EditMessageInput 1px 边框触发 0.5px hairline 门禁）→ 定向重跑确认我的条目清零。
+- **预先存在/并发领域，未动**（AGENTS.md：不修不藏，交接记录）：
+  - `elevation-styles` 剩余 2 条：PullToRefresh spinner 2px（像素）、MobileBottomNav separator 1px（触手，未提交改动区）
+  - `corner-shape-styles`：PullToRefresh spinner（像素）
+  - `menu-surfaces`：ContextMenu.tsx（ui-chat 并发区）
+  - `AssistantMessageActions.client.spec` 7/9 失败：**stash 实验证明与我的 CSS 无关**（stash 掉我的 3 个 CSS 文件后同样 7/9 失败；vitest css:false，CSS 值不进 jsdom）——edit/delete 行为接线在 HEAD 即坏，属 ui-message-actions TSX/store 层
+  - 其余 280+：ui-chat（chat-view 161/163、chat-scroll 27/27、IntersectionObserver 环境缺失）、ui-conversation（apply-inject 15/15 等）、ui-tool、ui-sidebar、ui-layout、excel-worker——全部在其他 bot 未提交改动区（git status：MessageIconActions.tsx、AppFrame、SidebarEdgeZone、ui-settings/index.ts）
+
+*复查工具：WCAG 2.1 相对亮度脚本（最终值全表验证）+ ripgrep 全仓扫描 + vitest 定向重跑 + git stash 归因实验*
+
+---
+
+## 8.6 产品决策执行（2026-11-06 午间轮，commit d1d669339d）
+
+> 决策来源：`YiKnowledge/roles/product/reports/2026-11-06-暗黑对比度与徽章插槽产品决策.md`（招财，5 flag 全裁决，无豁免搁置）
+> 执行范围：#1/#2/#3/#4 捆绑令牌 PR + #5 约定清单；PR 9 文件 71+/54- = 125 行（< 200 ✅）；设计品味对 #1/#2 的异步复议不阻塞、不回滚。
+
+### 8.6.1 令牌与消费点改动（对比度全部脚本实测）
+
+| # | 裁决 | 改动 | 前 → 后 |
+|---|------|------|---------|
+| 1 | 亮 link 加深一档 | `--dsw-alias-link`（亮）deepseek-500 → deepseek-600 | 白底 4.23 ❌ → **5.39** ✅；亮 tint 填充 b50/60/75/100 = 5.15/4.98/4.84/4.63 全过；暗 link（deepseek-400）不动 |
+| 2 | placeholder 提至 caption 级 | ui-primitives `Input.module.css` + ui-settings-models `ModelsSection.module.css` 的 `::placeholder`：label-dimmed → label-caption | 亮 1.26 ❌ → **4.78** ✅；暗 1.90 ❌ → **7.01/6.04/5.36/4.65**（base/L1/L2/L3）✅。house style 先例：FeedbackDialog、TaskManagerPage 的 spec 早已断言 placeholder=caption |
+| 3 | danger hover tint 降透明度 | 亮 rgba(236,19,19,0.05) → rgba(224,18,18,0.04)；暗 rgba(242,90,90,0.15) → rgba(242,90,90,0.04) | 亮：红字叠 tint 白底 4.15 ❌ → **4.61** ✅；暗：red-400 叠 tint on layer-1 3.95 ❌ → **4.56** ✅、base **5.33** ✅ |
+| 4 | red-600 切换 | `--dsw-static-red-600` 与 `-a08`（两主题静态块）rgb(236,19,19) → rgb(224,18,18) | 白底红字 4.497 临界 → **4.92** ✅；白字红底 4.50 → **4.92** ✅；FileTypeIcon pdf 图标（图形 ≥3:1）亮 4.92 / 暗 3.17 ✅ |
+| 5 | 着色填充上说明文字改 secondary（约定） | 确认违规 1 处已修：ui-trajectory `TrajectoryTable.module.css` `.promptDiffLinemeta` caption → secondary（对齐同族 `.promptDiffLinecontext`） | caption on b60 4.42 ❌ → secondary **5.36** ✅ |
+
+**#3 暗色"降一档"在数学上不够**：0.15→0.12 在 layer-1 只回到 4.12 仍 ❌。red-400（L=0.269）要在 layer-1（rgb(35,35,36)）上回 ≥4.5，需 tint alpha ≤0.05——故取 0.04（4.56，留余量）并与亮色对称。hover 反馈不丢：色相偏移仍在，danger 态同时有文字/图标变色。
+
+### 8.6.2 #5 受影响组件清单（38 个 tint 消费文件，规则级筛选 + 人工复核）
+
+- **已修（1 处）**：TrajectoryTable `.promptDiffLinemeta`（caption on bg-module-platform b60 = 4.42 ❌）。
+- **复核后排除（4 处）**：DatePicker `.selected` 在 b100 上用 label-primary（达标）；TextPreview 的 tertiary 是 `:disabled`（WCAG 1.4.3 豁免）且不在 b100 上；QuestionComposer 消费的是 `sidebar-nav-item-active-accent` 变体（非点名填充）；Reference `.unbound` / TrajectoryTable `.turnLabel` tertiary on b60 = 4.75 ✅（bluish-675 修复后 tertiary 在 b60/b75 全过，仅 b100 上 4.42 ❌）。
+- **P1 候选（7 文件，hover 级联）**：ChatView、MessageItem、InputBar、ModelsSection、SkillRow、ToolRow、bash-sample——hover/active 背景含 interactive-bg-hover-solid 或 button-floating-hover（均 b75），且文件内有 caption 消费；caption on b75 = 4.30 ❌（瞬态 hover），tertiary = 4.62 ✅ 不涉案。P1 修复时逐元素确认 caption 文字是否真落入 hover 区域。
+- **补充**：新 red-600 在 b75/b100 上为 4.43/4.23——错误文字上着色填充走同一约定（换深色或换填充）。
+- **label-dimmed 其余 7 处消费全部是 `:disabled` 态**（ModelSelect×2、PermissionSelect、TrajectoryToolbar、WorkspaceBrowser、QuestionComposer、HeroShell），按 WCAG 1.4.3  disabled 豁免保留 dimmed，不动。
+
+### 8.6.3 测试归因（test:gui 全量 57 failed / 9968 passed / 1 skipped，23 failed files；早间 290 红已大幅收敛）
+
+- **本 commit 触及文件的所有覆盖 spec 全绿**：styles.client.spec（ModelsSection 门禁）、file-type-icon-styles、scrollbar-styles、ui-trajectory、task-manager-page（断言 placeholder=caption）、message-feedback styles、ui-primitives 行为 specs。
+- **57 红全部在并发改动区**：elevation-styles 唯一红 = MobileBottomNav `.separator` 1px（触手）；corner-shape 唯一红 = PullToRefresh `.spinner`（像素——RING_TRACKS 豁免了 border 门禁，corner-shape 配对仍缺）；menu-surfaces = ContextMenu.tsx（ui-chat 并发区）；AssistantMessageActions spec = HEAD 预先存在的接线失败（早间 stash 实验已证）；其余 = ui-conversation 键盘接线、excel preview workers、connection 重试、ui-sidebar 快照。
+- 归因依据：vitest css:false，CSS 值改动不进 jsdom，行为 spec 不可能受本 commit 影响。
+
+### 8.6.4 新观察（非本轮 flag，建议单独立项）
+
+暗色 `state-error-primary`（red-400）在 bg-layer-2（rgb(44,44,46)）/ bg-layer-3（rgb(53,54,56)）上原生即 **4.24 / 3.71 ❌**——与 tint 无关，是暗色错误文字梯度问题。修需评估更亮的红或调整层表面色，涉及暗色品牌色，交设计/产品排期。
+
+*执行：暗骑；commit d1d669339d（代码 9 文件 125 行）+ 本报告 §8.6（docs）*
