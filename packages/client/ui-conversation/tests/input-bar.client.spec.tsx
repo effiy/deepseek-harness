@@ -380,6 +380,35 @@ describe('composer focus handoff', () => {
   })
 })
 
+describe('streaming focus retention (Story 1.4)', () => {
+  it('keeps the typing focus, editor node and draft across streaming session flips', () => {
+    const { view, shell, textarea, session } = bench()
+    act(() => { shell.focus() })
+    writeDraft(shell, '正在输入的消息')
+    expect(document.activeElement).toBe(textarea)
+    const lexicalFocus = vi.spyOn(shell.editor, 'focus')
+
+    // Streaming lifecycle: chunk arrivals flip the shared session snapshot
+    // repeatedly while running, then settle back to idle. Each set is one
+    // re-render pass over the resident bar (the same trigger surface the
+    // chat-side flow updates produce through the shared session store).
+    act(() => { session.set(snapshotOf({ running: true })) })
+    act(() => { session.set(snapshotOf({ running: true })) })
+    act(() => { session.set(snapshotOf({ running: false })) })
+
+    // Focus is never stolen (no blur path fires, and nothing re-focuses
+    // programmatically — a Lexical re-focus would restore a stored selection
+    // and jump the caret), the editor survives as the same DOM node (no
+    // remount), the draft text stays, and the surface remains editable.
+    expect(document.activeElement).toBe(textarea)
+    expect(lexicalFocus).not.toHaveBeenCalled()
+    expect(view.container.querySelector('[data-composer-input]')).toBe(textarea)
+    expect(shell.state.getSnapshot().draft).toBe('正在输入的消息')
+    expect(textarea.textContent).toContain('正在输入的消息')
+    expect(editableOf(textarea)).toBe(true)
+  })
+})
+
 describe('composer placeholder visibility', () => {
   it.each([' ', '   ', '\t', '\n'])('hides for whitespace %j and returns after deletion', async (draft) => {
     const { view, shell, textarea, button, sink, props } = bench()

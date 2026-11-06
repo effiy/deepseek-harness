@@ -1,6 +1,6 @@
 # DSH Web 移动端触控交互 & 键盘避让验证报告
 
-**日期**: 2026-11-04（2026-11-06 修订：VirtualKeyboard 退役 + 原生键盘 E2E 验收，见 §9）
+**日期**: 2026-11-04（2026-11-06 修订：VirtualKeyboard 退役 + 原生键盘 E2E 验收，见 §9；2026-11-07 修订：Story 1.4 本体证据闭环，见 §9.4）
 **域**: AI 专家 (aier)
 **工兵**: DSH·触控交互·钳子
 **评级标准**: S（原生级）/ A（优秀）/ B（及格）/ C（不可交付）
@@ -378,7 +378,7 @@ export function useTouchCapability(): TouchCapability
 | 1.1 | 消息列表高度自适应缩短 | **有意架构偏差**：scrollport 不缩短——transform 抬升零 reflow（防键盘动画期抖动），消息可达性由 `scroll-padding-bottom` + delta 补偿保证（ConversationRoot.module.css 注释即此理由）；resizes-content 场景演示平台真缩短路径 | ✅（意图达成，方式不同） |
 | 1.2 | 输入框回到原位、无布局跳动 | harness focusout 延迟重置（blur 后 100/350ms 无 vv 事件也归零，composerBottom 回 812）+ clamp（关闭不负越界）+ rapid open/close（单帧双事件零抖动） | ✅ |
 | 1.3 | 发送后自动平滑滚动到底部 | ui-chat follow 体系既有 specs：`chat-scroll.client.spec.tsx`「coalesces submitted inputs into one follow」「returns to bottom immediately」、`scroll-follow.client.spec.ts` 平滑/即时动画 | ✅（ui-chat 域证据；**勘误**：验收进度表曾把「1.3」映射到本 harness 的 scrollTop delta 断言——delta 补偿属 1.1/1.2 键盘机制，发送滚动属 follow 体系） |
-| 1.4 | 流式输出不抢焦点 | 铁甲在途（验收进度表分工）；本侧相邻基建就绪：card-press 焦点恢复（§9.5）+ WeChat-style 不自动回焦 2 specs | 🟡 铁甲 |
+| 1.4 | 流式输出不抢焦点（焦点不丢、光标不跳、键盘不收起） | **铁甲本体实测闭环（11-07）**：① 代码审计——全仓 6 处生产 focus() 全部用户手势触发（onClick handler ×3、`navigateFeed` 键盘导航带 OWNER_SELECTOR 守卫、`facade.focus()` 显式回焦 API、view-binding 焦点恢复），流式渲染路径（chunk→node 更新→render→scroll-follow）零焦点操作，全仓零 `scrollIntoView`；② 定向 spec——`input-bar.client.spec.tsx` 新增 `streaming focus retention (Story 1.4)`：用户打字中 session 三连翻转（running true/true/false = 3 个渲染 pass，即聊天侧流式更新经共享 session store 对常驻 bar 的触发面），断言 activeElement 不变 + `editor.focus` 零调用（无程序化回焦=光标不跳）+ 编辑器 DOM 节点同一（零 remount）+ 草稿机器/DOM 双层保留 + contenteditable 持续可编辑，**121/121 绿**；③ 键盘不收起=焦点保持的移动端推论——全仓唯一生产 blur 路径是发送后收起（InputBar sentRef 守卫，仅真实提交后触发，流式期间不可达）。相邻基建：card-press 焦点恢复（§9.5）+ WeChat-style 不自动回焦 2 specs | ✅ |
 | 1.6 | 滚动流畅 ≥60fps、有惯性 | 前轮已验：`overscroll-behavior-y: contain` + `-webkit-overflow-scrolling: touch` + `touch-action: pan-y`（触手 2026-11-06 自查确认在位）；replica 页携带同款规则参与 delta/clamp 断言 | ✅（CSS 机制级；60fps 真机实测为发布项） |
 
 ### 9.5 配套生产回归修复（焦点域，本轮发现并修复）
