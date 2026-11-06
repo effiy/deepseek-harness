@@ -17,7 +17,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react'
 import clsx from 'clsx'
 import {
-  createTapGuard, IconPanelLeftOutlineRegular, IconPlusOutlineMedium, IconWarningOutlineRegular,
+  createTapGuard, IconPlusOutlineMedium, IconWarningOutlineRegular,
   TAP_GUARD_WINDOW_MS, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
@@ -48,7 +48,6 @@ export const InputBar = memo(function InputBar({
   useSession, useInput, inputActions, keyboard, addFiles, removeAttachment, resolveDraftAttachments,
   retryFileUpload,
   toggleCommandMenu, stop, t,
-  toggleSidebar,
   renderSlot, useBusyEnter, useFileUploads, useNotices, useLexicon, useMenuLauncher, useStopShortcut,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
   workspacePickerOpen = false, onRequestWorkspace,
@@ -465,19 +464,6 @@ export const InputBar = memo(function InputBar({
         />
         <div ref={rowRef} className={css.row}>
           <div className={css.tools} hidden={activity}>
-            {toggleSidebar && (
-              <Tooltip label={t('input.sidebarToggle')} delayMs={500}>
-                <button
-                  type="button"
-                  className={css.sidebarToggle}
-                  aria-label={t('input.sidebarToggle')}
-                  onPointerDown={(e) => { e.preventDefault() }}
-                  onClick={() => { toggleSidebar() }}
-                >
-                  <IconPanelLeftOutlineRegular size={16} />
-                </button>
-              </Tooltip>
-            )}
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>
               <button
                 type="button"

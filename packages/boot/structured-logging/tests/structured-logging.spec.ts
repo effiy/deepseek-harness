@@ -129,6 +129,21 @@ describe('structured-logging', () => {
     expect(existsSync(file)).toBe(false)
   })
 
+  it('boots inert on the shipped base-bundle row expression', async () => {
+    // Verbatim copy of the base bundle's cordis.patch.yml row config: the
+    // !!js expression must evaluate to undefined and pass schema validation
+    // without activating the sink, or every profile boot would fail.
+    const saved = process.env.DSH_LOG_FILE
+    delete process.env.DSH_LOG_FILE
+    try {
+      const { ctx, file } = await boot(() => ['file: !!js process.env.DSH_LOG_FILE || undefined'])
+      expect(() => ctx.logger.warn('dropped')).not.toThrow()
+      expect(existsSync(file)).toBe(false)
+    } finally {
+      if (saved !== undefined) process.env.DSH_LOG_FILE = saved
+    }
+  })
+
   it('sanitizes errors, cycles, and exotic primitives', async () => {
     const { ctx, file } = await boot(withFile)
     ctx.logger.error(new Error('boom'))

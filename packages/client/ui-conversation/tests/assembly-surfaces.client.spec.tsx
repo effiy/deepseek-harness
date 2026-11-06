@@ -67,7 +67,6 @@ function provideWorkspaceNavigation(runtime: SlotTestRuntime): (id: SessionId) =
     }),
     openSession,
   } as never)
-  runtime.ctx.provide('layout', { toggleSidebar: vi.fn() } as never)
   return openSession
 }
 

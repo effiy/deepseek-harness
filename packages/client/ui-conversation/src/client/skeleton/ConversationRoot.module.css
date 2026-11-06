@@ -530,6 +530,18 @@ button.crumb:hover {
   );
 }
 
+/* Narrow viewports: the shell's bottom navigation (ui-layout MobileBottomNav,
+   shown at ≤900px) owns the home-indicator clearance there, so repeating the
+   env() margin on the seat would double the gap and float the composer above
+   the nav. Above the gate (desktop, iPad landscape) the base rule stays the
+   only clearance. */
+@media (max-width: 900px) {
+  .root[data-phase='active'] .composerSeat,
+  .embeddedBody[data-content-phase='active'] .composerSeat {
+    margin-bottom: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .root[data-phase='active'] .composerSeat,
   .embeddedBody[data-content-phase='active'] .composerSeat {

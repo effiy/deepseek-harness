@@ -2,7 +2,7 @@
  * Mobile content-contract verification for the 2026-11-06 gap-analysis ⚠️ items.
  *
  * Covers the runtime layout behaviors that unit-level DOM parity cannot show:
- * Story 3.2 (wide code blocks scroll internally without page overflow),
+ * Story 3.2 (wide code blocks wrap inside their block without page overflow),
  * 3.4 (wide tables ride a scroll wrapper), 3.5 (wide images stay contained),
  * 3.6 (image lightbox preview opens), 4.6 (a failed image degrades to its alt
  * fallback), 2.9 (the composer draft survives a bottom-nav panel switch),
@@ -10,7 +10,9 @@
  * confirmed absence of a non-modal offline indicator), and the shell.bottom
  * default-occupant contract landed with the 2026-11-06 bottom-nav wiring:
  * the bar renders at phone width with every `layout.bottom-nav` label
- * resolved, and its CSS gate hides it at desktop width.
+ * resolved, and its CSS gate hides it at desktop width. The tiers case pins
+ * composer containment at 375×667, 768×1024, and 1440×900: fully inside the
+ * viewport, focusable and typeable, and never overlapped by the bottom nav.
  *
  * The seeded session carries one assistant message with an over-wide fenced
  * code line, a five-column table, one route-fulfilled wide SVG image, and one
@@ -332,4 +334,35 @@ describe('web e2e: mobile content contracts (gap-analysis ⚠️ items)', () => 
     // intentionally aborted image request are expected and only counted.
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
+
+  it('tiers — the composer stays fully visible and focusable at 375, 768, and 1440 widths', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-mobile-composer-tiers'))
+    // Position-independent containment contract: the composer input is fully
+    // inside each viewport, takes focus and keystrokes, and clears again; when
+    // the bottom nav is on screen, the two boxes never overlap.
+    const composer = page.locator('[data-composer-input][contenteditable="true"]')
+    for (const [width, height] of [[375, 667], [768, 1024], [1440, 900]] as const) {
+      const tier = `${String(width)}x${String(height)}`
+      await page.setViewportSize({ width, height })
+      await composer.waitFor({ state: 'visible', timeout: 15_000 })
+      const box = await composer.boundingBox()
+      if (box === null) throw new Error(`composer has no bounding box at ${tier}`)
+      expect(box.x, `composer left edge at ${tier}`).toBeGreaterThanOrEqual(0)
+      expect(box.y, `composer top edge at ${tier}`).toBeGreaterThanOrEqual(0)
+      expect(box.x + box.width, `composer right edge at ${tier}`).toBeLessThanOrEqual(width)
+      expect(box.y + box.height, `composer bottom edge at ${tier}`).toBeLessThanOrEqual(height)
+      await composer.click()
+      await page.keyboard.type('TIER_PROBE')
+      expect(await composer.textContent()).toContain('TIER_PROBE')
+      await page.keyboard.press('ControlOrMeta+A')
+      await page.keyboard.press('Backspace')
+      const nav = page.getByRole('navigation', { name: 'Main navigation' })
+      if (await nav.isVisible()) {
+        const navBox = await nav.boundingBox()
+        if (navBox === null) throw new Error(`bottom nav has no bounding box at ${tier}`)
+        expect(box.y + box.height, `composer overlaps the bottom nav at ${tier}`)
+          .toBeLessThanOrEqual(navBox.y + 1)
+      }
+    }
+  }, 90_000)
 })

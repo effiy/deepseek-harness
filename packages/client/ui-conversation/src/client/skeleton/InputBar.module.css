@@ -3,11 +3,13 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* Side pads ride the shared clearance (figma Input_Bottom drew L32/R32/B8;
-     the sides narrow with the shared width axis); the bottom gradient mask
-     is owned by the chat scroller. No top pad: the composer stack's gap owns
-     the space above; the status strip still carries its own margin. */
-  padding: 0 var(--dsh-composer-side-clearance) 4px;
+  /* Side pads ride the shared clearance (the sides narrow with the shared
+     width axis); the bottom gradient mask is owned by the chat scroller.
+     No top pad: the composer stack's gap owns the space above; the status
+     strip still carries its own margin. No bottom pad: the composer seat
+     geometry owns the bottom clearance, docking the card as low as the
+     viewport allows. */
+  padding: 0 var(--dsh-composer-side-clearance);
 }
 
 .dock {
@@ -510,49 +512,6 @@
      * Use descendant selector for higher specificity than the base
      * .card rule which comes later in the cascade. */
     font-size: 16px;
-  }
-}
-
-/* ── Sidebar toggle button (mobile composer toolbar) ────────────────────────
-   Hidden on desktop; shown on narrow viewports where the sidebar is
-   collapsed and the composer toolbar is the primary thumb-accessible
-   surface.  The button sits in the tools row alongside the add (+)
-   control. */
-.sidebarToggle {
-  display: none;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: var(--dsw-radius-sm);
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-  transition: color 120ms ease, background-color 120ms ease;
-}
-
-.sidebarToggle:hover {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.sidebarToggle:active {
-  background: var(--dsw-alias-interactive-bg-active);
-}
-
-/* matches --dsh-bp-lg: 1024px */
-@media (max-width: 1024px) {
-  .sidebarToggle {
-    display: flex;
-  }
-}
-
-@media (pointer: coarse) {
-  .sidebarToggle {
-    min-width: 44px;
-    min-height: 44px;
   }
 }
 

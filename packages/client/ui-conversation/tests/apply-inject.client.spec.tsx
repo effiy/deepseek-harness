@@ -85,7 +85,6 @@ async function bench() {
     },
     openSession,
   } as never)
-  runtime.ctx.provide('layout', { toggleSidebar: vi.fn() } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
