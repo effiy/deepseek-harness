@@ -41,19 +41,19 @@ interface ZoomTransform {
  *  Discriminated by `kind` so the touchmove handler gains full type narrowing. */
 type GestureState =
   | {
-      kind: 'pinch'
-      initialDistance: number
-      initialScale: number
-      initialX: number
-      initialY: number
-      pinchCenterX: number
-      pinchCenterY: number
-    }
+    kind: 'pinch'
+    initialDistance: number
+    initialScale: number
+    initialX: number
+    initialY: number
+    pinchCenterX: number
+    pinchCenterY: number
+  }
   | {
-      kind: 'pan'
-      lastPanX: number
-      lastPanY: number
-    }
+    kind: 'pan'
+    lastPanX: number
+    lastPanY: number
+  }
 
 /**
  * Euclidean distance between two touch-point objects.
@@ -62,8 +62,11 @@ type GestureState =
  */
 function fingerDistance(touches: readonly { clientX: number; clientY: number }[]): number {
   if (touches.length < 2) return 0
-  const dx = touches[0]!.clientX - touches[1]!.clientX
-  const dy = touches[0]!.clientY - touches[1]!.clientY
+  const p0 = touches[0]
+  const p1 = touches[1]
+  if (!p0 || !p1) return 0
+  const dx = p0.clientX - p1.clientX
+  const dy = p0.clientY - p1.clientY
   return Math.sqrt(dx * dx + dy * dy)
 }
 
@@ -73,9 +76,12 @@ function fingerDistance(touches: readonly { clientX: number; clientY: number }[]
  * @returns the center as client coordinates.
  */
 function fingerCenter(touches: readonly { clientX: number; clientY: number }[]): { x: number; y: number } {
+  const p0 = touches[0]
+  const p1 = touches[1]
+  if (!p0 || !p1) return { x: 0, y: 0 }
   return {
-    x: (touches[0]!.clientX + touches[1]!.clientX) / 2,
-    y: (touches[0]!.clientY + touches[1]!.clientY) / 2,
+    x: (p0.clientX + p1.clientX) / 2,
+    y: (p0.clientY + p1.clientY) / 2,
   }
 }
 
@@ -170,8 +176,10 @@ export function ImageLightbox({ src, alt, labels, onClose }: {
     }
 
     if (touches.length === 1) {
-      const tx = touches[0]!.clientX
-      const ty = touches[0]!.clientY
+      const t = touches[0]
+      if (!t) return
+      const tx = t.clientX
+      const ty = t.clientY
       // Double-tap detection must run BEFORE the pan track is set up, so a
       // quick pair of taps (even on a zoomed image) triggers the toggle
       // rather than starting a pan gesture.
@@ -234,10 +242,12 @@ export function ImageLightbox({ src, alt, labels, onClose }: {
 
     if (g.kind === 'pan') {
       if (touches.length !== 1) return
-      const dx = touches[0]!.clientX - g.lastPanX
-      const dy = touches[0]!.clientY - g.lastPanY
-      g.lastPanX = touches[0]!.clientX
-      g.lastPanY = touches[0]!.clientY
+      const t = touches[0]
+      if (!t) return
+      const dx = t.clientX - g.lastPanX
+      const dy = t.clientY - g.lastPanY
+      g.lastPanX = t.clientX
+      g.lastPanY = t.clientY
       setTransform(prev => ({
         scale: prev.scale,
         x: prev.x + dx,
