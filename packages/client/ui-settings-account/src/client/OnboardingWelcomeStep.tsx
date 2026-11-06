@@ -13,15 +13,20 @@ const ILLUSTRATION_BASE = '/assets/onboarding'
  *
  * Images are static PNG files under {@link ILLUSTRATION_BASE}, served with
  * standard HTTP caching and brotli compression by the frontend-static server.
- * No base64 encoding — the browser loads only the two variants (light + dark)
- * for the current locale, and only when the `<img>` elements render.
+ * Two resolution tiers via srcSet: 1125px for mobile (3× retina safe) and the
+ * original 3993px for desktop (2× retina safe).  The browser picks the
+ * appropriate source based on viewport width and device pixel ratio.
  */
 function useWelcomeImages(locale: string) {
   const isZh = locale === 'zh'
   const suffix = isZh ? '-zh' : ''
+  const base = `${ILLUSTRATION_BASE}/onboarding-welcome${suffix}`
   return {
-    art: `${ILLUSTRATION_BASE}/onboarding-welcome${suffix}.png`,
-    artDark: `${ILLUSTRATION_BASE}/onboarding-welcome${suffix}-dark.png`,
+    art: `${base}.png`,
+    artDark: `${base}-dark.png`,
+    srcSet: `${base}.png 1125w, ${base}@2x.png 3993w`,
+    darkSrcSet: `${base}-dark.png 1125w, ${base}-dark@2x.png 3993w`,
+    sizes: '(max-width: 900px) 100vw, 50vw',
   }
 }
 
@@ -31,7 +36,7 @@ export function OnboardingWelcomeStep({ t, locale, heading, busy, onStart }: Pic
   busy: boolean
   onStart: () => void
 }) {
-  const { art, artDark } = useWelcomeImages(locale)
+  const { art, artDark, srcSet, darkSrcSet, sizes } = useWelcomeImages(locale)
 
   return <div className={`${css.content} ${css.welcome}`}>
     <div className={css.copy}>
@@ -41,7 +46,7 @@ export function OnboardingWelcomeStep({ t, locale, heading, busy, onStart }: Pic
     </div>
     {art !== undefined && artDark !== undefined && (
       <div className={css.welcomeIllustration} aria-hidden="true">
-        <OnboardingIllustration className={css.welcomeArtwork} src={art} darkSrc={artDark} />
+        <OnboardingIllustration className={css.welcomeArtwork} src={art} darkSrc={artDark} srcSet={srcSet} darkSrcSet={darkSrcSet} sizes={sizes} />
       </div>
     )}
   </div>

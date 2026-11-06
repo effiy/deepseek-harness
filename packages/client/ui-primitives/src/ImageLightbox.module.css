@@ -3,9 +3,11 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
+  overflow: hidden;
 }
 
-/* Painted area below the Windows caption; like Modal, the caption stays unpainted. */
+/* Painted area below the Windows caption; like Modal, the caption stays unpainted.
+   touch-action: none routes all touch gestures to our handlers (pinch, pan, double-tap). */
 .stage {
   position: absolute;
   inset: var(--dsh-frame-chrome-top, 0px) 0 0;
@@ -13,6 +15,7 @@
   align-items: center;
   justify-content: center;
   padding: 40px;
+  touch-action: none;
 }
 
 /* Shared dimming mask below the preview and its controls. */
@@ -32,6 +35,9 @@
   background: var(--dsw-specific-input-major);
   border: 0;
   box-shadow: var(--dsw-elevation-prominent);
+  /* Smooth transition on double-tap, not during manual pinch/pan (handlers
+     override the inline style with instant values). */
+  transition: transform 300ms cubic-bezier(0.2, 0, 0, 1), max-width 300ms ease, max-height 300ms ease;
 }
 
 .close {
