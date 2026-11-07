@@ -7,7 +7,7 @@
  * Selecting "Delete" shows an inline confirmation bubble.
  * Both keep the user inside the conversation flow — no blocking modals.
  */
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconEditOutlineRegular, IconTrashOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-chat SlotMap merge (the assistant-actions hole).
@@ -48,6 +48,16 @@ export const AssistantMessageActions = memo(function AssistantMessageActions({
 
   const isEditing = editingMessageSeq === seq
   const isDeleting = pendingDeleteSeq === seq
+  const deleteBtnRef = useRef<HTMLButtonElement>(null)
+  const restoreFocus = useRef(false)
+  const wasDeleting = useRef(false)
+  useEffect(() => {
+    if (wasDeleting.current && !isDeleting && restoreFocus.current && deleteBtnRef.current) {
+      deleteBtnRef.current.focus()
+      restoreFocus.current = false
+    }
+    wasDeleting.current = isDeleting
+  }, [isDeleting])
 
   const handleEdit = useCallback(() => { beginEdit(seq) }, [beginEdit, seq])
   const handleDelete = useCallback(() => { beginDelete(seq) }, [beginDelete, seq])
@@ -66,7 +76,7 @@ export const AssistantMessageActions = memo(function AssistantMessageActions({
     commitDelete()
   }, [deleteMessage, seq, commitDelete])
 
-  const handleDeleteCancel = useCallback(() => { cancelDelete() }, [cancelDelete])
+  const handleDeleteCancel = useCallback(() => { restoreFocus.current = true; cancelDelete() }, [cancelDelete])
 
   if (text === '') return null
 
@@ -110,7 +120,7 @@ export const AssistantMessageActions = memo(function AssistantMessageActions({
         </button>
       </Tooltip>
       <Tooltip label={deleteLabel} side="bottom">
-        <button type="button" className={`${css.action} ${css.danger}`} aria-label={deleteLabel} onClick={handleDelete}>
+        <button type="button" ref={deleteBtnRef} className={`${css.action} ${css.danger}`} aria-label={deleteLabel} onClick={handleDelete}>
           <IconTrashOutlineRegular />
         </button>
       </Tooltip>

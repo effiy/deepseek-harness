@@ -169,7 +169,7 @@ const MOVE_DEAD_ZONE = 10
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
   content, renderMessageImages, actions, pending = false, echo = false, referenceLabels = [], skillNames = [],
-  previewAttachments, references, t, onCopyText, onDeleteMessage,
+  previewAttachments, references, t, onCopyText,
 }: {
   content: readonly unknown[]
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
@@ -189,8 +189,6 @@ function UserStyleBubble({
   t: ChatViewSlotProps['t']
   /** Copy the message text to the clipboard. */
   onCopyText?: (text: string) => void
-  /** Delete the message. Undefined when delete is not available. */
-  onDeleteMessage?: (() => void) | undefined
 }): ReactNode {
   const { text, attachments: contentAttachments, rest } = contentParts(content)
   const attachments = previewAttachments ?? contentAttachments
@@ -262,22 +260,12 @@ function UserStyleBubble({
       ),
       action: () => { onCopyText(text) },
     })
-    if (onDeleteMessage !== undefined) items.push({
-      label: t('delete'),
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-          <path d="M5 6.5h10l-.8 9.5a1.5 1.5 0 0 1-1.5 1.5H7.3a1.5 1.5 0 0 1-1.49-1.37L5 6.5zM3.5 4.5h13M8 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-      danger: true,
-      action: () => { onDeleteMessage() },
-    })
     if (items.length === 0) return
     const el = bubbleRef.current
     if (el !== null) el.setAttribute('data-long-pressed', '')
     navigator.vibrate?.(10)
     setMenu({ items, top, left, originX, originY: originY })
-  }, [onCopyText, onDeleteMessage, text, t])
+  }, [onCopyText, text, t])
 
   // Mobile: long-press timer.
   const onTouchStart = useCallback((e: React.TouchEvent) => {
@@ -448,7 +436,7 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
 type UserMessageNodeViewProps = ChatNodeViewProps<'user' | 'steering'> & PropsRenderSlots<'conversation.chat.user-actions'>
 
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderMessageImages, openFile, openSkill, renderSlot, t, deleteMessage,
+  node, renderMessageImages, openFile, openSkill, renderSlot, t,
 }: UserMessageNodeViewProps) {
   const data = node.data
   const { text } = contentParts(data.content)
@@ -458,9 +446,6 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
   const onCopyText = useCallback((textToCopy: string) => {
     writeClipboard(textToCopy).then((ok) => { if (ok) setCopied(true) })
   }, [])
-  const onDeleteMessage = deleteMessage !== undefined ? useCallback(() => {
-    deleteMessage(data.seq)
-  }, [deleteMessage, data.seq]) : undefined
   return (
     <>
       {copied && <Toast text={t('copied')} onDone={() => { setCopied(false) }} />}
@@ -472,7 +457,6 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
         {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
         t={t}
         onCopyText={onCopyText}
-        onDeleteMessage={onDeleteMessage}
         actions={textValue => (
           <MessageIconActions
             text={textValue}

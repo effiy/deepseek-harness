@@ -20,3 +20,10 @@
 .danger:hover {
   color: var(--dsw-alias-state-error-label);
 }
+
+@media (pointer: coarse) {
+  .action {
+    width: 44px;
+    height: 44px;
+  }
+}

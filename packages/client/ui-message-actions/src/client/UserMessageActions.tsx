@@ -1,16 +1,13 @@
 /**
- * Per-message edit/delete actions with context-menu and inline-edit support.
- *
- * Desktop: right-click on the actions row shows a context menu.
- * Mobile: long-press (>500 ms) on the actions row shows the same menu.
+ * Per-message edit/delete actions with inline-edit support.
  *
  * Selecting "Edit" replaces the icon buttons with an inline textarea.
  * Selecting "Delete" shows an inline confirmation bubble.
  * Both keep the user inside the conversation flow — no blocking modals.
  */
-import { memo, useCallback, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { IconEditOutlineRegular, IconTrashOutlineRegular, MenuSurface, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconEditOutlineRegular, IconTrashOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-chat SlotMap merge (the user-actions hole).
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 // Type-only: pulls the LocaleNamespaceMap merge declared in locale.ts.
@@ -19,9 +16,6 @@ import type { MessageEditStore } from './store.ts'
 import { EditMessageInput } from './EditMessageInput.tsx'
 import { DeleteConfirmBubble } from './DeleteConfirmBubble.tsx'
 import css from './UserMessageActions.module.css'
-
-/** Milliseconds before a touch is treated as long-press. */
-const LONG_PRESS_MS = 500
 
 /** Registrant-provided business callbacks for the entry. */
 interface Injected {
@@ -37,7 +31,7 @@ type Props = PropsRuntime<'conversation.chat.user-actions'>
 
 /**
  * Per-message edit/delete actions. Three visual modes:
- * 1. Normal: icon buttons with right-click/long-press context menu.
+ * 1. Normal: icon buttons with Tooltip labels.
  * 2. Editing: inline textarea + Save/Cancel (replaces icon buttons).
  * 3. Deleting: inline confirmation bubble (replaces icon buttons).
  * @param props - Slot owner props, store handle, locale, and RPC callbacks.
@@ -50,15 +44,18 @@ export const UserMessageActions = memo(function UserMessageActions({
   const { beginEdit, beginDelete, cancelEdit, cancelDelete, commitEdit, commitDelete } = actions
   const [submitting, setSubmitting] = useState(false)
 
-  // ---- Context menu state ----
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [menuX, setMenuX] = useState(0)
-  const [menuY, setMenuY] = useState(0)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
-
   const isEditing = editingMessageSeq === seq
   const isDeleting = pendingDeleteSeq === seq
+  const deleteBtnRef = useRef<HTMLButtonElement>(null)
+  const restoreFocus = useRef(false)
+  const wasDeleting = useRef(false)
+  useEffect(() => {
+    if (wasDeleting.current && !isDeleting && restoreFocus.current && deleteBtnRef.current) {
+      deleteBtnRef.current.focus()
+      restoreFocus.current = false
+    }
+    wasDeleting.current = isDeleting
+  }, [isDeleting])
 
   const handleEdit = useCallback(() => { beginEdit(seq) }, [beginEdit, seq])
   const handleDelete = useCallback(() => { beginDelete(seq) }, [beginDelete, seq])
@@ -77,54 +74,7 @@ export const UserMessageActions = memo(function UserMessageActions({
     commitDelete()
   }, [deleteMessage, seq, commitDelete])
 
-  const handleDeleteCancel = useCallback(() => { cancelDelete() }, [cancelDelete])
-
-  // ---- Context menu helpers ----
-  const closeMenu = useCallback(() => { setMenuOpen(false) }, [])
-
-  const openMenuAt = useCallback((x: number, y: number) => {
-    setMenuX(x)
-    setMenuY(y)
-    setMenuOpen(true)
-  }, [])
-
-  // Desktop: right-click.
-  const onContextMenu = useCallback((event: React.MouseEvent) => {
-    event.preventDefault()
-    openMenuAt(event.clientX, event.clientY)
-  }, [openMenuAt])
-
-  // Mobile: cancel any in-progress long-press timer.
-  const cancelLongPress = useCallback(() => {
-    if (longPressTimer.current !== null) {
-      clearTimeout(longPressTimer.current)
-      longPressTimer.current = null
-    }
-  }, [])
-
-  // Mobile: start long-press timer.
-  const onTouchStart = useCallback((event: React.TouchEvent) => {
-    const touch = event.touches[0]
-    if (touch == null) return
-    longPressTimer.current = setTimeout(() => {
-      openMenuAt(touch.clientX, touch.clientY)
-    }, LONG_PRESS_MS)
-  }, [openMenuAt])
-
-  // Menu item selection.
-  const onMenuSelect = useCallback((kind: 'edit' | 'delete') => {
-    closeMenu()
-    if (kind === 'edit') beginEdit(seq)
-    else beginDelete(seq)
-  }, [closeMenu, beginEdit, beginDelete, seq])
-
-  // Escape closes the menu.
-  const onWrapperKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if (event.key === 'Escape' && menuOpen) {
-      event.stopPropagation()
-      closeMenu()
-    }
-  }, [menuOpen, closeMenu])
+  const handleDeleteCancel = useCallback(() => { restoreFocus.current = true; cancelDelete() }, [cancelDelete])
 
   if (text === '') return null
 
@@ -159,48 +109,19 @@ export const UserMessageActions = memo(function UserMessageActions({
     )
   }
 
-  // ---- Render: normal mode with context menu ----
+  // ---- Render: normal mode ----
   return (
-    <>
-      <div
-        ref={wrapperRef}
-        className={css.wrapper}
-        onContextMenu={onContextMenu}
-        onTouchStart={onTouchStart}
-        onTouchMove={cancelLongPress}
-        onTouchEnd={cancelLongPress}
-        onKeyDown={onWrapperKeyDown}
-      >
-        <Tooltip label={editLabel} side="bottom">
-          <button type="button" className={css.action} aria-label={editLabel} onClick={handleEdit}>
-            <IconEditOutlineRegular />
-          </button>
-        </Tooltip>
-        <Tooltip label={deleteLabel} side="bottom">
-          <button type="button" className={`${css.action} ${css.danger}`} aria-label={deleteLabel} onClick={handleDelete}>
-            <IconTrashOutlineRegular />
-          </button>
-        </Tooltip>
-      </div>
-      {menuOpen && (
-        <>
-          <div
-            className={css.backdrop}
-            onClick={closeMenu}
-            onContextMenu={(e) => { e.preventDefault(); closeMenu() }}
-          />
-          <MenuSurface compact className={css.menuSurface} style={{ left: menuX, top: menuY }} role="menu">
-            <button type="button" className={css.menuItem} role="menuitem"
-              onClick={() => { onMenuSelect('edit') }}>
-              {editLabel}
-            </button>
-            <button type="button" className={css.menuItemDanger} role="menuitem"
-              onClick={() => { onMenuSelect('delete') }}>
-              {deleteLabel}
-            </button>
-          </MenuSurface>
-        </>
-      )}
-    </>
+    <div className={css.wrapper}>
+      <Tooltip label={editLabel} side="bottom">
+        <button type="button" className={css.action} aria-label={editLabel} onClick={handleEdit}>
+          <IconEditOutlineRegular />
+        </button>
+      </Tooltip>
+      <Tooltip label={deleteLabel} side="bottom">
+        <button type="button" ref={deleteBtnRef} className={`${css.action} ${css.danger}`} aria-label={deleteLabel} onClick={handleDelete}>
+          <IconTrashOutlineRegular />
+        </button>
+      </Tooltip>
+    </div>
   )
 })

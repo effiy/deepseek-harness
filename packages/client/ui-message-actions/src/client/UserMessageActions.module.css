@@ -30,62 +30,6 @@
   color: var(--dsw-alias-state-error-label);
 }
 
-/* Context / long-press menu items inside MenuSurface */
-.menuItem {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 8px 16px;
-  border: none;
-  background: none;
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-  font-size: 0.875rem;
-  cursor: pointer;
-  text-align: left;
-  line-height: 1.4;
-}
-
-.menuItem:hover,
-.menuItem:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover);
-  outline: none;
-}
-
-.menuItemDanger {
-  composes: menuItem;
-  color: var(--dsw-alias-state-error-label);
-}
-
-.menuItemDanger:hover,
-.menuItemDanger:focus-visible {
-  background: var(--dsw-alias-interactive-bg-hover-danger);
-}
-
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-}
-
-.menuSurface {
-  position: fixed;
-  z-index: 9999;
-  min-width: 120px;
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 @media (pointer: coarse) {
   .action {
     width: 44px;
