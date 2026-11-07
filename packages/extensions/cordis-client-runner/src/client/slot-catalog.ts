@@ -80,6 +80,55 @@ export const CLIENT_NOTES: readonly string[] = [
 // detection is told to skip the data rather than the file.
 export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
   {
+    key: 'bottom-nav.tab',
+    kind: 'list',
+    scope: 'root',
+    summary: 'Mobile bottom-nav tab icons, one cell per panel id.',
+    doc: 'Mobile bottom-nav tab icons, one cell per panel id. Declared as a child\nof the bottom nav\'s own registration (not by the frame): feature\npackages contribute a tab beside their `sidebar.panellist` entry, and\nthe bar renders the cells whose id is also a registered `main` key, in\nascending order, each with its resolved slot label beneath the icon.\nThe declaration lives and dies with the bottom nav occupant — while the\nbar is shadowed or unmounted, contributed tabs project to nothing.\n\nOwner share: the icon size to render at, and whether the tab\'s panel is\nthe active one (icons may use it for a filled/outline swap).',
+    registerOptions: [
+      {
+        name: 'id',
+        requirement: 'required',
+        type: 'string',
+        doc: 'Your cell key. Use an id of your own: a fresh id is added beside the shipped entries, while reusing a shipped id puts you in THAT cell and replaces it. Owners that filter by id address you by it.',
+      },
+      {
+        name: 'order',
+        requirement: 'optional',
+        type: 'number',
+        doc: 'Position among the entries, ascending (default 0).',
+      },
+      {
+        name: 'label',
+        requirement: 'optional',
+        type: 'string | (() => string)',
+        doc: 'Display text where the owner projects one (nav rows, tabs). A thunk is re-read on every projection, so localized text follows the active locale without re-registering.',
+      },
+    ],
+    ownerProps: [],
+    ownerPropsReferences: [],
+    standardProps: [
+      'useResource: UseResource',
+      'useWorkspaces: SnapshotSelectorHook<WorkspaceSnapshot>',
+      'usePanelInfo: UsePanelInfo',
+      'useSessions: UseSessions',
+      'useSessionStatus: UseSessionStatus',
+      'useSessionRetainInfo: UseSessionRetainInfo',
+      'useWorkspaces: SnapshotSelectorHook<WorkspaceSnapshot>',
+    ],
+    keyDomain: '',
+    hookContext: '',
+    slotInject: '',
+    declaredBy: 'an entry in \'shell.bottom\' (client-ui-layout), so it exists while that entry is mounted',
+    occupants: [
+      'client-ui-plugin-manager PluginsPanelIcon',
+      'client-ui-schedule TaskManagerIcon',
+    ],
+    replaceRisk: 'none',
+    example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'bottom-nav.tab\', () => ctx.slots.register(\n      { name: \'bottom-nav.tab\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
+    source: 'packages/client/ui-layout/src/client/index.ts:110',
+  },
+  {
     key: 'conversation.approval.detail',
     kind: 'single',
     scope: 'session',
@@ -2983,7 +3032,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     ],
     replaceRisk: 'shadows-shipped-ui',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.leading\', () => ctx.slots.register(\n      { name: \'shell.leading\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:122',
+    source: 'packages/client/ui-layout/src/client/index.ts:135',
   },
   {
     key: 'shell.overlay',
@@ -3038,10 +3087,11 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-workspace SessionRenameDialog id \'workspace.session-rename\'',
       'client-ui-workspace SessionArchiveConfirmDialog id \'workspace.session-archive\'',
       'client-ui-workspace RowActionToast id \'workspace.row-toast\'',
+      'client-web NetworkStatusBanner id \'network-status-indicator\'',
     ],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'shell.overlay\', () => ctx.slots.register(\n      { name: \'shell.overlay\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-layout/src/client/index.ts:108',
+    source: 'packages/client/ui-layout/src/client/index.ts:121',
   },
   {
     key: 'shell.quota-notice',

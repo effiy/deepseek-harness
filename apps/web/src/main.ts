@@ -82,6 +82,66 @@ export async function getSWCacheStats(): Promise<Record<string, number | string>
   })
 }
 
+/**
+ * Query the full cache report from the active Service Worker.
+ *
+ * Includes the synchronous stats from {@link getSWCacheStats} plus
+ * cache-size estimates (total bytes, entry count) obtained by scanning
+ * the Cache API.  The async report has a longer timeout because cache
+ * scanning can take a few hundred milliseconds.
+ *
+ * Returns null when no SW is in control or the report times out.
+ */
+export async function getSWCacheReport(): Promise<Record<string, number | string> | null> {
+  // `navigator.serviceWorker` is undefined outside secure contexts.
+  if (!('serviceWorker' in navigator)) return null
+  const controller = navigator.serviceWorker.controller
+  if (controller === null) return null
+  return new Promise((resolve) => {
+    const channel = new MessageChannel()
+    // Timeout after 5 s — cache scanning may be slower than the stats query.
+    const timer = setTimeout(() => {
+      resolve(null)
+    }, 5000)
+    channel.port1.onmessage = (event: MessageEvent<Record<string, string | number> | null>) => {
+      clearTimeout(timer)
+      resolve(event.data)
+    }
+    channel.port1.onmessageerror = () => {
+      clearTimeout(timer)
+      resolve(null)
+    }
+    controller.postMessage({ type: 'DSH_CACHE_REPORT' }, [channel.port2])
+  })
+}
+
+/**
+ * Reset the SW's cache-hit counters to zero.
+ *
+ * Sends `DSH_RESET_STATS` to the active SW.  Returns the reset timestamp
+ * on success, or null when no SW is in control.
+ */
+export async function resetSWCacheStats(): Promise<number | null> {
+  if (!('serviceWorker' in navigator)) return null
+  const controller = navigator.serviceWorker.controller
+  if (controller === null) return null
+  return new Promise((resolve) => {
+    const channel = new MessageChannel()
+    const timer = setTimeout(() => {
+      resolve(null)
+    }, 2000)
+    channel.port1.onmessage = (event: MessageEvent<{ resetTime: number } | null>) => {
+      clearTimeout(timer)
+      resolve(event.data?.resetTime ?? null)
+    }
+    channel.port1.onmessageerror = () => {
+      clearTimeout(timer)
+      resolve(null)
+    }
+    controller.postMessage({ type: 'DSH_RESET_STATS' }, [channel.port2])
+  })
+}
+
 interface DesktopBootGlobal {
   dshDesktopBoot?: {
     failed(message: string): Promise<void>

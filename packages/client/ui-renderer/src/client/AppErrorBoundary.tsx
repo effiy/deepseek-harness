@@ -12,6 +12,8 @@ import { Component, createElement, type ErrorInfo, type ReactNode } from 'react'
 export interface AppErrorBoundaryState {
   crashed: boolean
   error: unknown
+  /** Whether the error was copied to clipboard (brief visual feedback). */
+  copied: boolean
 }
 
 /** True after the first crash face render — avoid duplicate <style> injection. */
@@ -35,6 +37,14 @@ const CRASH_STYLES = /* css */ `
 }
 ._ceb_btn:hover { background: #1557b0; }
 ._ceb_btn:active { background: #0d47a1; }
+._ceb_btn_secondary {
+  display: inline-block; padding: .625rem 1.5rem; font-size: .9375rem;
+  font-weight: 500; line-height: 1.5; border: 1px solid #ccc; border-radius: .5rem;
+  background: transparent; color: #555; cursor: pointer; transition: background .15s;
+}
+._ceb_btn_secondary:hover { background: rgba(0,0,0,.06); }
+._ceb_btn_secondary:active { background: rgba(0,0,0,.1); }
+._ceb_actions { display: flex; gap: .75rem; justify-content: center; margin-bottom: 1.5rem; }
 ._ceb_details { margin-top: 2rem; text-align: left; color: #666; font-size: .75rem; }
 ._ceb_details summary { cursor: pointer; padding: .25rem 0; user-select: none; }
 ._ceb_trace {
@@ -48,6 +58,9 @@ const CRASH_STYLES = /* css */ `
   ._ceb_text, ._ceb_details { color: #999; }
   ._ceb_details summary:hover { color: #ccc; }
   ._ceb_trace { background: rgba(255,255,255,.06); }
+  ._ceb_btn_secondary { border-color: #555; color: #bbb; }
+  ._ceb_btn_secondary:hover { background: rgba(255,255,255,.08); }
+  ._ceb_btn_secondary:active { background: rgba(255,255,255,.12); }
 }`
 
 let nextResetKey = 1
@@ -58,10 +71,10 @@ export class AppErrorBoundary extends Component<
 > {
   private resetKey = nextResetKey++
 
-  override state: AppErrorBoundaryState = { crashed: false, error: undefined }
+  override state: AppErrorBoundaryState = { crashed: false, error: undefined, copied: false }
 
   static getDerivedStateFromError(error: unknown): AppErrorBoundaryState {
-    return { crashed: true, error }
+    return { crashed: true, error, copied: false }
   }
 
   override componentDidCatch(error: unknown, info: ErrorInfo): void {
@@ -72,6 +85,14 @@ export class AppErrorBoundary extends Component<
   private handleRetry = (): void => {
     this.resetKey = nextResetKey++
     this.setState({ crashed: false, error: undefined })
+  }
+
+  private handleCopy = (): void => {
+    const text = stringifyError(this.state.error)
+    void navigator.clipboard.writeText(text).then(
+      () => { this.setState({ copied: true }); setTimeout(() => { this.setState({ copied: false }) }, 2_000) },
+      () => { /* clipboard unavailable — silently ignore */ },
+    )
   }
 
   override render(): ReactNode {
@@ -86,11 +107,18 @@ export class AppErrorBoundary extends Component<
           createElement('h1', { className: '_ceb_title' }, 'Something went wrong'),
           createElement('p', { className: '_ceb_text' },
             'The application encountered an unexpected error. You can try reloading.'),
-          createElement('button', {
-            className: '_ceb_btn',
-            onClick: this.handleRetry,
-            type: 'button',
-          }, 'Reload'),
+          createElement('div', { className: '_ceb_actions' },
+            createElement('button', {
+              className: '_ceb_btn',
+              onClick: this.handleRetry,
+              type: 'button',
+            }, 'Reload'),
+            createElement('button', {
+              className: '_ceb_btn_secondary',
+              onClick: this.handleCopy,
+              type: 'button',
+            }, this.state.copied ? 'Copied \u2713' : 'Copy error'),
+          ),
           createElement('details', { className: '_ceb_details' },
             createElement('summary', null, 'Error details'),
             createElement('pre', { className: '_ceb_trace' },

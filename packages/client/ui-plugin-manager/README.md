@@ -3,7 +3,7 @@ title: "client-ui-plugin-manager"
 tags: ["deepseek-harness", "client", "ui-plugin-manager"]
 category: "客户端"
 created: "2025-01-01"
-updated: "2026-10-20"
+updated: "2026-11-07"
 source: external
 type: index
 status: stable
@@ -88,7 +88,7 @@ ctx.slots.inject('plugins.detail.section', () => ctx.slots.register({
 #### 注册
 Host 入口通过生成的 Remote 接口暴露 `pluginRegistryProbe.fastest()`，共享进行中的比较、让缓存按时过期，并在卸载时中止和等待未完成探测。卸载后调用会返回拒绝的 Promise。
 
-浏览器插件通过 `ctx.slots.inject()` 注册 `plugins` 侧栏入口与它的 `main` 面板，使两者跟随 slot 延迟声明、本地化变化与销毁。页面为全局页面，不属于任何 Session。显示文本来自包元信息与页面字典。
+浏览器插件通过 `ctx.slots.inject()` 注册 `plugins` 侧栏入口与它的 `main` 面板，并在 ui-layout 的 `bottom-nav.tab` list slot 中注册同一个图标组件、面板 id、`order` 与标签，使窄视口底部导航复用同一份贡献。这些注册跟随 slot 延迟声明、本地化变化与销毁。页面为全局页面，不属于任何 Session。显示文本来自包元信息与页面字典。
 
 添加控件复用 `Button`、`Menu` 和 `MenuItemButton`。两个安装入口调用同一个 `openInstall` 回调，使用 `InstallDialog` 与 `PluginManagerController`。root 作用域的 list slot `plugins.add.actions` 接受贡献的 `MenuItemButton` 行，放在安装项之后；每个贡献者接收 `onDismiss()` 回调，在开始动作前关闭菜单。
 

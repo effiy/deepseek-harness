@@ -58,6 +58,7 @@ function declare(slots: SlotRegistry): () => void {
       'main': { kind: 'keyed', scope: 'root' },
       'shell.overlay': { kind: 'list', scope: 'root' },
       'sidebar.panellist': { kind: 'list', scope: 'root' },
+      'bottom-nav.tab': { kind: 'list', scope: 'root' },
     },
   } as never, () => null)
 }
@@ -152,6 +153,12 @@ describe('ui-plugin-manager browser plugin', () => {
     expect(icon.options).toMatchObject({ id: PANEL_ID, order: 0 })
     expect(icon.locale).toBe(NS)
     expect(resolveSlotLabel(icon.options.label)).toBe('插件')
+    // The narrow-viewport bottom nav reuses the same icon, id, order, and label.
+    const tab = b.slots.entries('bottom-nav.tab')[0]!
+    expect(tab.component).toBe(PluginsPanelIcon)
+    expect(tab.options).toMatchObject({ id: PANEL_ID, order: 0 })
+    expect(tab.locale).toBe(NS)
+    expect(resolveSlotLabel(tab.options.label)).toBe('插件')
     // The page declares the slots a plugin's configuration arrives through, and binds their projection beside its state.
     expect(b.slots.spec('plugins.add.actions')).toMatchObject({ kind: 'list', scope: 'root' })
     expect(b.slots.spec('plugins.item')).toMatchObject({ kind: 'list', scope: 'root' })
@@ -203,6 +210,7 @@ describe('ui-plugin-manager browser plugin', () => {
     expect(b.slots.entries('main')).toHaveLength(0)
     expect(b.slots.entries('shell.overlay')).toHaveLength(0)
     expect(b.slots.entries('sidebar.panellist')).toHaveLength(0)
+    expect(b.slots.entries('bottom-nav.tab')).toHaveLength(0)
     b.remote.emit('plugin-manager/changed', [{ reason: 'install' }])
     await Promise.resolve()
     expect(b.list).toHaveBeenCalledTimes(3)

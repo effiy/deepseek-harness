@@ -107,10 +107,11 @@ describe('ui-layout client apply', () => {
     expect(entries).toHaveLength(1)
     expect(entries[0]!.component).toBe(MobileBottomNav)
     expect(entries[0]!.locale).toBe(NAV_NS)
+    // The bar owns the tab ledger its feature-package icons register into.
+    expect(slots.spec('bottom-nav.tab')).toEqual({ kind: 'list', scope: 'root' })
     // The inject face hands the component the same shared instance the frame
-    // renders from: bound actions plus the store as a bare observable.
+    // renders from; the validated dispatch is the bottom-nav spec's subject.
     const face = entries[0]!.inject!()
-    expect(face.actions).toBe(instance.actions)
     expect((face.hooks as { layoutStore: unknown }).layoutStore).toBe(instance)
   })
 
@@ -186,6 +187,7 @@ describe('ui-layout client apply', () => {
     expect(slots.spec('shell.bottom')).toBeUndefined()
     expect(slots.spec('shell.overlay')).toBeUndefined()
     expect(slots.spec('shell.leading')).toBeUndefined()
+    expect(slots.spec('bottom-nav.tab')).toBeUndefined()
     expect(host.root.getSnapshot().hooks.panelInfo).toBeUndefined()
     // The built-in root declaration survives entry teardown (renderer-owned).
     expect(slots.spec('root')).toEqual({ kind: 'single', scope: 'root' })

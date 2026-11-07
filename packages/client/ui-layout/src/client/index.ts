@@ -96,6 +96,19 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'shell.bottom': { kind: 'single'; scope: 'root' }
     /**
+     * Mobile bottom-nav tab icons, one cell per panel id. Declared as a child
+     * of the bottom nav's own registration (not by the frame): feature
+     * packages contribute a tab beside their `sidebar.panellist` entry, and
+     * the bar renders the cells whose id is also a registered `main` key, in
+     * ascending order, each with its resolved slot label beneath the icon.
+     * The declaration lives and dies with the bottom nav occupant — while the
+     * bar is shadowed or unmounted, contributed tabs project to nothing.
+     *
+     * Owner share: the icon size to render at, and whether the tab's panel is
+     * the active one (icons may use it for a filled/outline swap).
+     */
+    'bottom-nav.tab': { kind: 'list'; scope: 'root'; owner: { size: number; active: boolean } }
+    /**
      * Frame-wide floating layer, above every column and outside their scroll
      * containers. Deliberately generic and unowned by any feature: a badge, a
      * toast stack or a status pill all belong here, and entries order among
@@ -218,7 +231,7 @@ export function apply(ctx: ClientContext): void {
     })
     // Default shell.bottom occupant: the mobile bar (CSS hides it above the
     // tablet breakpoint); a later dynamic registrant shadows it while mounted.
-    const disposeBottomNav = registerBottomNav(ctx, instance)
+    const disposeBottomNav = registerBottomNav(ctx, instance, layout)
     const disposePanels = ctx.slots.subscribe('main', retainMainPanels)
     retainMainPanels()
     return () => {

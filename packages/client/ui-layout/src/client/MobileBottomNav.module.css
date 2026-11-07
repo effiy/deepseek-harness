@@ -94,7 +94,8 @@
 }
 
 /* ── Tab group ────────────────────────────────────────────────────
- * Fills the remaining space and evenly distributes the 4 tab buttons. */
+ * Fills the remaining space and evenly distributes the tab buttons
+ * (the fixed Chat tab plus one per projected ledger row). */
 .tabGroup {
   display: flex;
   align-items: center;
@@ -131,8 +132,26 @@
   will-change: transform;
   transition: color 200ms var(--ds-ease-in-out);
   -webkit-tap-highlight-color: transparent;
-  /* Minimum 44 px touch target regardless of visual size. */
+  /* Minimum 44 px touch target regardless of visual size. */
   min-height: 44px;
+}
+
+/* Visible text label under the icon.  Typography is inherited from
+   .button; long feature-owned labels truncate inside the 88 px cap
+   instead of wrapping or overflowing the tab. */
+.label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Keyboard focus: the design-system focus ring (same convention as
+   the permission selects), drawn over the pill and neighbours. */
+.button:focus-visible,
+.hamburger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
 }
 
 /* ------------------------------------------------------------------

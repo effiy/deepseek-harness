@@ -9,8 +9,9 @@
  * 1.5 (portrait↔landscape rotation keeps the layout intact), 4.2 (records the
  * confirmed absence of a non-modal offline indicator), and the shell.bottom
  * default-occupant contract landed with the 2026-11-06 bottom-nav wiring:
- * the bar renders at phone width with every `layout.bottom-nav` label
- * resolved, and its CSS gate hides it at desktop width. The tiers case pins
+ * the bar renders at phone width with Chat plus one tab per openable
+ * `bottom-nav.tab` ledger entry, every label resolved, and its CSS gate hides
+ * it at desktop width. The tiers case pins
  * composer containment at 375×667, 768×1024, and 1440×900: fully inside the
  * viewport, focusable and typeable, and never overlapped by the bottom nav.
  *
@@ -262,7 +263,7 @@ describe('web e2e: mobile content contracts (gap-analysis ⚠️ items)', () => 
     await composer.click()
     await page.keyboard.type(DRAFT_TEXT)
     expect(await composer.textContent()).toContain(DRAFT_TEXT)
-    await nav.getByRole('button', { name: 'Workspace', exact: true }).click()
+    await nav.getByRole('button', { name: 'Plugins', exact: true }).click()
     // The conversation panel (with its composer) leaves the render tree.
     await composer.waitFor({ state: 'hidden', timeout: 15_000 })
     await nav.getByRole('button', { name: 'Chat', exact: true }).click()
@@ -270,7 +271,7 @@ describe('web e2e: mobile content contracts (gap-analysis ⚠️ items)', () => 
     expect(await composer.textContent()).toContain(DRAFT_TEXT)
   }, 90_000)
 
-  it('wiring — the shell.bottom bar renders at phone width with all six locale labels', async () => {
+  it('wiring — the shell.bottom bar renders Chat plus every openable ledger tab', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-mobile-bottom-nav'))
     // Set the phone viewport explicitly so this case also stands alone under
     // a `-t` filter; a fresh load keeps Chat (panel id null) active, and 2.9
@@ -278,10 +279,12 @@ describe('web e2e: mobile content contracts (gap-analysis ⚠️ items)', () => 
     await page.setViewportSize({ width: 375, height: 812 })
     const nav = page.getByRole('navigation', { name: 'Main navigation' })
     await nav.waitFor({ state: 'visible', timeout: 15_000 })
-    // The five buttons plus the nav's own accessible name carry all six
-    // `layout.bottom-nav` keys; an unresolved key would surface verbatim
-    // (e.g. "nav.chat") instead of the English dictionary value.
-    for (const label of ['Chat', 'Workspace', 'Reminders', 'Settings', 'Toggle left sidebar']) {
+    // The nav's accessible name plus the Chat and hamburger buttons carry the
+    // three `layout.bottom-nav` keys; 'Plugins' and 'Automation tasks' are the
+    // feature packages' own dictionary labels for the `bottom-nav.tab` entries
+    // the shipped composition can open. An unresolved key would surface
+    // verbatim (e.g. "nav.chat") instead of the English dictionary value.
+    for (const label of ['Chat', 'Plugins', 'Automation tasks', 'Toggle left sidebar']) {
       await nav.getByRole('button', { name: label, exact: true })
         .waitFor({ state: 'visible', timeout: 10_000 })
     }

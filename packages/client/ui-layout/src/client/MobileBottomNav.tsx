@@ -2,93 +2,93 @@
  * Bottom navigation bar rendered on narrow viewports.  {@link registerBottomNav}
  * seats it as the default composition's `shell.bottom` occupant: the
  * registration declares the `layout.bottom-nav` locale (the framework injects
- * the `t` seat) and a per-registration `inject` carrying the bound `actions`
- * and the layout store instance as a bare observable (the renderer binds it to
- * `useLayoutStore`).  A later dynamic registrant (the experimental inspector
- * panel) shadows the bar at a lower priority; removing it restores the bar.
+ * the `t` seat), declares the `bottom-nav.tab` child list the feature panels
+ * contribute their tab icons through, and injects the validated layout face
+ * plus two observables (the layout store and the tab-ledger projection; the
+ * renderer binds them to `useLayoutStore` and `useTabs`).  A later dynamic
+ * registrant (the experimental inspector panel) shadows the bar at a lower
+ * priority; removing it restores the bar.
  *
- * The component always renders; CSS `@media (max-width: 899px)` on `.root`
- * hides the bar above the `--ds-bp-tablet` threshold (900 px) so the footer
- * row stays at zero height on wide viewports.
+ * The tab row is data-driven: a fixed Chat button plus one button per
+ * `bottom-nav.tab` head entry whose id is also a registered `main` key —
+ * a panel the frame cannot open never offers a tab — in ascending `order`.
+ * Each tab's label is its entry's resolved slot label (the feature package
+ * owns the copy) and its icon is the entry's component, rendered through
+ * `renderSlot` with the active-state owner share.
+ *
+ * The component always renders; CSS `@media (max-width: 900px)` on `.root`
+ * hides the bar above the tablet threshold so the footer row stays at zero
+ * height on wide viewports.
  */
-import type { JSX } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { brandString } from '@deepseek-ai/dsh-brand'
-import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-locale/client'
+import { IconQueueOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable, InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import { NAV_NS, type BottomNavKey } from './locale.ts'
-import type { MainPanelId, PanelActions } from './service.ts'
+import { NAV_NS } from './locale.ts'
+import type { ILayout, MainPanelId } from './service.ts'
 import type { createLayoutStore } from './stores.ts'
 import css from './MobileBottomNav.module.css'
 
 // ---------------------------------------------------------------------------
-// Inline SVG icons (20×20 viewbox).
+// Tab-ledger projection.
 // ---------------------------------------------------------------------------
 
-function ChatIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M10 3C6.134 3 3 5.686 3 9c0 1.537.682 2.944 1.801 4.002l-.801 3.198 3.3-.825A8.13 8.13 0 0 0 10 15c3.866 0 7-2.686 7-6s-3.134-6-7-6Z"
-        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-      />
-    </svg>
-  )
+/** One tab row projected from the `bottom-nav.tab` ledger. */
+export interface BottomNavTabMeta {
+  /** Main-panel key the tab selects. */
+  id: MainPanelId
+  /** Ascending display rank among sibling tabs. */
+  order: number
+  /** Display label resolved from the entry's slot label. */
+  label: string
 }
 
-function WorkspaceIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M3 7a2 2 0 0 1 2-2h3l2-2h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
-        stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function ScheduleIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M10 6v4l2.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <circle cx="10" cy="10" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M10 1.5v2m0 13v2M18.5 10h-2m-13 0h-2m12.01-5.99-1.42 1.42m-9.19 9.19-1.42 1.42m12.02 0-1.42-1.42m-9.19-9.19-1.42-1.42"
-        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"
-      />
-    </svg>
-  )
+/**
+ * Project the tab ledger: every `bottom-nav.tab` head entry whose id is also
+ * a registered `main` key, in ascending `order`.  The projection caches on
+ * the ledger versions and the locale revision — label thunks follow the
+ * active dictionary — so the snapshot reference is stable between changes
+ * (safe as a uSES getSnapshot source).
+ * @param ctx - client context owning the ledger subscriptions.
+ * @returns observable of the projected tab rows.
+ */
+function createTabsSource(ctx: ClientContext): HostObservable<readonly BottomNavTabMeta[]> {
+  let tabVersion = -1
+  let mainVersion = -1
+  let localeRevision = -1
+  let tabs: readonly BottomNavTabMeta[] = []
+  return {
+    getSnapshot: () => {
+      const tabV = ctx.slots.getVersion('bottom-nav.tab')
+      const mainV = ctx.slots.getVersion('main')
+      const revision = ctx.locale.getSnapshot().revision
+      if (tabV === tabVersion && mainV === mainVersion && revision === localeRevision) return tabs
+      tabVersion = tabV
+      mainVersion = mainV
+      localeRevision = revision
+      const openable = new Set(ctx.slots.entries('main').map(entry => entry.options.key))
+      tabs = ctx.slots.entriesOfSlot('bottom-nav.tab').map(({ options }) => {
+        // The list registration requires an id; StoredEntry erases the slot kind.
+        const id = options.id as MainPanelId
+        return { id, order: options.order ?? 0, label: resolveSlotLabel(options.label) ?? id }
+      }).filter(tab => openable.has(tab.id)).sort((a, b) => a.order - b.order)
+      return tabs
+    },
+    subscribe: (listener) => {
+      const offTabs = ctx.slots.subscribe('bottom-nav.tab', listener)
+      const offMain = ctx.slots.subscribe('main', listener)
+      const offLocale = ctx.locale.subscribe(listener)
+      return () => { offTabs(); offMain(); offLocale() }
+    },
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Nav button descriptors (branded panel ids).
-// ---------------------------------------------------------------------------
-
-interface NavButton {
-  id: MainPanelId | null
-  labelKey: BottomNavKey
-  Icon: () => JSX.Element
-}
-
-const NAV_BUTTONS: readonly NavButton[] = [
-  { id: null,                                        labelKey: 'nav.chat',      Icon: ChatIcon },
-  { id: brandString<MainPanelId>('workspace'),       labelKey: 'nav.workspace', Icon: WorkspaceIcon },
-  { id: brandString<MainPanelId>('schedule'),        labelKey: 'nav.schedule',  Icon: ScheduleIcon },
-  { id: brandString<MainPanelId>('settings'),        labelKey: 'nav.settings',  Icon: SettingsIcon },
-]
-
-// ---------------------------------------------------------------------------
-// Component.  The framework binds the injected `hooks.layoutStore` observable
-// to `useLayoutStore` (a SnapshotSelectorHook).  The bound `actions` arrive
-// as a plain value through the inject face.
+// Component.  The framework binds the injected `hooks` observables to
+// `useLayoutStore` and `useTabs` (SnapshotSelectorHooks).  The validated
+// layout actions arrive as plain values through the inject face.
 // ---------------------------------------------------------------------------
 
 /** The subset of LayoutState the bottom nav reads. */
@@ -101,14 +101,23 @@ export interface LayoutSnapshot {
 
 /** The inject face {@link registerBottomNav} supplies at the registration. */
 export interface BottomNavInjected {
-  /** Bound layout store actions (selectPanel, toggleSidebar, …). */
-  actions: PanelActions
-  /** The layout store instance; the renderer binds it to `useLayoutStore`. */
-  hooks: { layoutStore: HostObservable<LayoutSnapshot> }
+  /**
+   * Select a main panel through the validated ctx.layout face.
+   * @param panelId - registered main key, or null to show the Conversation.
+   */
+  selectPanel(panelId: MainPanelId | null): void
+  /** Toggle the narrow-viewport sidebar (double-tap deduplicated). */
+  toggleSidebar(): void
+  /** Observables the renderer binds to the component's selector hooks. */
+  hooks: {
+    layoutStore: HostObservable<LayoutSnapshot>
+    tabs: HostObservable<readonly BottomNavTabMeta[]>
+  }
 }
 
-/** Composed props: the frame's runtime share, the declared locale's `t`, and the inject face. */
+/** Composed props: the frame's runtime share, the tab-icon child-render share, the declared locale's `t`, and the inject face. */
 export type MobileBottomNavProps = PropsRuntime<'shell.bottom'>
+  & PropsRenderSlots<'bottom-nav.tab'>
   & PropsLocale<'layout.bottom-nav'>
   & InjectFace<BottomNavInjected>
 
@@ -125,15 +134,22 @@ function HamburgerIcon() {
   )
 }
 
-export function MobileBottomNav({ actions, useLayoutStore, t }: MobileBottomNavProps) {
-  const activePanelId = useLayoutStore(s => s.panelInfo.activePanelId)
-  const narrowExpanded = useLayoutStore(s => s.layoutInfo.narrowExpanded)
+/**
+ * Render the bar: the sidebar hamburger, the fixed Chat tab, and one tab per
+ * projected ledger row.
+ * @param props - the composed slot props (see {@link MobileBottomNavProps}).
+ * @returns the navigation element (CSS hides it above the tablet threshold).
+ */
+export function MobileBottomNav({ selectPanel, toggleSidebar, useLayoutStore, useTabs, t, renderSlot }: MobileBottomNavProps) {
+  const activePanelId = useLayoutStore(snapshot => snapshot.panelInfo.activePanelId)
+  const narrowExpanded = useLayoutStore(snapshot => snapshot.layoutInfo.narrowExpanded)
+  const tabs = useTabs(snapshot => snapshot)
 
   return (
     <nav className={css.root} role="navigation" aria-label={t('nav.mainNavigation')}>
       <button
         className={css.hamburger}
-        onClick={() => { actions.toggleSidebar() }}
+        onClick={() => { toggleSidebar() }}
         aria-label={t('nav.toggleSidebar')}
         aria-expanded={narrowExpanded}
       >
@@ -141,17 +157,28 @@ export function MobileBottomNav({ actions, useLayoutStore, t }: MobileBottomNavP
       </button>
       <span className={css.separator} aria-hidden="true" />
       <div className={css.tabGroup}>
-        {NAV_BUTTONS.map(btn => (
-          <button
-            key={btn.labelKey}
-            className={`${css.button} ${activePanelId === btn.id ? css.active : ''}`}
-            onClick={() => { actions.selectPanel(btn.id) }}
-            aria-label={t(btn.labelKey)}
-            aria-current={activePanelId === btn.id ? 'page' : undefined}
-          >
-            <btn.Icon />
-          </button>
-        ))}
+        <button
+          className={`${css.button} ${activePanelId === null ? css.active : ''}`}
+          onClick={() => { selectPanel(null) }}
+          aria-current={activePanelId === null ? 'page' : undefined}
+        >
+          <IconQueueOutlineRegular size={20} />
+          <span className={css.label}>{t('nav.chat')}</span>
+        </button>
+        {tabs.map((tab) => {
+          const active = activePanelId === tab.id
+          return (
+            <button
+              key={tab.id}
+              className={`${css.button} ${active ? css.active : ''}`}
+              onClick={() => { selectPanel(tab.id) }}
+              aria-current={active ? 'page' : undefined}
+            >
+              {renderSlot('bottom-nav.tab', { size: 20, active }, { only: tab.id })}
+              <span className={css.label}>{tab.label}</span>
+            </button>
+          )
+        })}
       </div>
     </nav>
   )
@@ -166,20 +193,25 @@ export type LayoutStoreInstance = ReturnType<ReturnType<typeof createLayoutStore
 
 /**
  * Seat the bottom nav as the default composition's `shell.bottom` occupant.
- * The registration declares the `layout.bottom-nav` locale and injects the
- * bound store actions plus the store instance as a bare observable; the
- * renderer binds the observable to the component's `useLayoutStore` seat.
+ * The registration declares the `layout.bottom-nav` locale and the
+ * `bottom-nav.tab` child list, and injects the validated layout face plus the
+ * store and tab-ledger observables; the renderer binds the observables to the
+ * component's `useLayoutStore` and `useTabs` seats.
  * @param ctx - client context owning the registration.
  * @param instance - the shared layout store instance the frame renders from.
- * @returns disposer removing the registration.
+ * @param layout - the validated panel-action face (ctx.layout) the buttons dispatch through.
+ * @returns disposer removing the registration and the `bottom-nav.tab` declaration with it.
  */
-export function registerBottomNav(ctx: ClientContext, instance: LayoutStoreInstance): () => void {
+export function registerBottomNav(ctx: ClientContext, instance: LayoutStoreInstance, layout: ILayout): () => void {
+  const tabs = createTabsSource(ctx)
   return ctx.slots.register({
     name: 'shell.bottom',
     locale: NAV_NS,
+    children: { 'bottom-nav.tab': { kind: 'list', scope: 'root' } },
     inject: (): BottomNavInjected => ({
-      actions: instance.actions,
-      hooks: { layoutStore: instance },
+      selectPanel: (panelId) => { layout.selectPanel(panelId) },
+      toggleSidebar: () => { layout.toggleSidebar() },
+      hooks: { layoutStore: instance, tabs },
     }),
   }, MobileBottomNav)
 }

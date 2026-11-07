@@ -4,15 +4,25 @@
  * Uses inline styles (no CSS module dependency) so it renders even when
  * the app's style pipeline is unavailable.
  */
-import { useCallback, useSyncExternalStore, type ReactNode } from 'react'
-import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ReactNode } from 'react'
+import type {
+  HostObservable, InjectFace, PropsLocale, PropsRuntime,
+} from '@deepseek-ai/dsh-client-ui-slots'
+// Type-only: pulls the `shell.overlay` SlotMap declaration this entry registers into.
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 
+/** Business face the boot registration injects. */
 export interface NetworkStatusInjected {
   hooks: {
     /** Observable from ConnectionHandle.networkAvailable. */
-    networkAvailable: HostObservable<boolean>
+    readonly networkAvailable: HostObservable<boolean>
   }
 }
+
+/** Props of the `shell.overlay` entry: the availability hook and localized copy. */
+export type NetworkStatusBannerProps = PropsRuntime<'shell.overlay'>
+  & PropsLocale<'web.network-status'>
+  & InjectFace<NetworkStatusInjected>
 
 const bannerStyle: React.CSSProperties = {
   position: 'fixed',
@@ -59,12 +69,13 @@ const BANNER_CSS = /* css */ `
   ._nws_banner { background: #422006; color: #fde68a; }
 }`
 
-export function NetworkStatusBanner(props: NetworkStatusInjected): ReactNode {
-  const source = props.hooks.networkAvailable
-  const available = useSyncExternalStore(
-    useCallback((cb: () => void) => source.subscribe(cb), [source]),
-    () => source.getSnapshot(),
-  )
+/**
+ * Render the offline banner while the connection reports unavailable.
+ * @param props - the availability selector hook and the locale seat.
+ * @returns the banner, or null while the network is available.
+ */
+export function NetworkStatusBanner({ useNetworkAvailable, t }: NetworkStatusBannerProps): ReactNode {
+  const available = useNetworkAvailable(current => current)
 
   if (available) return null
 
@@ -76,7 +87,7 @@ export function NetworkStatusBanner(props: NetworkStatusInjected): ReactNode {
   return (
     <div className="_nws_banner" style={bannerStyle} role="status" aria-live="polite">
       <span style={iconStyle} aria-hidden="true">{'\u{1F4E1}'}</span>
-      <span style={labelStyle}>No internet connection</span>
+      <span style={labelStyle}>{t('offline')}</span>
     </div>
   )
 }

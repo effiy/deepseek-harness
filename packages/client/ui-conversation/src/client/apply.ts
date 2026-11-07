@@ -550,4 +550,20 @@ export function apply(ctx: Context, config: Config = Config({})): void {
   })
   ctx.plugin(todoDockEntry)
   ctx.plugin(queueDockEntry)
+
+  // ── Offline queue drain ──────────────────────────────────────────────
+  // When the network returns, replay every queued message through the
+  // session's conversation.send().  Access the queue service without
+  // declaring a package-level inject dependency — the connection plugin
+  // provides it early, so it is always ready by the time the conversation
+  // plugin activates.
+  const offlineQueue = ctx.get('offlineQueue') as {
+    registerDrainHandler(h: (m: { sessionId: string; text: string }) => Promise<void>): () => void
+  } | undefined
+  if (offlineQueue !== undefined) {
+    offlineQueue.registerDrainHandler(async (message) => {
+      const conv = scopedConversation(sessions, message.sessionId as SessionId)
+      await conv.send(message.text)
+    })
+  }
 }

@@ -9,8 +9,14 @@ import { Context } from '@deepseek-ai/cordis'
 import type {
   BootManifest, ClientModuleCreateOptions, ClientModuleSystem, DshWindow,
 } from '@deepseek-ai/dsh-client-modules/client'
+// Type-only: the ctx.locale service merge and the `shell.overlay` SlotMap
+// declaration the offline banner registers into. Both stay off the runtime
+// graph — the boot kernel loads these plugins, it never imports their code.
+import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { bootClient } from './boot-client.ts'
 import { BootPage } from './boot-page.ts'
+import { NETWORK_STATUS_NS, networkStatusEn, networkStatusZh } from './locale.ts'
 import { mountClient } from './mount.ts'
 import { getStaticModules } from './seed.ts'
 import { installWindowDragRecall } from './window-drag/recall.ts'
@@ -121,21 +127,11 @@ export class AppWebEntry {
       if (connHandle) {
         const { networkAvailable } = connHandle
         const { NetworkStatusBanner } = await import('./NetworkStatusBanner.tsx')
-        // Cast through `unknown`: the web package lacks a direct tsconfig
-        // reference to ui-layout, so SlotMap overloads for `shell.overlay`
-        // do not resolve `inject` / `register` parameter types here.
-        type OverlayAPI = {
-          inject(key: string, factory: () => void): void
-          register(options: {
-            name: string
-            id: string
-            inject: () => Record<string, unknown>
-          }, component: (props: Record<string, unknown>) => unknown): () => void
-        }
-        const overlay = ctx.slots as unknown as OverlayAPI
-        overlay.inject('shell.overlay', () => overlay.register({
+        ctx.locale.register(NETWORK_STATUS_NS, { zh: networkStatusZh, en: networkStatusEn })
+        ctx.slots.inject('shell.overlay', () => ctx.slots.register({
           name: 'shell.overlay',
           id: 'network-status-indicator',
+          locale: NETWORK_STATUS_NS,
           inject: () => ({ hooks: { networkAvailable } }),
         }, NetworkStatusBanner))
       }

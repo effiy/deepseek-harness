@@ -145,5 +145,14 @@ export function apply(ctx: ClientContext): void {
     label: () => t('panel'),
     locale: NS,
   }, PluginsPanelIcon))
+  // The narrow-viewport bottom nav reuses the same icon component and label:
+  // its bar renders one tab per entry whose id is a registered `main` key.
+  ctx.slots.inject('bottom-nav.tab', () => ctx.slots.register({
+    name: 'bottom-nav.tab',
+    id: PANEL_ID,
+    order: 0,
+    label: () => t('panel'),
+    locale: NS,
+  }, PluginsPanelIcon))
 
 }

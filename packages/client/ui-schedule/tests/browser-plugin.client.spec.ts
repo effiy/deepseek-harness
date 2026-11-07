@@ -416,16 +416,22 @@ describe('ui-schedule browser half', () => {
       children: {
         main: { kind: 'keyed', scope: 'root' },
         'sidebar.panellist': { kind: 'list', scope: 'root' },
+        'bottom-nav.tab': { kind: 'list', scope: 'root' },
       },
     } as never, Empty)
     const entry = ctx.slots.entries('main')[0]!
     expect(entry.options.key).toBe('schedules')
     const panel = ctx.slots.entries('sidebar.panellist')[0]!
     expect(panel.options.id).toBe('schedules')
+    // The narrow-viewport bottom nav reuses the same id, order, and label.
+    const tab = ctx.slots.entries('bottom-nav.tab')[0]!
+    expect(tab.options).toMatchObject({ id: 'schedules', order: 10 })
     ctx.locale.setLocale('en')
     expect(resolveSlotLabel(panel.options.label)).toBe('Automation tasks')
+    expect(resolveSlotLabel(tab.options.label)).toBe('Automation tasks')
     ctx.locale.setLocale('zh')
     expect(resolveSlotLabel(panel.options.label)).toBe('自动化任务')
+    expect(resolveSlotLabel(tab.options.label)).toBe('自动化任务')
     const face = injectedFace(entry, undefined as never) as TaskManagerInjected
     const dispose = face.hooks.catalog.subscribe(vi.fn())
     try {
@@ -470,6 +476,7 @@ describe('ui-schedule browser half', () => {
       await fiber.dispose()
       expect(ctx.slots.entries('main')).toEqual([])
       expect(ctx.slots.entries('sidebar.panellist')).toEqual([])
+      expect(ctx.slots.entries('bottom-nav.tab')).toEqual([])
       owner()
       await ctx.fiber.dispose()
     }

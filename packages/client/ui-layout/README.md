@@ -3,7 +3,7 @@ title: "client-ui-layout"
 tags: ["deepseek-harness", "client", "ui-layout"]
 category: "客户端"
 created: "2025-01-01"
-updated: "2026-11-06"
+updated: "2026-11-07"
 source: external
 type: index
 status: stable
@@ -26,6 +26,8 @@ lifecycle: active
 全局面板占据 root 作用域的 `main` keyed slot；`conversation` 是为会话界面保留的 key。`ctx.layout.selectPanel(id)` 选中已注册面板，`null` 则选中会话界面，但不改变当前会话。Plugins 页面是默认组合中的一个全局面板。
 
 root 作用域的单一 `shell.bottom` slot 横跨三列下方的整行。占用方控制自身高度与显隐；三列按该高度缩短，空内容不预留空间。切换主面板时保留底部组件。列宽拖拽手柄止于底部内容上方，`shell.overlay` 仍覆盖整个框架。默认组合由本插件以 MobileBottomNav 占用此 slot：≤899px 视口显示移动端底部导航，更宽视口经 CSS 折叠为零高度；experimental inspector 面板激活时以更低优先级 shadow 底导航，其卸载后底导航恢复。
+
+底导航的标签行由数据驱动：固定的会话按钮，加上每条 id 同时是已注册 `main` 键的 `bottom-nav.tab` 账本记录，按 `order` 升序排列，框架打不开的面板不提供标签。标签的图标即该记录的组件，文字是解析后的 slot label，因此文案归功能包字典所有；点击经 `ctx.layout.selectPanel` 分派，未注册的面板 id 抛错而不是留下空白主区。该 root 作用域 list slot 由本插件在注册 `shell.bottom` 时以 children 声明，随底导航一同存亡：底导航被 shadow 或卸载期间，功能包贡献的标签不投影到任何内容。所有者在渲染时向图标共享尺寸与该标签的面板是否处于选中状态。
 
 
 ---

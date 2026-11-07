@@ -182,6 +182,15 @@ export function apply(ctx: ClientContext): void {
     locale: MANAGER_NS,
     label: () => t('panel'),
   }, TaskManagerIcon))
+  // The narrow-viewport bottom nav reuses the same icon component and label:
+  // its bar renders one tab per entry whose id is a registered `main` key.
+  ctx.slots.inject('bottom-nav.tab', () => ctx.slots.register({
+    name: 'bottom-nav.tab',
+    id: PANEL_ID,
+    order: 10,
+    locale: MANAGER_NS,
+    label: () => t('panel'),
+  }, TaskManagerIcon))
   // The created task is a Turn-level element, not a Tool-group row: the Turn
   // Definition publishes the settled result and this tail list entry renders
   // the card beneath the closing prose.
